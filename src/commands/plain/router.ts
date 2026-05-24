@@ -6,6 +6,7 @@ import { join } from "path";
 
 interface Flags {
   force?: boolean;
+  args?: string[];
   [key: string]: any;
 }
 
@@ -44,7 +45,7 @@ export async function runNonTUICommand(
       await cmdDeps(cwd);
       break;
     case "config":
-      await cmdConfig(sub, cwd);
+      await cmdConfig(sub, cwd, flags);
       break;
     case "lock":
       await cmdLock(cwd);
@@ -385,15 +386,97 @@ async function cmdDeps(cwd: string) {
   console.log(result.stdout || result.stderr);
 }
 
-async function cmdConfig(sub: string | undefined, cwd: string) {
-  const { loadConfig, saveConfig } = await import("../../state/config.js");
+async function cmdConfig(sub: string | undefined, cwd: string, flags?: Flags) {
+  const { loadConfig, saveConfig, updateConfig } = await import("../../state/config.js");
   const config = await loadConfig();
+
   if (!sub || sub === "show") {
     console.log(chalk.blue.bold("\n  P-Setup Config\n"));
-    console.log(JSON.stringify(config, null, 2));
-  } else {
-    console.log(chalk.dim("Usage: setup config [show]"));
+    console.log(`  AI enabled:     ${chalk.white(String(config.ai.enabled))}`);
+    console.log(`  AI model:       ${chalk.white(config.ai.model || "auto-detect")}`);
+    console.log(`  Theme:          ${chalk.white(config.preferences.theme)}`);
+    console.log(`  Confirm install: ${chalk.white(String(config.preferences.confirmBeforeInstall))}`);
+    console.log(`  Auto update:    ${chalk.white(String(config.preferences.autoUpdate))}`);
+    console.log("");
+    console.log(chalk.dim("  Use 'setup config set <key> <value>' to change"));
+    return;
   }
+
+  if (sub === "set") {
+    const args: string[] = flags?.args || [];
+    const key = args[0];
+    const value = args.slice(1).join(" ");
+
+    if (!key || !value) {
+      console.log(chalk.red("Usage: setup config set <key> <value>"));
+      console.log(chalk.dim("  Keys: model, theme, confirm, autoupdate, ai"));
+      return;
+    }
+
+    switch (key) {
+      case "model":
+        config.ai.model = value;
+        break;
+      case "theme":
+        if (value === "dark" || value === "light") {
+          config.preferences.theme = value;
+        } else {
+          console.log(chalk.red("Theme must be 'dark' or 'light'"));
+          return;
+        }
+        break;
+      case "confirm":
+        config.preferences.confirmBeforeInstall = value === "true" || value === "1" || value === "yes";
+        break;
+      case "autoupdate":
+        config.preferences.autoUpdate = value === "true" || value === "1" || value === "yes";
+        break;
+      case "ai":
+        config.ai.enabled = value === "true" || value === "1" || value === "yes";
+        break;
+      default:
+        console.log(chalk.red(`Unknown config key: ${key}`));
+        console.log(chalk.dim("  Valid keys: model, theme, confirm, autoupdate, ai"));
+        return;
+    }
+
+    await saveConfig(config);
+    console.log(chalk.green(`✓ Set ${key} = ${value}`));
+    return;
+  }
+
+  if (sub === "reset") {
+    const { updateConfig } = await import("../../state/config.js");
+    await saveConfig({
+      ai: { enabled: true },
+      preferences: { theme: "dark", confirmBeforeInstall: true, autoUpdate: false, telemetry: false },
+      remembered: {},
+    });
+    console.log(chalk.green("✓ Config reset to defaults"));
+    return;
+  }
+
+  if (sub === "models") {
+    const { MODELS, PROVIDERS, getAvailableModels } = await import("../../ai/models.js");
+    const available = getAvailableModels();
+    console.log(chalk.blue.bold("\n  Available AI Models\n"));
+
+    const providers = [...new Set(MODELS.map((m) => m.provider))];
+    for (const provider of providers) {
+      const providerConfig = PROVIDERS[provider];
+      const hasKey = !!process.env[providerConfig.envKey];
+      const providerModels = MODELS.filter((m) => m.provider === provider);
+      console.log(`  ${hasKey ? chalk.green("●") : chalk.red("○")} ${chalk.white(provider)} ${chalk.dim(`(${providerConfig.envKey})`)}`);
+      for (const model of providerModels) {
+        const isAvailable = available.includes(model);
+        console.log(`    ${isAvailable ? chalk.green(model.id) : chalk.dim(model.id)} — ${model.name}`);
+      }
+    }
+    console.log(chalk.dim(`\n  ${available.length} models available (set API keys to unlock more)`));
+    return;
+  }
+
+  console.log(chalk.dim("Usage: setup config [show|set|reset|models]"));
 }
 
 async function cmdLock(cwd: string) {

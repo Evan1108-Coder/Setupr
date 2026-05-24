@@ -80,6 +80,6 @@ export async function run() {
   } else {
     // Non-TUI commands
     const { runNonTUICommand } = await import("../commands/plain/router.js");
-    await runNonTUICommand(command, subCommand, cwd, cli.flags);
+    await runNonTUICommand(command, subCommand, cwd, { ...cli.flags, args: cli.input.slice(2) });
   }
 }

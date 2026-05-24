@@ -88,6 +88,25 @@ P-Setup uses a 3-tier progressive intelligence system:
 2. **Cached Responses** (Level 1) — Free after first hit. Smart deduplication
 3. **Live AI** (Level 2) — Only for novel situations. Uses compressed DSL for minimal token usage
 
+Supports 6 AI providers (22 models):
+
+| Provider | Models | Env Key |
+|----------|--------|---------|
+| OpenAI | gpt-5.4-pro, gpt-5.4-mini, gpt-4o, gpt-4o-mini | `OPENAI_API_KEY` |
+| Anthropic | claude-opus-4.6, claude-sonnet-4.6, claude-haiku-4.5, claude-3.5-sonnet | `ANTHROPIC_API_KEY` |
+| Google | gemini-3.1-pro, gemini-3-flash, gemini-2.5-flash-lite | `GOOGLE_API_KEY` |
+| Groq (Llama) | llama-4-maverick, llama-4-scout, llama-3.3-70b | `GROQ_API_KEY` |
+| MiniMax | minimax-m2.7, minimax-m2.5-lightning | `MINIMAX_API_KEY` |
+| Moonshot (Kimi) | kimi-latest, kimi-k2-thinking, kimi-k2-turbo, kimi-k2.5-vision, moonshot-v1-128k | `MOONSHOT_API_KEY` |
+
+```bash
+# View available models
+setup config models
+
+# Set preferred model
+setup config set model kimi-k2-turbo-preview
+```
+
 ### Environment Management
 
 ```bash
