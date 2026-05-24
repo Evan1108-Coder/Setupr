@@ -132,11 +132,96 @@ async function cmdEnv(sub: string | undefined, cwd: string) {
       break;
     }
     case "smart": {
-      console.log(chalk.blue("Running env smart..."));
+      console.log(chalk.blue.bold("\n  🧠 Env Smart Analysis\n"));
       try {
         const example = await readFile(examplePath, "utf-8");
         const env = await readFile(envPath, "utf-8").catch(() => "");
+        const examplePairs = parseEnvPairs(example);
         const currentPairs = parseEnvPairs(env);
+        const exampleKeys = parseEnvKeys(example);
+        const currentKeys = parseEnvKeys(env);
+
+        const missing: string[] = [];
+        const empty: string[] = [];
+        const invalid: string[] = [];
+        const extra: string[] = [];
+        const changed: string[] = [];
+
+        for (const key of exampleKeys) {
+          if (!currentKeys.includes(key)) {
+            missing.push(key);
+          } else if (!currentPairs[key] || currentPairs[key].trim() === "" || currentPairs[key] === '""' || currentPairs[key] === "''") {
+            empty.push(key);
+          } else {
+            const val = currentPairs[key];
+            if (isLikelyInvalid(key, val)) {
+              invalid.push(key);
+            }
+          }
+        }
+
+        for (const key of currentKeys) {
+          if (!exampleKeys.includes(key)) {
+            extra.push(key);
+          }
+        }
+
+        const exampleDefaultPairs = parseEnvPairs(example);
+        for (const key of exampleKeys) {
+          if (currentPairs[key] && exampleDefaultPairs[key] && currentPairs[key] !== exampleDefaultPairs[key] && exampleDefaultPairs[key].trim() !== "") {
+            changed.push(key);
+          }
+        }
+
+        let issues = 0;
+
+        if (missing.length > 0) {
+          issues += missing.length;
+          console.log(chalk.red(`  ✗ Missing (${missing.length}):`));
+          missing.forEach((k) => {
+            const defaultVal = examplePairs[k];
+            console.log(chalk.dim(`    ${k}`) + (defaultVal ? chalk.dim(` (default: ${defaultVal})`) : chalk.yellow(" — needs value")));
+          });
+          console.log("");
+        }
+
+        if (empty.length > 0) {
+          issues += empty.length;
+          console.log(chalk.yellow(`  ⚠ Empty/placeholder values (${empty.length}):`));
+          empty.forEach((k) => console.log(chalk.dim(`    ${k}=${currentPairs[k] || ""}`)));
+          console.log("");
+        }
+
+        if (invalid.length > 0) {
+          issues += invalid.length;
+          console.log(chalk.yellow(`  ⚠ Possibly invalid (${invalid.length}):`));
+          invalid.forEach((k) => console.log(chalk.dim(`    ${k}=${currentPairs[k]}`) + chalk.yellow(` — ${getInvalidReason(k, currentPairs[k])}`)));
+          console.log("");
+        }
+
+        if (extra.length > 0) {
+          console.log(chalk.cyan(`  ℹ Extra vars not in .env.example (${extra.length}):`));
+          extra.forEach((k) => console.log(chalk.dim(`    ${k}`)));
+          console.log("");
+        }
+
+        if (changed.length > 0) {
+          console.log(chalk.cyan(`  ℹ Customized from defaults (${changed.length}):`));
+          changed.forEach((k) => console.log(chalk.dim(`    ${k}: ${exampleDefaultPairs[k]} → ${currentPairs[k]}`)));
+          console.log("");
+        }
+
+        if (issues === 0) {
+          console.log(chalk.green("  ✓ All environment variables look good!"));
+          if (extra.length > 0) {
+            console.log(chalk.dim(`    (${extra.length} extra vars present, not in .env.example)`));
+          }
+        } else {
+          console.log(chalk.yellow(`  Summary: ${issues} issue${issues > 1 ? "s" : ""} found`));
+          console.log(chalk.dim("  Run 'setup env sync' to auto-fill missing vars from .env.example defaults"));
+          console.log(chalk.dim("  Run 'setup env check' to see required vs defined"));
+        }
+
         let output = "";
         for (const line of example.split("\n")) {
           if (!line.trim() || line.startsWith("#")) {
@@ -150,10 +235,14 @@ async function cmdEnv(sub: string | undefined, cwd: string) {
             output += line + "\n";
           }
         }
+        for (const key of extra) {
+          output += `${key}=${currentPairs[key]}\n`;
+        }
         await writeFile(envPath, output);
-        console.log(chalk.green("✓ Reorganized .env matching .env.example structure"));
+        console.log(chalk.green("\n  ✓ Reorganized .env (preserved all values, matched .env.example order)"));
       } catch {
-        console.log(chalk.red("No .env.example found for smart sync"));
+        console.log(chalk.red("No .env.example found for smart analysis"));
+        console.log(chalk.dim("  Create a .env.example with required variable names to enable smart mode"));
       }
       break;
     }
@@ -403,4 +492,31 @@ function parseEnvPairs(content: string): Record<string, string> {
     }
   }
   return pairs;
+}
+
+function isLikelyInvalid(key: string, value: string): boolean {
+  const k = key.toUpperCase();
+  const v = value.trim();
+
+  if (v === "your_key_here" || v === "changeme" || v === "TODO" || v === "xxx" || v === "REPLACE_ME") return true;
+
+  if ((k.includes("URL") || k.includes("ENDPOINT") || k.includes("HOST")) && !v.startsWith("http") && !v.startsWith("localhost") && !v.includes(":")) return true;
+  if ((k.includes("PORT")) && (isNaN(Number(v)) || Number(v) < 1 || Number(v) > 65535)) return true;
+  if ((k.includes("KEY") || k.includes("SECRET") || k.includes("TOKEN")) && v.length < 8) return true;
+  if ((k.includes("EMAIL")) && !v.includes("@")) return true;
+
+  return false;
+}
+
+function getInvalidReason(key: string, value: string): string {
+  const k = key.toUpperCase();
+  const v = value.trim();
+
+  if (v === "your_key_here" || v === "changeme" || v === "TODO" || v === "xxx" || v === "REPLACE_ME") return "placeholder value";
+  if ((k.includes("URL") || k.includes("ENDPOINT") || k.includes("HOST")) && !v.startsWith("http") && !v.startsWith("localhost") && !v.includes(":")) return "doesn't look like a URL";
+  if ((k.includes("PORT")) && (isNaN(Number(v)) || Number(v) < 1 || Number(v) > 65535)) return "invalid port number";
+  if ((k.includes("KEY") || k.includes("SECRET") || k.includes("TOKEN")) && v.length < 8) return "too short for a key/secret";
+  if ((k.includes("EMAIL")) && !v.includes("@")) return "missing @ symbol";
+
+  return "may be invalid";
 }
