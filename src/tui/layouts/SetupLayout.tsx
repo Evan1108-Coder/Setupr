@@ -123,7 +123,7 @@ export function SetupLayout({ store }: SetupLayoutProps) {
       {/* ═══ INFO PANELS ROW ═══ */}
       <Box flexDirection="row" width="100%" borderStyle="single" borderColor={colors.border}>
         {/* STEPS column */}
-        <Box flexDirection="column" borderStyle="single" borderColor={colors.border} borderRight paddingX={1} width={18}>
+        <Box flexDirection="column" borderStyle="single" borderColor={colors.border} borderRight paddingX={1} width={24}>
           <Text color={colors.heading} bold>STEPS</Text>
           {steps.length > 0 ? steps.map((step, i) => {
             const icon = step.status === "done" ? icons.check
@@ -136,7 +136,7 @@ export function SetupLayout({ store }: SetupLayoutProps) {
               : colors.textDim;
             return (
               <Text key={step.id} color={col}>
-                {icon} {step.label.slice(0, 14)}
+                {icon} {step.label.slice(0, 20)}
               </Text>
             );
           }) : <Text color={colors.textDim}>Scanning...</Text>}
@@ -169,7 +169,7 @@ export function SetupLayout({ store }: SetupLayoutProps) {
           <KVRow label="Auto-filled" value={String(autoFilled)} w={18} />
           <KVRow label="Need Input" value={String(needInput)} w={18} color={needInput > 0 ? colors.warning : undefined} />
           <KVRow label="Skipped" value={String(envVars.filter(v => v.status === "skipped").length)} w={18} />
-          <KVRow label=".env File" value={envVars.length > 0 ? "creating" : "—"} w={18} color={colors.info} />
+          <KVRow label=".env File" value={isComplete && envVars.length > 0 ? "✓ ready" : envVars.length > 0 ? "creating" : "—"} w={18} color={isComplete && envVars.length > 0 ? colors.success : colors.info} />
         </Box>
 
         {/* SERVICES column */}
@@ -236,7 +236,7 @@ export function SetupLayout({ store }: SetupLayoutProps) {
               <Text color={colors.label}>{dep.name}</Text>
               <Text color={colors.value}>{dep.version} <Text color={colors.success}>✓</Text></Text>
             </Box>
-          )) : <Text color={colors.textDim}>Scanning...</Text>}
+          )) : <Text color={colors.textDim}>{isComplete ? "None found" : "Scanning..."}</Text>}
           <Text> </Text>
           <Text color={colors.heading} bold>NOTICES</Text>
           {notices.length > 0 ? notices.map((n, i) => (

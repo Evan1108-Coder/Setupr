@@ -65,7 +65,8 @@ async function runSetupFlow(cwd: string, store: AppStore) {
       cost: 0,
     });
 
-    populateKeyDeps(cwd, store, scan);
+    await populateKeyDeps(cwd, store, scan);
+    await populateEnvVars(cwd, store);
     populatePorts(store, scan);
     populateServices(store, scan);
 
@@ -91,6 +92,26 @@ async function runSetupFlow(cwd: string, store: AppStore) {
     store.getState().setComplete(true);
     store.getState().setCheckpoint(true);
 
+    const currentServices = store.getState().services;
+    if (currentServices.length > 0) {
+      store.getState().setServices(
+        currentServices.map((s) => ({ ...s, status: "ready" as const }))
+      );
+    }
+
+    try {
+      const { access: accessCheck } = await import("fs/promises");
+      const { join } = await import("path");
+      const lockFiles = ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb"];
+      for (const lf of lockFiles) {
+        try {
+          await accessCheck(join(cwd, lf));
+          store.setState({ lockSynced: true });
+          break;
+        } catch {}
+      }
+    } catch {}
+
     store.getState().addLog({ content: "Setup complete!", type: "success" });
     store.getState().addMessage({
       role: "assistant",
@@ -104,22 +125,54 @@ async function runSetupFlow(cwd: string, store: AppStore) {
   }
 }
 
-function populateKeyDeps(cwd: string, store: AppStore, scan: ScanResult) {
+async function populateKeyDeps(cwd: string, store: AppStore, scan: ScanResult) {
   try {
-    const fs = require("fs");
-    const pkgPath = `${cwd}/package.json`;
-    if (fs.existsSync(pkgPath)) {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-      const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
-      const important = Object.entries(allDeps).slice(0, 8).map(([name, version]) => ({
-        name,
-        version: String(version).replace(/[\^~]/, ""),
-        status: "ok" as const,
-      }));
-      store.getState().setKeyDeps(important);
-      const total = Object.keys(allDeps).length;
-      store.getState().setPackageStats({ total, installed: total, deprecated: 0 });
-    }
+    const { readFile } = await import("fs/promises");
+    const { join } = await import("path");
+    const pkgPath = join(cwd, "package.json");
+    const pkg = JSON.parse(await readFile(pkgPath, "utf-8"));
+    const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+    const important = Object.entries(allDeps).slice(0, 8).map(([name, version]) => ({
+      name,
+      version: String(version).replace(/[\^~]/, ""),
+      status: "ok" as const,
+    }));
+    store.getState().setKeyDeps(important);
+    const total = Object.keys(allDeps).length;
+    store.getState().setPackageStats({ total, installed: total, deprecated: 0 });
+  } catch {}
+}
+
+async function populateEnvVars(cwd: string, store: AppStore) {
+  try {
+    const { readFile } = await import("fs/promises");
+    const { join } = await import("path");
+    const example = await readFile(join(cwd, ".env.example"), "utf-8");
+    const requiredKeys = example
+      .split("\n")
+      .filter((l) => l.trim() && !l.startsWith("#"))
+      .map((l) => l.split("=")[0].trim())
+      .filter(Boolean);
+
+    let currentVars: Record<string, string> = {};
+    try {
+      const env = await readFile(join(cwd, ".env"), "utf-8");
+      for (const line of env.split("\n")) {
+        if (line.trim() && !line.startsWith("#")) {
+          const [k, ...rest] = line.split("=");
+          if (k) currentVars[k.trim()] = rest.join("=").trim();
+        }
+      }
+    } catch {}
+
+    const envVars = requiredKeys.map((key) => ({
+      key,
+      value: currentVars[key] || "",
+      status: (currentVars[key] ? "auto" : process.env[key] ? "auto" : "pending") as "auto" | "pending",
+      source: currentVars[key] ? ".env" : process.env[key] ? "system" : undefined,
+    }));
+
+    store.getState().setEnvVars(envVars);
   } catch {}
 }
 
