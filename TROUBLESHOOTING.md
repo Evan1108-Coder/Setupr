@@ -23,12 +23,19 @@ setup --plain
 
 ### AI features not working
 
-**Cause**: Missing API key.
+**Cause**: No AI provider API key configured.
 
-**Fix**: Set the environment variable:
+**Fix**: Set any one of the supported provider keys:
 ```bash
-export MINIMAX_API_KEY=your-key-here
+export OPENAI_API_KEY=your-key       # or
+export ANTHROPIC_API_KEY=your-key    # or
+export GOOGLE_API_KEY=your-key       # or
+export GROQ_API_KEY=your-key         # or
+export MINIMAX_API_KEY=your-key      # or
+export MOONSHOT_API_KEY=your-key
 ```
+
+Check configured providers: `setup config models`
 
 P-Setup works without AI — it falls back to pattern matching and heuristics.
 
@@ -62,10 +69,15 @@ setup port  # Check all common ports
 
 ### Checkpoint issues
 
-If a checkpoint is corrupted or stale:
+If a checkpoint is corrupted or stale, use `--force` to start fresh:
+```bash
+setup --force
+```
+
+Or manually remove it:
 ```bash
 rm -rf .p-setup/checkpoint.json
-setup  # Start fresh
+setup
 ```
 
 ### Wrong language/framework detected

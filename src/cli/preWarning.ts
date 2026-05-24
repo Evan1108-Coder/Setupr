@@ -1,4 +1,5 @@
 import { scanProject } from "../scanner/index.js";
+import { loadCheckpoint, formatCheckpointAge } from "../state/checkpoint.js";
 import chalk from "chalk";
 
 export async function showPreWarning(command: string, cwd: string, force: boolean): Promise<void> {
@@ -19,6 +20,19 @@ export async function showPreWarning(command: string, cwd: string, force: boolea
   const msg = warnings[command] || "Will execute the requested operation.";
 
   console.log("");
+
+  if (command === "setup" && !force) {
+    const checkpoint = await loadCheckpoint(cwd);
+    if (checkpoint) {
+      const age = formatCheckpointAge(checkpoint.timestamp);
+      const done = checkpoint.completedSteps.length;
+      const total = checkpoint.steps.length;
+      console.log(chalk.cyan(`  ↻  Found interrupted setup from ${age} (${done}/${total} steps done). Will resume automatically.`));
+      console.log(chalk.dim(`     Use --force to start fresh instead.`));
+      console.log("");
+    }
+  }
+
   console.log(chalk.yellow(`  ⚠  ${msg}`));
   console.log("");
 

@@ -54,15 +54,39 @@ node dist/setup.js --help
 
 ## AI Features (Optional)
 
-To enable AI-powered features, set the Minimax API key:
+P-Setup supports 6 AI providers. Set any one of these environment variables:
 
 ```bash
-export MINIMAX_API_KEY=your-key-here
+export OPENAI_API_KEY=your-key       # OpenAI (GPT-5.4, GPT-4o)
+export ANTHROPIC_API_KEY=your-key    # Anthropic (Claude Opus, Sonnet, Haiku)
+export GOOGLE_API_KEY=your-key       # Google (Gemini 3.1 Pro, Flash)
+export GROQ_API_KEY=your-key         # Groq (Llama 4 Maverick/Scout)
+export MINIMAX_API_KEY=your-key      # MiniMax (M2.7, M2.5)
+export MOONSHOT_API_KEY=your-key     # Moonshot (Kimi K2)
 ```
 
-Or add it to your shell profile (`~/.zshrc` / `~/.bashrc`).
+Add it to your shell profile (`~/.zshrc` / `~/.bashrc`) for persistence.
 
-Without an API key, P-Setup works fully — it just uses pattern matching and heuristics instead of AI for step planning and chat responses.
+With AI enabled, P-Setup provides:
+- Intelligent step planning tailored to your project
+- Plan narration explaining what will happen
+- Failure diagnosis with fix suggestions
+- Post-setup summary
+- Interactive chat about your project
+
+Without an API key, P-Setup works fully — it uses pattern matching and heuristics instead.
+
+## Checkpoint & Resume
+
+If a setup is interrupted (Ctrl+C, crash, closed terminal), just run `setup` again in the same directory. P-Setup automatically detects the checkpoint and resumes from where it stopped.
+
+```bash
+# Resume interrupted setup
+setup
+
+# Discard checkpoint and start fresh
+setup --force
+```
 
 ## CI/CD Usage
 

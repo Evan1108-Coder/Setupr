@@ -6,6 +6,7 @@ import { scanProject } from "../scanner/index.js";
 
 interface LaunchOptions {
   cleanMode?: "deps" | "share" | "all";
+  force?: boolean;
 }
 
 export async function launchTUI(
@@ -15,7 +16,6 @@ export async function launchTUI(
 ): Promise<void> {
   const store = createAppStore(cwd);
 
-  // Pre-scan for non-setup commands (setup does its own)
   if (command !== "setup") {
     const scan = await scanProject(cwd);
     store.getState().setScan(scan);
@@ -27,6 +27,7 @@ export async function launchTUI(
       cwd,
       store,
       cleanMode: options?.cleanMode || "deps",
+      force: options?.force || false,
     }),
     { exitOnCtrlC: true }
   );

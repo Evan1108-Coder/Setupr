@@ -12,6 +12,8 @@ import { collectContext } from "../context/collector.js";
 import { contextToDSL } from "../ai/dsl.js";
 import { planSteps } from "../ai/planner.js";
 import { executeAllSteps } from "../executor/index.js";
+import { loadCheckpoint, deleteCheckpoint, formatCheckpointAge } from "../state/checkpoint.js";
+import { chat, hasAIKey, type ChatMessage } from "../ai/client.js";
 
 export type TUICommand = "setup" | "start" | "doctor" | "update" | "clean";
 
@@ -20,12 +22,13 @@ interface AppProps {
   cwd: string;
   store: AppStore;
   cleanMode?: "deps" | "share" | "all";
+  force?: boolean;
 }
 
-export function App({ command, cwd, store, cleanMode = "deps" }: AppProps) {
+export function App({ command, cwd, store, cleanMode = "deps", force = false }: AppProps) {
   useEffect(() => {
     if (command === "setup") {
-      runSetupFlow(cwd, store);
+      runSetupFlow(cwd, store, force);
     }
   }, []);
 
@@ -47,8 +50,55 @@ export function App({ command, cwd, store, cleanMode = "deps" }: AppProps) {
   }
 }
 
-async function runSetupFlow(cwd: string, store: AppStore) {
+async function runSetupFlow(cwd: string, store: AppStore, force = false) {
   try {
+    if (force) {
+      await deleteCheckpoint(cwd);
+    }
+
+    const checkpoint = force ? null : await loadCheckpoint(cwd);
+
+    if (checkpoint) {
+      const age = formatCheckpointAge(checkpoint.timestamp);
+      const completed = checkpoint.completedSteps.length;
+      const total = checkpoint.steps.length;
+      const remaining = total - completed;
+
+      store.getState().addLog({ content: `Found checkpoint from ${age} (${completed}/${total} steps done)`, type: "warning" });
+      store.getState().addLog({ content: `Resuming — ${remaining} step(s) remaining...`, type: "info" });
+      store.getState().addMessage({
+        role: "assistant",
+        content: `Resuming interrupted setup (${completed}/${total} steps completed ${age}). Picking up where we left off.`,
+        level: "pattern",
+        cost: 0,
+      });
+
+      store.getState().setScan(checkpoint.scan);
+      store.getState().setSteps(checkpoint.steps);
+
+      await populateKeyDeps(cwd, store, checkpoint.scan);
+      await populateEnvVars(cwd, store);
+      populatePorts(store, checkpoint.scan);
+      populateServices(store, checkpoint.scan);
+
+      const context = await collectContext(cwd, checkpoint.scan);
+      store.getState().setContext(context);
+
+      store.getState().addLog({ content: "Resuming execution...", type: "info" });
+      store.getState().setRunning(true);
+      const result = await executeAllSteps(checkpoint.steps, cwd, store, checkpoint.currentStepIndex);
+      store.getState().setRunning(false);
+      store.getState().setComplete(true);
+      store.getState().setCheckpoint(true);
+
+      if (result.success) {
+        await deleteCheckpoint(cwd);
+      }
+
+      finishSetup(store, cwd);
+      return;
+    }
+
     store.getState().addLog({ content: "Scanning project structure...", type: "info" });
     store.getState().addMessage({ role: "system", content: "Scanning project..." });
 
@@ -78,51 +128,86 @@ async function runSetupFlow(cwd: string, store: AppStore) {
     const steps = await planSteps(scan);
     store.getState().setSteps(steps);
     store.getState().addLog({ content: `Plan ready: ${steps.length} steps to execute.`, type: "success" });
+
+    const stackDesc = [scan.language, scan.framework, ...(scan.services || [])].filter(Boolean).join(" + ");
+    const stepNames = steps.map((s) => s.label).join(", ");
+    const planNarration = await aiNarrate(
+      `Explain the setup plan briefly. Steps: ${stepNames}`,
+      `Stack: ${stackDesc}, PM: ${scan.packageManager || "none"}`
+    );
     store.getState().addMessage({
       role: "assistant",
-      content: `Plan ready: ${steps.length} steps to execute.`,
-      level: hasAIKeyCheck() ? "live" : "pattern",
+      content: planNarration || `Plan ready: ${steps.length} steps to execute.`,
+      level: planNarration ? "live" : "pattern",
       cost: 0,
     });
 
     store.getState().addLog({ content: "Beginning execution...", type: "info" });
     store.getState().setRunning(true);
-    await executeAllSteps(steps, cwd, store);
+    const result = await executeAllSteps(steps, cwd, store);
     store.getState().setRunning(false);
     store.getState().setComplete(true);
     store.getState().setCheckpoint(true);
 
-    const currentServices = store.getState().services;
-    if (currentServices.length > 0) {
-      store.getState().setServices(
-        currentServices.map((s) => ({ ...s, status: "ready" as const }))
+    if (result.success) {
+      await deleteCheckpoint(cwd);
+      const summary = await aiNarrate(
+        `Summarize what was set up. Steps completed: ${stepNames}`,
+        `Stack: ${stackDesc}`
       );
+      if (summary) {
+        store.getState().addMessage({ role: "assistant", content: summary, level: "live", cost: 0 });
+      }
+    } else {
+      const failedStep = steps.find((s) => s.status === "failed");
+      if (failedStep) {
+        const fix = await aiAnalyzeFailure(
+          failedStep.label,
+          failedStep.error || "unknown error",
+          `Stack: ${stackDesc}, PM: ${scan.packageManager || "none"}`
+        );
+        if (fix) {
+          store.getState().addLog({ content: `AI suggestion: ${fix}`, type: "warning" });
+          store.getState().addMessage({ role: "assistant", content: fix, level: "live", cost: 0 });
+        }
+      }
     }
 
-    try {
-      const { access: accessCheck } = await import("fs/promises");
-      const { join } = await import("path");
-      const lockFiles = ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb"];
-      for (const lf of lockFiles) {
-        try {
-          await accessCheck(join(cwd, lf));
-          store.setState({ lockSynced: true });
-          break;
-        } catch {}
-      }
-    } catch {}
-
-    store.getState().addLog({ content: "Setup complete!", type: "success" });
-    store.getState().addMessage({
-      role: "assistant",
-      content: "Setup complete! You can now chat with me about your project.",
-    });
+    finishSetup(store, cwd);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     store.getState().addLog({ content: `Fatal error: ${msg}`, type: "error" });
     store.getState().addMessage({ role: "system", content: `Error: ${msg}` });
     store.getState().setRunning(false);
   }
+}
+
+async function finishSetup(store: AppStore, cwd: string) {
+  const currentServices = store.getState().services;
+  if (currentServices.length > 0) {
+    store.getState().setServices(
+      currentServices.map((s) => ({ ...s, status: "ready" as const }))
+    );
+  }
+
+  try {
+    const { access: accessCheck } = await import("fs/promises");
+    const { join } = await import("path");
+    const lockFiles = ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb"];
+    for (const lf of lockFiles) {
+      try {
+        await accessCheck(join(cwd, lf));
+        store.setState({ lockSynced: true });
+        break;
+      } catch {}
+    }
+  } catch {}
+
+  store.getState().addLog({ content: "Setup complete!", type: "success" });
+  store.getState().addMessage({
+    role: "assistant",
+    content: "Setup complete! You can now chat with me about your project.",
+  });
 }
 
 async function populateKeyDeps(cwd: string, store: AppStore, scan: ScanResult) {
@@ -216,4 +301,32 @@ function hasAIKeyCheck(): boolean {
     process.env.ANTHROPIC_API_KEY ||
     process.env.GOOGLE_API_KEY
   );
+}
+
+async function aiNarrate(prompt: string, context: string): Promise<string | null> {
+  if (!hasAIKeyCheck()) return null;
+  try {
+    const messages: ChatMessage[] = [
+      { role: "system", content: `You are P-Setup's AI guide. Be concise (1-2 sentences max). Context: ${context}` },
+      { role: "user", content: prompt },
+    ];
+    const result = await chat(messages, { maxTokens: 150 });
+    return result.content;
+  } catch {
+    return null;
+  }
+}
+
+async function aiAnalyzeFailure(step: string, error: string, context: string): Promise<string | null> {
+  if (!hasAIKeyCheck()) return null;
+  try {
+    const messages: ChatMessage[] = [
+      { role: "system", content: `You are P-Setup's AI troubleshooter. Diagnose the error and suggest a fix in 2-3 sentences. Context: ${context}` },
+      { role: "user", content: `Step "${step}" failed with: ${error}` },
+    ];
+    const result = await chat(messages, { maxTokens: 200 });
+    return result.content;
+  } catch {
+    return null;
+  }
 }

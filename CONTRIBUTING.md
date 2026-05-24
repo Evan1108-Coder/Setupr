@@ -17,8 +17,8 @@ src/
 ├── commands/     # Non-TUI command implementations
 ├── tui/          # React/Ink TUI components and layouts
 ├── scanner/      # Project detection (language, framework, PM, services)
-├── ai/           # Minimax AI client, intelligence layers, DSL
-├── executor/     # Command execution, undo/redo
+├── ai/           # Multi-provider AI client (6 providers), intelligence layers, DSL
+├── executor/     # Step execution, checkpoint saving, undo/redo
 ├── context/      # Environment context collection
 ├── state/        # Zustand store, checkpoint, config
 └── utils/        # Shared utilities

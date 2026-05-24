@@ -74,7 +74,7 @@ export async function run() {
     await showTransition(command);
 
     // Launch TUI
-    await launchTUI(command as any, cwd, { cleanMode: subCommand as any });
+    await launchTUI(command as any, cwd, { cleanMode: subCommand as any, force: cli.flags.force });
   } else if (tuiCommands.includes(command) && isPlain) {
     await runPlainMode(command, cwd, subCommand);
   } else {

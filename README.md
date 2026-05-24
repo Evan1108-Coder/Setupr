@@ -123,12 +123,25 @@ setup env sync
 setup env smart
 ```
 
+### AI-Driven Setup
+
+When an AI provider is configured, P-Setup provides intelligent guidance throughout the setup process:
+
+- **Plan narration**: AI explains what will happen before execution begins
+- **Failure analysis**: When a step fails, AI diagnoses the issue and suggests fixes
+- **Completion summary**: AI summarizes everything that was configured
+
+Works without AI too — falls back to deterministic heuristics with zero API calls.
+
 ### Checkpoint & Resume
 
-- Progress saved to `.p-setup/checkpoint.json`
-- Persists across terminals and reboots
-- Automatically cleaned up on success
-- Resume interrupted setups seamlessly
+Interrupted setups resume automatically — no progress lost:
+
+- Checkpoint saved after each step to `.p-setup/checkpoint.json`
+- On re-run, detects the checkpoint and resumes from where it stopped
+- Skips already-completed steps, picks up remaining work
+- Cleaned up automatically on successful completion
+- Use `--force` to discard a checkpoint and start fresh
 
 ## Flags
 

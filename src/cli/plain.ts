@@ -5,6 +5,7 @@ import { planSteps } from "../ai/planner.js";
 import { executeStep } from "../executor/index.js";
 import { createAppStore } from "../state/store.js";
 import { collectContext } from "../context/collector.js";
+import { loadCheckpoint, deleteCheckpoint, saveCheckpoint, formatCheckpointAge } from "../state/checkpoint.js";
 
 export async function runPlainMode(command: string, cwd: string, sub?: string): Promise<void> {
   switch (command) {
@@ -30,38 +31,76 @@ export async function runPlainMode(command: string, cwd: string, sub?: string): 
 }
 
 async function plainSetup(cwd: string): Promise<void> {
-  const spinner = ora("Scanning project...").start();
-  const scan = await scanProject(cwd);
-  spinner.succeed(`Detected: ${scan.language || "unknown"}${scan.framework ? ` / ${scan.framework}` : ""}`);
+  const checkpoint = await loadCheckpoint(cwd);
 
-  console.log(chalk.dim(`  PM: ${scan.packageManager || "none"} | Deps: ${scan.dependencies.prod} prod + ${scan.dependencies.dev} dev`));
-  if (scan.services.length) console.log(chalk.dim(`  Services: ${scan.services.join(", ")}`));
+  let scan;
+  let steps;
+  let startIndex = 0;
 
-  const planSpinner = ora("Planning setup steps...").start();
-  const steps = await planSteps(scan);
-  planSpinner.succeed(`${steps.length} steps planned`);
+  if (checkpoint) {
+    const age = formatCheckpointAge(checkpoint.timestamp);
+    const done = checkpoint.completedSteps.length;
+    const total = checkpoint.steps.length;
+    console.log(chalk.cyan(`\n  ↻  Resuming interrupted setup from ${age} (${done}/${total} steps done)\n`));
+    scan = checkpoint.scan;
+    steps = checkpoint.steps;
+    startIndex = checkpoint.currentStepIndex;
+  } else {
+    const spinner = ora("Scanning project...").start();
+    scan = await scanProject(cwd);
+    spinner.succeed(`Detected: ${scan.language || "unknown"}${scan.framework ? ` / ${scan.framework}` : ""}`);
+
+    console.log(chalk.dim(`  PM: ${scan.packageManager || "none"} | Deps: ${scan.dependencies.prod} prod + ${scan.dependencies.dev} dev`));
+    if (scan.services.length) console.log(chalk.dim(`  Services: ${scan.services.join(", ")}`));
+
+    const planSpinner = ora("Planning setup steps...").start();
+    steps = await planSteps(scan);
+    planSpinner.succeed(`${steps.length} steps planned`);
+  }
 
   const store = createAppStore(cwd);
   store.getState().setScan(scan);
   store.getState().setSteps(steps);
 
   let failures = 0;
-  for (const step of steps) {
+  const completedIds: string[] = checkpoint?.completedSteps || [];
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+
+    if (i < startIndex) {
+      console.log(chalk.dim(`  ○ ${step.label} (already done)`));
+      continue;
+    }
+
     const stepSpinner = ora(step.label).start();
     const result = await executeStep(step, cwd, store);
     if (result.success) {
       stepSpinner.succeed(step.label);
+      completedIds.push(step.id);
     } else {
       stepSpinner.fail(`${step.label} — ${result.error || "failed"}`);
       failures++;
     }
+
+    try {
+      await saveCheckpoint(cwd, {
+        cwd,
+        scan,
+        steps: store.getState().steps,
+        currentStepIndex: i + 1,
+        completedSteps: completedIds,
+      });
+    } catch {}
   }
 
   console.log("");
   if (failures === 0) {
+    await deleteCheckpoint(cwd);
     console.log(chalk.green.bold("✓ Setup complete!"));
   } else {
     console.log(chalk.yellow.bold(`⚠ Setup finished with ${failures} failed step${failures > 1 ? "s" : ""}`));
+    console.log(chalk.dim("  Run 'setup' again to resume from where it left off."));
   }
 }
 

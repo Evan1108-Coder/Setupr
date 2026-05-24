@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import type { SetupStep } from "../ai/planner.js";
 import type { AppStore } from "../state/store.js";
 import { createSnapshot } from "./undo.js";
+import { saveCheckpoint } from "../state/checkpoint.js";
 
 export interface ExecutionResult {
   success: boolean;
@@ -147,14 +148,37 @@ export function runCommand(
 export async function executeAllSteps(
   steps: SetupStep[],
   cwd: string,
-  store: AppStore
+  store: AppStore,
+  startFromIndex = 0
 ): Promise<{ success: boolean; results: ExecutionResult[] }> {
   const results: ExecutionResult[] = [];
+  const scan = store.getState().scan;
   store.getState().setRunning(true);
 
-  for (const step of steps) {
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+
+    if (i < startFromIndex) {
+      store.getState().updateStep(step.id, { status: "done" });
+      store.getState().nextStep();
+      continue;
+    }
+
     const result = await executeStep(step, cwd, store);
     results.push(result);
+
+    const completedIds = steps.slice(0, i + 1).filter((s) => s.status === "done" || result.success).map((s) => s.id);
+    if (scan) {
+      try {
+        await saveCheckpoint(cwd, {
+          cwd,
+          scan,
+          steps: store.getState().steps,
+          currentStepIndex: i + 1,
+          completedSteps: completedIds,
+        });
+      } catch {}
+    }
 
     if (!result.success && step.type !== "verify") {
       store.getState().setRunning(false);
