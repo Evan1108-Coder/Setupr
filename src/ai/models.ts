@@ -12,13 +12,9 @@ export type AIProvider =
   | "openai"
   | "anthropic"
   | "google"
-  | "mistral"
   | "groq"
-  | "deepseek"
   | "minimax"
-  | "together"
-  | "openrouter"
-  | "local";
+  | "moonshot";
 
 export interface ProviderConfig {
   provider: AIProvider;
@@ -43,13 +39,7 @@ export const PROVIDERS: Record<AIProvider, ProviderConfig> = {
   google: {
     provider: "google",
     baseURL: "https://generativelanguage.googleapis.com/v1beta",
-    envKey: "GOOGLE_AI_KEY",
-    headerFormat: "bearer",
-  },
-  mistral: {
-    provider: "mistral",
-    baseURL: "https://api.mistral.ai/v1",
-    envKey: "MISTRAL_API_KEY",
+    envKey: "GOOGLE_API_KEY",
     headerFormat: "bearer",
   },
   groq: {
@@ -58,81 +48,53 @@ export const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     envKey: "GROQ_API_KEY",
     headerFormat: "bearer",
   },
-  deepseek: {
-    provider: "deepseek",
-    baseURL: "https://api.deepseek.com/v1",
-    envKey: "DEEPSEEK_API_KEY",
-    headerFormat: "bearer",
-  },
   minimax: {
     provider: "minimax",
     baseURL: "https://api.minimaxi.chat/v1",
     envKey: "MINIMAX_API_KEY",
     headerFormat: "bearer",
   },
-  together: {
-    provider: "together",
-    baseURL: "https://api.together.xyz/v1",
-    envKey: "TOGETHER_API_KEY",
-    headerFormat: "bearer",
-  },
-  openrouter: {
-    provider: "openrouter",
-    baseURL: "https://openrouter.ai/api/v1",
-    envKey: "OPENROUTER_API_KEY",
-    headerFormat: "bearer",
-  },
-  local: {
-    provider: "local",
-    baseURL: "http://localhost:11434/v1",
-    envKey: "OLLAMA_HOST",
+  moonshot: {
+    provider: "moonshot",
+    baseURL: "https://api.moonshot.cn/v1",
+    envKey: "MOONSHOT_API_KEY",
     headerFormat: "bearer",
   },
 };
 
 export const MODELS: AIModel[] = [
   // OpenAI
+  { id: "gpt-5.4-pro", name: "GPT-5.4 Pro", provider: "openai", maxTokens: 200000, costPer1kInput: 0.01, costPer1kOutput: 0.03, supportsStreaming: true },
+  { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", provider: "openai", maxTokens: 200000, costPer1kInput: 0.001, costPer1kOutput: 0.003, supportsStreaming: true },
   { id: "gpt-4o", name: "GPT-4o", provider: "openai", maxTokens: 128000, costPer1kInput: 0.005, costPer1kOutput: 0.015, supportsStreaming: true },
   { id: "gpt-4o-mini", name: "GPT-4o Mini", provider: "openai", maxTokens: 128000, costPer1kInput: 0.00015, costPer1kOutput: 0.0006, supportsStreaming: true },
-  { id: "gpt-4-turbo", name: "GPT-4 Turbo", provider: "openai", maxTokens: 128000, costPer1kInput: 0.01, costPer1kOutput: 0.03, supportsStreaming: true },
-  { id: "o1", name: "O1", provider: "openai", maxTokens: 200000, costPer1kInput: 0.015, costPer1kOutput: 0.06, supportsStreaming: false },
-  { id: "o1-mini", name: "O1 Mini", provider: "openai", maxTokens: 128000, costPer1kInput: 0.003, costPer1kOutput: 0.012, supportsStreaming: false },
 
   // Anthropic
   { id: "claude-opus-4-6", name: "Claude Opus 4.6", provider: "anthropic", maxTokens: 200000, costPer1kInput: 0.015, costPer1kOutput: 0.075, supportsStreaming: true },
   { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "anthropic", maxTokens: 200000, costPer1kInput: 0.003, costPer1kOutput: 0.015, supportsStreaming: true },
   { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", provider: "anthropic", maxTokens: 200000, costPer1kInput: 0.0008, costPer1kOutput: 0.004, supportsStreaming: true },
+  { id: "claude-3.5-sonnet", name: "Claude 3.5 Sonnet", provider: "anthropic", maxTokens: 200000, costPer1kInput: 0.003, costPer1kOutput: 0.015, supportsStreaming: true },
 
   // Google
-  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", provider: "google", maxTokens: 1048576, costPer1kInput: 0.0001, costPer1kOutput: 0.0004, supportsStreaming: true },
-  { id: "gemini-2.0-pro", name: "Gemini 2.0 Pro", provider: "google", maxTokens: 2097152, costPer1kInput: 0.00125, costPer1kOutput: 0.005, supportsStreaming: true },
-  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", provider: "google", maxTokens: 1048576, costPer1kInput: 0.000075, costPer1kOutput: 0.0003, supportsStreaming: true },
+  { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro", provider: "google", maxTokens: 2000000, costPer1kInput: 0.00125, costPer1kOutput: 0.005, supportsStreaming: true },
+  { id: "gemini-3-flash", name: "Gemini 3 Flash", provider: "google", maxTokens: 1000000, costPer1kInput: 0.0001, costPer1kOutput: 0.0004, supportsStreaming: true },
+  { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite", provider: "google", maxTokens: 1000000, costPer1kInput: 0.00005, costPer1kOutput: 0.0002, supportsStreaming: true },
 
-  // Mistral
-  { id: "mistral-large-latest", name: "Mistral Large", provider: "mistral", maxTokens: 128000, costPer1kInput: 0.002, costPer1kOutput: 0.006, supportsStreaming: true },
-  { id: "mistral-small-latest", name: "Mistral Small", provider: "mistral", maxTokens: 128000, costPer1kInput: 0.0002, costPer1kOutput: 0.0006, supportsStreaming: true },
-  { id: "codestral-latest", name: "Codestral", provider: "mistral", maxTokens: 32000, costPer1kInput: 0.0003, costPer1kOutput: 0.0009, supportsStreaming: true },
+  // Groq (Llama)
+  { id: "llama-4-maverick", name: "Llama 4 Maverick", provider: "groq", maxTokens: 128000, costPer1kInput: 0.0005, costPer1kOutput: 0.001, supportsStreaming: true },
+  { id: "llama-4-scout", name: "Llama 4 Scout", provider: "groq", maxTokens: 128000, costPer1kInput: 0.0003, costPer1kOutput: 0.0006, supportsStreaming: true },
+  { id: "llama-3.3-70b", name: "Llama 3.3 70B", provider: "groq", maxTokens: 128000, costPer1kInput: 0.00059, costPer1kOutput: 0.00079, supportsStreaming: true },
 
-  // Groq (fast inference)
-  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", provider: "groq", maxTokens: 128000, costPer1kInput: 0.00059, costPer1kOutput: 0.00079, supportsStreaming: true },
-  { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B", provider: "groq", maxTokens: 128000, costPer1kInput: 0.00005, costPer1kOutput: 0.00008, supportsStreaming: true },
-  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B", provider: "groq", maxTokens: 32768, costPer1kInput: 0.00024, costPer1kOutput: 0.00024, supportsStreaming: true },
+  // MiniMax
+  { id: "minimax-m2.7", name: "MiniMax M2.7", provider: "minimax", maxTokens: 1000000, costPer1kInput: 0.001, costPer1kOutput: 0.001, supportsStreaming: true },
+  { id: "minimax-m2.5-lightning", name: "MiniMax M2.5 Lightning", provider: "minimax", maxTokens: 1000000, costPer1kInput: 0.0005, costPer1kOutput: 0.0005, supportsStreaming: true },
 
-  // DeepSeek
-  { id: "deepseek-chat", name: "DeepSeek V3", provider: "deepseek", maxTokens: 128000, costPer1kInput: 0.00014, costPer1kOutput: 0.00028, supportsStreaming: true },
-  { id: "deepseek-reasoner", name: "DeepSeek R1", provider: "deepseek", maxTokens: 128000, costPer1kInput: 0.00055, costPer1kOutput: 0.0022, supportsStreaming: true },
-
-  // Minimax
-  { id: "MiniMax-Text-01", name: "MiniMax Text 01", provider: "minimax", maxTokens: 1000000, costPer1kInput: 0.001, costPer1kOutput: 0.001, supportsStreaming: true },
-
-  // Together AI
-  { id: "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", name: "Llama 3.1 405B", provider: "together", maxTokens: 128000, costPer1kInput: 0.003, costPer1kOutput: 0.003, supportsStreaming: true },
-  { id: "Qwen/Qwen2.5-72B-Instruct-Turbo", name: "Qwen 2.5 72B", provider: "together", maxTokens: 128000, costPer1kInput: 0.0012, costPer1kOutput: 0.0012, supportsStreaming: true },
-
-  // Local (Ollama)
-  { id: "llama3.2", name: "Llama 3.2 (Local)", provider: "local", maxTokens: 128000, costPer1kInput: 0, costPer1kOutput: 0, supportsStreaming: true },
-  { id: "qwen2.5-coder", name: "Qwen 2.5 Coder (Local)", provider: "local", maxTokens: 32000, costPer1kInput: 0, costPer1kOutput: 0, supportsStreaming: true },
-  { id: "deepseek-r1:14b", name: "DeepSeek R1 14B (Local)", provider: "local", maxTokens: 128000, costPer1kInput: 0, costPer1kOutput: 0, supportsStreaming: true },
+  // Moonshot (Kimi)
+  { id: "kimi-latest", name: "Kimi Latest", provider: "moonshot", maxTokens: 128000, costPer1kInput: 0.001, costPer1kOutput: 0.002, supportsStreaming: true },
+  { id: "kimi-k2-thinking", name: "Kimi K2 Thinking", provider: "moonshot", maxTokens: 128000, costPer1kInput: 0.002, costPer1kOutput: 0.004, supportsStreaming: true },
+  { id: "kimi-k2-turbo-preview", name: "Kimi K2 Turbo Preview", provider: "moonshot", maxTokens: 128000, costPer1kInput: 0.0008, costPer1kOutput: 0.0016, supportsStreaming: true },
+  { id: "kimi-k2.5-vision", name: "Kimi K2.5 Vision", provider: "moonshot", maxTokens: 128000, costPer1kInput: 0.0015, costPer1kOutput: 0.003, supportsStreaming: true },
+  { id: "moonshot-v1-128k", name: "Moonshot V1 128K", provider: "moonshot", maxTokens: 128000, costPer1kInput: 0.001, costPer1kOutput: 0.002, supportsStreaming: true },
 ];
 
 export function getModelById(id: string): AIModel | undefined {
@@ -146,7 +108,6 @@ export function getModelsByProvider(provider: AIProvider): AIModel[] {
 export function getAvailableModels(): AIModel[] {
   return MODELS.filter((m) => {
     const config = PROVIDERS[m.provider];
-    if (m.provider === "local") return true;
     return !!process.env[config.envKey];
   });
 }
@@ -160,10 +121,10 @@ export function getDefaultModel(): AIModel {
 
   const available = getAvailableModels();
   if (available.length === 0) {
-    return MODELS.find((m) => m.id === "MiniMax-Text-01")!;
+    return MODELS.find((m) => m.id === "minimax-m2.7")!;
   }
 
-  const preferred = ["deepseek-chat", "gpt-4o-mini", "gemini-2.0-flash", "llama-3.3-70b-versatile", "mistral-small-latest"];
+  const preferred = ["kimi-k2-turbo-preview", "gpt-4o-mini", "gemini-3-flash", "llama-3.3-70b", "minimax-m2.5-lightning"];
   for (const pref of preferred) {
     const model = available.find((m) => m.id === pref);
     if (model) return model;

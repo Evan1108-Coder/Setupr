@@ -15,11 +15,11 @@ function getClientForProvider(provider: AIProvider): OpenAI | null {
   const config = PROVIDERS[provider];
   const apiKey = process.env[config.envKey];
 
-  if (!apiKey && provider !== "local") return null;
+  if (!apiKey) return null;
 
   const client = new OpenAI({
-    apiKey: apiKey || "ollama",
-    baseURL: provider === "local" ? (process.env.OLLAMA_HOST || config.baseURL) : config.baseURL,
+    apiKey,
+    baseURL: config.baseURL,
   });
 
   clients.set(provider, client);
@@ -28,7 +28,6 @@ function getClientForProvider(provider: AIProvider): OpenAI | null {
 
 export function hasAIKey(): boolean {
   const model = getDefaultModel();
-  if (model.provider === "local") return true;
   const config = PROVIDERS[model.provider];
   return !!process.env[config.envKey];
 }
@@ -69,13 +68,14 @@ export async function chat(
   }
 
   if (model.provider === "anthropic") {
-    return chatAnthropic(client, model, messages, options);
+    return chatAnthropic(model, messages, options);
   }
 
   if (model.provider === "google") {
     return chatGoogle(model, messages, options);
   }
 
+  // OpenAI, Groq, MiniMax, Moonshot — all OpenAI-compatible
   return chatOpenAICompatible(client, model, messages, options);
 }
 
@@ -103,7 +103,6 @@ async function chatOpenAICompatible(
 }
 
 async function chatAnthropic(
-  _client: OpenAI,
   model: AIModel,
   messages: ChatMessage[],
   options?: ChatOptions
@@ -152,8 +151,8 @@ async function chatGoogle(
   messages: ChatMessage[],
   options?: ChatOptions
 ): Promise<{ content: string; tokens: number; model: string }> {
-  const apiKey = process.env.GOOGLE_AI_KEY;
-  if (!apiKey) throw new Error("GOOGLE_AI_KEY not set");
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) throw new Error("GOOGLE_API_KEY not set");
 
   const systemMsg = messages.find((m) => m.role === "system");
   const nonSystemMessages = messages.filter((m) => m.role !== "system");
@@ -194,7 +193,7 @@ async function chatGoogle(
 export function listConfiguredProviders(): AIProvider[] {
   const configured: AIProvider[] = [];
   for (const [provider, config] of Object.entries(PROVIDERS)) {
-    if (provider === "local" || process.env[config.envKey]) {
+    if (process.env[config.envKey]) {
       configured.push(provider as AIProvider);
     }
   }

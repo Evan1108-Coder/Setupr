@@ -211,17 +211,40 @@ async function cmdEnv(sub: string | undefined, cwd: string) {
           console.log("");
         }
 
-        if (issues === 0) {
+        // Interactive: prompt for missing/empty/invalid values
+        const needsInput = [...missing, ...empty, ...invalid];
+        if (needsInput.length > 0 && process.stdin.isTTY) {
+          console.log(chalk.blue.bold("  Interactive Fix\n"));
+          console.log(chalk.dim("  Enter values for issues below (press Enter to skip):\n"));
+
+          const { createInterface } = await import("readline");
+          const rl = createInterface({ input: process.stdin, output: process.stdout });
+          const ask = (q: string): Promise<string> => new Promise((r) => rl.question(q, r));
+
+          for (const key of needsInput) {
+            const current = currentPairs[key] || examplePairs[key] || "";
+            const hint = current ? chalk.dim(` [${current}]`) : "";
+            const reason = invalid.includes(key) ? chalk.yellow(` (${getInvalidReason(key, currentPairs[key] || "")})`) : "";
+            const answer = await ask(`  ${chalk.white(key)}${hint}${reason}: `);
+            if (answer.trim()) {
+              currentPairs[key] = answer.trim();
+            } else if (!currentPairs[key] && examplePairs[key]) {
+              currentPairs[key] = examplePairs[key];
+            }
+          }
+          rl.close();
+          console.log("");
+        } else if (issues === 0) {
           console.log(chalk.green("  ✓ All environment variables look good!"));
           if (extra.length > 0) {
             console.log(chalk.dim(`    (${extra.length} extra vars present, not in .env.example)`));
           }
         } else {
           console.log(chalk.yellow(`  Summary: ${issues} issue${issues > 1 ? "s" : ""} found`));
-          console.log(chalk.dim("  Run 'setup env sync' to auto-fill missing vars from .env.example defaults"));
-          console.log(chalk.dim("  Run 'setup env check' to see required vs defined"));
+          console.log(chalk.dim("  Run interactively in a TTY to fix, or manually edit .env"));
         }
 
+        // Write reorganized .env
         let output = "";
         for (const line of example.split("\n")) {
           if (!line.trim() || line.startsWith("#")) {
@@ -239,7 +262,7 @@ async function cmdEnv(sub: string | undefined, cwd: string) {
           output += `${key}=${currentPairs[key]}\n`;
         }
         await writeFile(envPath, output);
-        console.log(chalk.green("\n  ✓ Reorganized .env (preserved all values, matched .env.example order)"));
+        console.log(chalk.green("  ✓ Saved .env (reorganized, matched .env.example order)"));
       } catch {
         console.log(chalk.red("No .env.example found for smart analysis"));
         console.log(chalk.dim("  Create a .env.example with required variable names to enable smart mode"));

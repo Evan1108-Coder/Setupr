@@ -90,7 +90,7 @@ export async function intelligentResponse(
   // Level 2: Live AI call
   if (!hasAIKey()) {
     return {
-      response: "AI features require a Minimax API key. Set MINIMAX_API_KEY in your environment.",
+      response: "AI features require an API key. Set one of: MINIMAX_API_KEY, MOONSHOT_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY.",
       level: "pattern",
       cost: 0,
     };
