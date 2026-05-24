@@ -362,8 +362,9 @@ function getOS(): string {
   if (platform === "darwin") {
     const major = parseInt(os.release().split(".")[0] || "0", 10);
     if (major >= 25) return "macOS 15";
-    if (major >= 24) return "macOS 15";
-    if (major >= 23) return "macOS 14";
+    if (major >= 24) return "macOS 14";
+    if (major >= 23) return "macOS 13";
+    if (major >= 22) return "macOS 12";
     return "macOS";
   }
   if (platform === "win32") return "Windows";

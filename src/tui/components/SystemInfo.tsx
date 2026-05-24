@@ -11,7 +11,6 @@ export function SystemInfo() {
   const totalMem = (os.totalmem() / (1024 * 1024 * 1024)).toFixed(0);
   const freeMem = (os.freemem() / (1024 * 1024 * 1024)).toFixed(1);
   const shell = process.env.SHELL?.split("/").pop() || "sh";
-  const shellVersion = "";
 
   let osLabel = "Linux";
   if (platform === "darwin") osLabel = `macOS ${getMacVersion(release)}`;
@@ -30,8 +29,9 @@ export function SystemInfo() {
 
 function getMacVersion(release: string): string {
   const major = parseInt(release.split(".")[0] || "0", 10);
-  if (major >= 24) return "15";
-  if (major >= 23) return "14";
-  if (major >= 22) return "13";
+  if (major >= 25) return "15";
+  if (major >= 24) return "14";
+  if (major >= 23) return "13";
+  if (major >= 22) return "12";
   return "";
 }

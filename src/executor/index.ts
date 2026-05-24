@@ -99,7 +99,8 @@ interface CommandResult {
 export function runCommand(
   command: string,
   cwd: string,
-  onLine?: (line: string) => void
+  onLine?: (line: string) => void,
+  signal?: AbortSignal
 ): Promise<CommandResult> {
   return new Promise((resolve) => {
     const proc = spawn(command, {
@@ -108,19 +109,29 @@ export function runCommand(
       env: { ...process.env, FORCE_COLOR: "1" },
     });
 
+    if (signal) {
+      signal.addEventListener("abort", () => {
+        proc.kill("SIGTERM");
+      }, { once: true });
+    }
+
     let stdout = "";
     let stderr = "";
 
     proc.stdout?.on("data", (data) => {
       const str = data.toString();
       stdout += str;
-      str.split("\n").filter(Boolean).forEach((line: string) => onLine?.(line));
+      str.split("\n").filter(Boolean).forEach((line: string) => {
+        try { onLine?.(line); } catch {}
+      });
     });
 
     proc.stderr?.on("data", (data) => {
       const str = data.toString();
       stderr += str;
-      str.split("\n").filter(Boolean).forEach((line: string) => onLine?.(line));
+      str.split("\n").filter(Boolean).forEach((line: string) => {
+        try { onLine?.(line); } catch {}
+      });
     });
 
     proc.on("close", (code) => {

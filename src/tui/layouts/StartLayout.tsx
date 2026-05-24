@@ -25,19 +25,23 @@ export function StartLayout({ scan, cwd }: StartLayoutProps) {
   const [chatMessages, setChatMessages] = useState<string[]>([]);
 
   useEffect(() => {
+    const abortController = new AbortController();
     const startCmd = detectStartCommand(scan);
     if (startCmd) {
       setCommand(startCmd);
       setStatus("running");
       runCommand(startCmd, cwd, (line) => {
         setOutput((prev) => [...prev.slice(-50), line]);
-      }).then((result) => {
-        if (result.exitCode !== 0) setStatus("failed");
-        else setStatus("stopped");
+      }, abortController.signal).then((result) => {
+        if (!abortController.signal.aborted) {
+          if (result.exitCode !== 0) setStatus("failed");
+          else setStatus("stopped");
+        }
       });
     } else {
       setStatus("failed");
     }
+    return () => { abortController.abort(); };
   }, []);
 
   const handleChat = useCallback(async (text: string) => {

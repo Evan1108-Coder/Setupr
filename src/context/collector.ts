@@ -86,7 +86,7 @@ async function collectFileTree(cwd: string): Promise<string[]> {
     if (depth > 3) return;
     try {
       const entries = await readdir(dir, { withFileTypes: true });
-      for (const entry of entries.slice(0, 50)) {
+      for (const entry of entries.slice(0, 200)) {
         if (ignore.has(entry.name)) continue;
         const path = prefix ? `${prefix}/${entry.name}` : entry.name;
         files.push(path);

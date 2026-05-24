@@ -180,20 +180,22 @@ export function createAppStore(cwd: string) {
       })),
 
     addMessage: (msg) =>
-      set((state) => ({
-        messages: [
+      set((state) => {
+        const messages = [
           ...state.messages,
           { ...msg, id: crypto.randomUUID().slice(0, 8), timestamp: Date.now() },
-        ],
-      })),
+        ];
+        return { messages: messages.length > 500 ? messages.slice(-500) : messages };
+      }),
 
     addLog: (entry) =>
-      set((state) => ({
-        logs: [
+      set((state) => {
+        const logs = [
           ...state.logs,
           { ...entry, id: crypto.randomUUID().slice(0, 8), timestamp: Date.now() },
-        ],
-      })),
+        ];
+        return { logs: logs.length > 500 ? logs.slice(-500) : logs };
+      }),
 
     setInput: (inputValue) => set({ inputValue }),
     setActivePanel: (activePanel) => set({ activePanel }),

@@ -48,62 +48,60 @@ export function App({ command, cwd, store, cleanMode = "deps" }: AppProps) {
 }
 
 async function runSetupFlow(cwd: string, store: AppStore) {
-  store.getState().addLog({ content: "Scanning project structure...", type: "info" });
-  store.getState().addMessage({ role: "system", content: "Scanning project..." });
+  try {
+    store.getState().addLog({ content: "Scanning project structure...", type: "info" });
+    store.getState().addMessage({ role: "system", content: "Scanning project..." });
 
-  const scan = await scanProject(cwd);
-  store.getState().setScan(scan);
+    const scan = await scanProject(cwd);
+    store.getState().setScan(scan);
 
-  const stackParts = [scan.framework, scan.language, ...(scan.services || [])].filter(Boolean);
-  store.getState().addLog({
-    content: `Detected: ${stackParts.join(" + ")}`,
-    type: "success",
-  });
-  store.getState().addLog({
-    content: `Found: ${scan.configFiles.join(", ")}`,
-    type: "info",
-  });
-  store.getState().addMessage({
-    role: "assistant",
-    content: `Detected: ${scan.language || "unknown"}${scan.framework ? ` / ${scan.framework}` : ""} with ${scan.packageManager || "no"} package manager.`,
-    level: "pattern",
-    cost: 0,
-  });
+    const stackParts = [scan.framework, scan.language, ...(scan.services || [])].filter(Boolean);
+    store.getState().addLog({ content: `Detected: ${stackParts.join(" + ")}`, type: "success" });
+    store.getState().addLog({ content: `Found: ${scan.configFiles.join(", ")}`, type: "info" });
+    store.getState().addMessage({
+      role: "assistant",
+      content: `Detected: ${scan.language || "unknown"}${scan.framework ? ` / ${scan.framework}` : ""} with ${scan.packageManager || "no"} package manager.`,
+      level: "pattern",
+      cost: 0,
+    });
 
-  populateKeyDeps(cwd, store, scan);
-  populatePorts(store, scan);
-  populateServices(store, scan);
+    populateKeyDeps(cwd, store, scan);
+    populatePorts(store, scan);
+    populateServices(store, scan);
 
-  const context = await collectContext(cwd, scan);
-  store.getState().setContext(context);
+    const context = await collectContext(cwd, scan);
+    store.getState().setContext(context);
 
-  store.getState().addLog({ content: "Planning setup steps...", type: "info" });
-  store.getState().addMessage({ role: "thinking", content: "Planning setup steps..." });
-  const steps = await planSteps(scan);
-  store.getState().setSteps(steps);
-  store.getState().addLog({
-    content: `Plan ready: ${steps.length} steps to execute.`,
-    type: "success",
-  });
-  store.getState().addMessage({
-    role: "assistant",
-    content: `Plan ready: ${steps.length} steps to execute.`,
-    level: hasAIKeyCheck() ? "live" : "pattern",
-    cost: 0,
-  });
+    store.getState().addLog({ content: "Planning setup steps...", type: "info" });
+    store.getState().addMessage({ role: "thinking", content: "Planning setup steps..." });
+    const steps = await planSteps(scan);
+    store.getState().setSteps(steps);
+    store.getState().addLog({ content: `Plan ready: ${steps.length} steps to execute.`, type: "success" });
+    store.getState().addMessage({
+      role: "assistant",
+      content: `Plan ready: ${steps.length} steps to execute.`,
+      level: hasAIKeyCheck() ? "live" : "pattern",
+      cost: 0,
+    });
 
-  store.getState().addLog({ content: "Beginning execution...", type: "info" });
-  store.getState().setRunning(true);
-  await executeAllSteps(steps, cwd, store);
-  store.getState().setRunning(false);
-  store.getState().setComplete(true);
-  store.getState().setCheckpoint(true);
+    store.getState().addLog({ content: "Beginning execution...", type: "info" });
+    store.getState().setRunning(true);
+    await executeAllSteps(steps, cwd, store);
+    store.getState().setRunning(false);
+    store.getState().setComplete(true);
+    store.getState().setCheckpoint(true);
 
-  store.getState().addLog({ content: "Setup complete!", type: "success" });
-  store.getState().addMessage({
-    role: "assistant",
-    content: "Setup complete! You can now chat with me about your project.",
-  });
+    store.getState().addLog({ content: "Setup complete!", type: "success" });
+    store.getState().addMessage({
+      role: "assistant",
+      content: "Setup complete! You can now chat with me about your project.",
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    store.getState().addLog({ content: `Fatal error: ${msg}`, type: "error" });
+    store.getState().addMessage({ role: "system", content: `Error: ${msg}` });
+    store.getState().setRunning(false);
+  }
 }
 
 function populateKeyDeps(cwd: string, store: AppStore, scan: ScanResult) {

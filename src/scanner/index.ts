@@ -97,8 +97,8 @@ async function getDependencyCounts(
     let section = "";
     for (const line of content.split("\n")) {
       if (line.startsWith("[")) section = line;
-      else if (section === "[dependencies]" && line.includes("=") && line.trim()) prod++;
-      else if (section === "[dev-dependencies]" && line.includes("=") && line.trim()) dev++;
+      else if (section === "[dependencies]" && line.includes("=") && line.trim() && !line.trim().startsWith("#")) prod++;
+      else if (section === "[dev-dependencies]" && line.includes("=") && line.trim() && !line.trim().startsWith("#")) dev++;
     }
     return { prod, dev };
   } catch {}

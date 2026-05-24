@@ -357,22 +357,31 @@ async function cmdRemove(pkg: string | undefined, cwd: string) {
 }
 
 async function cmdPort(port: string | undefined, cwd: string) {
+  const isWin = process.platform === "win32";
+  const checkPort = async (p: number | string) => {
+    const cmd = isWin
+      ? `netstat -ano | findstr :${p}`
+      : `lsof -i :${p} -t 2>/dev/null`;
+    return runCommand(cmd, cwd);
+  };
+
   if (!port) {
     console.log(chalk.blue("Checking common ports..."));
     for (const p of [3000, 5173, 8080, 4200, 8000]) {
-      const result = await runCommand(`lsof -i :${p} -t 2>/dev/null`, cwd);
+      const result = await checkPort(p);
       if (result.stdout.trim()) {
-        console.log(chalk.yellow(`  Port ${p}: IN USE (PID: ${result.stdout.trim()})`));
+        console.log(chalk.yellow(`  Port ${p}: IN USE (PID: ${result.stdout.trim().split("\n")[0]})`));
       } else {
         console.log(chalk.green(`  Port ${p}: available`));
       }
     }
     return;
   }
-  const result = await runCommand(`lsof -i :${port} -t 2>/dev/null`, cwd);
+  const result = await checkPort(port);
   if (result.stdout.trim()) {
-    console.log(chalk.yellow(`Port ${port} in use by PID: ${result.stdout.trim()}`));
-    console.log(chalk.dim(`Kill with: kill ${result.stdout.trim()}`));
+    const pid = result.stdout.trim().split("\n")[0];
+    console.log(chalk.yellow(`Port ${port} in use by PID: ${pid}`));
+    console.log(chalk.dim(isWin ? `Kill with: taskkill /PID ${pid} /F` : `Kill with: kill ${pid}`));
   } else {
     console.log(chalk.green(`Port ${port} is available`));
   }
@@ -591,10 +600,16 @@ function parseEnvKeys(content: string): string[] {
 function parseEnvPairs(content: string): Record<string, string> {
   const pairs: Record<string, string> = {};
   for (const line of content.split("\n")) {
-    if (!line.trim() || line.startsWith("#")) continue;
+    if (!line.trim() || line.trim().startsWith("#")) continue;
     const eqIdx = line.indexOf("=");
     if (eqIdx > 0) {
-      pairs[line.slice(0, eqIdx).trim()] = line.slice(eqIdx + 1).trim();
+      const key = line.slice(0, eqIdx).trim();
+      let value = line.slice(eqIdx + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      pairs[key] = value;
     }
   }
   return pairs;

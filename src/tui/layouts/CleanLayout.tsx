@@ -47,7 +47,7 @@ export function CleanLayout({ scan, cwd, mode }: CleanLayoutProps) {
         setCleaning(false);
       });
     }
-  }, [loading]);
+  }, [loading, targets.length, cleaning, done]);
 
   return (
     <Box flexDirection="column" width="100%">

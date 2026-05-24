@@ -80,9 +80,7 @@ async function resolveWorkspacePackages(cwd: string, patterns: string[]): Promis
         try {
           await access(join(cwd, match, "package.json"));
           results.push(match);
-        } catch {
-          results.push(match);
-        }
+        } catch {}
       }
     } catch {}
   }

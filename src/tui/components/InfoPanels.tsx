@@ -66,11 +66,9 @@ export function InfoPanels({
             : step.status === "running" ? colors.accent
             : step.status === "failed" ? colors.error
             : colors.textDim;
-          const timeStr = step.status === "done" ? "  " + formatStepTime(step) : "";
           return (
             <Box key={step.id}>
               <Text color={statusColor}>{i === currentStepIndex ? icons.arrowRight : icon} {step.label}</Text>
-              {timeStr && <Text color={colors.textDim}>{timeStr}</Text>}
             </Box>
           );
         })}
@@ -136,10 +134,6 @@ function getServiceColor(status: ServiceInfo["status"]): string {
     case "pending": return colors.textDim;
     case "error": return colors.error;
   }
-}
-
-function formatStepTime(step: SetupStep): string {
-  return "";
 }
 
 function truncPath(): string {
