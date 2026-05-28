@@ -2,7 +2,6 @@ import chalk from "chalk";
 import { readdir, writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { createSetuprError, printPlainError } from "../../errors/index.js";
-import { scanProject } from "../../scanner/index.js";
 
 interface InitFlags {
   force?: boolean;
@@ -161,6 +160,12 @@ async function scaffoldGo(cwd: string): Promise<void> {
 
 async function initFromTemplate(cwd: string, template: string, _flags: InitFlags): Promise<void> {
   const builtinTemplates: Record<string, () => Promise<void>> = {
+    "node": () => scaffoldNode(cwd, "typescript", "npm", null),
+    "javascript": () => scaffoldNode(cwd, "javascript", "npm", null),
+    "typescript": () => scaffoldNode(cwd, "typescript", "npm", null),
+    "python": () => scaffoldPython(cwd),
+    "rust": () => scaffoldRust(cwd),
+    "go": () => scaffoldGo(cwd),
     "express-api": () => scaffoldNode(cwd, "typescript", "npm", "express"),
     "react-app": () => scaffoldReactApp(cwd),
     "cli-tool": () => scaffoldCLI(cwd),

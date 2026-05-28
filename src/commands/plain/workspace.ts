@@ -242,7 +242,7 @@ async function workspaceCheck(cwd: string): Promise<void> {
     const checks: string[] = [];
 
     if (!existsSync(join(pkgDir, "package.json"))) { checks.push("missing package.json"); issues++; }
-    if (!existsSync(join(pkgDir, "src")) && !existsSync(join(pkgDir, "lib"))) { checks.push("no src/ or lib/"); }
+    if (!existsSync(join(pkgDir, "src")) && !existsSync(join(pkgDir, "lib"))) { checks.push("no src/ or lib/"); issues++; }
 
     const icon = checks.length === 0 ? chalk.green("✓") : chalk.yellow("⚠");
     console.log(`  ${icon} ${pkg.name}${checks.length > 0 ? chalk.dim(` — ${checks.join(", ")}`) : ""}`);

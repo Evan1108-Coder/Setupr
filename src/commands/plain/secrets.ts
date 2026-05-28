@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { randomBytes, createCipheriv, createDecipheriv, scryptSync } from "crypto";
-import { createSetuprError, printPlainError } from "../../errors/index.js";
+import { createSetuprError, fromUnknownError, printPlainError, type SetuprError } from "../../errors/index.js";
 
 interface SecretsFlags {
   force?: boolean;
@@ -12,29 +12,38 @@ interface SecretsFlags {
   [key: string]: unknown;
 }
 
+function isSetuprError(error: unknown): error is SetuprError {
+  const value = error as Partial<SetuprError> | undefined;
+  return Boolean(value?.code && value.title && value.explanation && value.timestamp);
+}
+
 const SECRETS_DIR = ".setupr";
 const SECRETS_FILE = "secrets.enc";
 const KEY_FILE = "secrets.key";
 const ALGORITHM = "aes-256-gcm";
 
 export async function cmdSecrets(sub: string | undefined, cwd: string, flags: SecretsFlags): Promise<void> {
-  switch (sub) {
-    case "init": return secretsInit(cwd, flags);
-    case "set": return secretsSet(cwd, flags);
-    case "get": return secretsGet(cwd, flags);
-    case "list": return secretsList(cwd);
-    case "remove": return secretsRemove(cwd, flags);
-    case "export": return secretsExport(cwd, flags);
-    case "import": return secretsImport(cwd, flags);
-    case "rotate": return secretsRotate(cwd);
-    default:
-      printPlainError(createSetuprError({
-        code: "UNKNOWN_SUBCOMMAND",
-        command: "secrets",
-        subcommand: sub,
-        cwd,
-        details: ["Valid: init, set, get, list, remove, export, import, rotate"],
-      }));
+  try {
+    switch (sub) {
+      case "init": return await secretsInit(cwd, flags);
+      case "set": return await secretsSet(cwd, flags);
+      case "get": return await secretsGet(cwd, flags);
+      case "list": return await secretsList(cwd);
+      case "remove": return await secretsRemove(cwd, flags);
+      case "export": return await secretsExport(cwd, flags);
+      case "import": return await secretsImport(cwd, flags);
+      case "rotate": return await secretsRotate(cwd);
+      default:
+        printPlainError(createSetuprError({
+          code: "UNKNOWN_SUBCOMMAND",
+          command: "secrets",
+          subcommand: sub,
+          cwd,
+          details: ["Valid: init, set, get, list, remove, export, import, rotate"],
+        }));
+    }
+  } catch (err) {
+    printPlainError(isSetuprError(err) ? err : fromUnknownError(err, { command: "secrets", subcommand: sub, cwd }));
   }
 }
 
@@ -51,16 +60,16 @@ async function secretsInit(cwd: string, flags: SecretsFlags): Promise<void> {
   const key = randomBytes(32).toString("hex");
   await writeFile(keyPath, key, { mode: 0o600 });
   console.log(chalk.green("✓ Generated encryption key"));
-  console.log(chalk.yellow("  ⚠ Add .setupr/secrets.key to .gitignore!"));
   console.log(chalk.dim("  The .setupr/secrets.enc file IS safe to commit."));
 
   const gitignorePath = join(cwd, ".gitignore");
-  if (existsSync(gitignorePath)) {
-    const content = await readFile(gitignorePath, "utf-8");
-    if (!content.includes("secrets.key")) {
-      await writeFile(gitignorePath, content.trimEnd() + "\n.setupr/secrets.key\n");
-      console.log(chalk.green("  ✓ Added secrets.key to .gitignore"));
-    }
+  const content = existsSync(gitignorePath) ? await readFile(gitignorePath, "utf-8") : "";
+  if (!content.includes(".setupr/secrets.key")) {
+    const next = content.trimEnd()
+      ? `${content.trimEnd()}\n.setupr/secrets.key\n`
+      : ".setupr/secrets.key\n";
+    await writeFile(gitignorePath, next);
+    console.log(chalk.green("  ✓ Added secrets.key to .gitignore"));
   }
 }
 
@@ -239,8 +248,13 @@ async function loadSecrets(cwd: string): Promise<Record<string, string>> {
     let decrypted = decipher.update(data, "hex", "utf-8");
     decrypted += decipher.final("utf-8");
     return JSON.parse(decrypted);
-  } catch {
-    return {};
+  } catch (err) {
+    throw createSetuprError({
+      code: "SECRETS_FILE_CORRUPT",
+      command: "secrets",
+      cwd,
+      details: [err instanceof Error ? err.message : String(err)],
+    });
   }
 }
 

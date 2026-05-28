@@ -5,16 +5,16 @@ dist/
 *.tgz
 .DS_Store
 coverage/
-.p-setup/
+.setupr/
 
 # Local visual smoke-test artifacts
 tui-screenshots/
 tui-live-screenshots/
 tui-live-test-project/
 tui-empty-test-project/
-.p-setup/secrets.key
+.setupr/secrets.key
 
-# Added by P-Setup
+# Added by Setupr
 .pnp.*
 .yarn/
 build/

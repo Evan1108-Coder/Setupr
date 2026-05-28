@@ -75,7 +75,7 @@ setup --plain
 | `workspace <list\|run\|exec\|add\|info\|check>` | Operate on monorepo workspaces |
 | `health [full\|deps\|security\|outdated\|size]` | Run project health checks |
 | `share <export\|import\|inspect>` | Export/import shareable setup bundles |
-| `plugin <install\|remove\|list\|info\|enable\|disable>` | Manage P-Setup plugins |
+| `plugin <install\|remove\|list\|info\|enable\|disable>` | Manage Setupr plugins |
 | `lint <run\|setup\|fix>` | Run or set up linting |
 | `format <run\|check\|setup>` | Run or set up formatting |
 | `scaffold <type> <name>` | Generate components, pages, APIs, hooks, models, tests, services, or middleware |
@@ -169,7 +169,7 @@ The `setup` TUI is an agent workspace, not just a log viewer:
 - The AI director can also act on natural language while setup is open: change models, answer the current prompt, fill env values from pasted text, skip or rewrite plan steps, summarize status, and continue with the updated plan.
 - The AI director stays centered on the current setup task, while still allowing brief adjacent questions, clarifications, and steering without being overly strict.
 - For live AI decisions, the director receives a sanitized context packet with project scan data, OS/terminal details, config parameters, current plan, TUI state, notices, dependency/service/port state, terminal diary, and chat history. Secret values are masked before model calls.
-- The same packet includes P-Setup's current command capabilities, so the director can recommend or explain git, Docker, CI, workspace, secrets, template, health, plugin, lint, format, and scaffold workflows when they are relevant.
+- The same packet includes Setupr's current command capabilities, so the director can recommend or explain git, Docker, CI, workspace, secrets, template, health, plugin, lint, format, and scaffold workflows when they are relevant.
 - User replies appear on the right side of the timeline; AI reasoning and decisions appear inline before execution.
 - `--force` skips safe prompts and uses defaults where possible, but it does not invent secrets and still stops for serious blockers or destructive choices.
 
@@ -291,6 +291,8 @@ npm run smoke:fixtures
 ```
 
 This builds the CLI, creates temporary broken/chaotic fixture projects, and checks malformed project files, env failures, corrupt auth storage, missing scripts, failing scripts, no-project setup, monorepo detection, missing logs/locks/remotes, and structured error codes.
+
+The fixture smoke also exercises the expanded command surface through the built CLI, including CI, Docker, secrets, share, workspace, scaffold, and a git shell-injection regression check.
 
 For a best-effort terminal capture smoke on macOS:
 

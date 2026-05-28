@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { mkdir, writeFile, readdir, rm } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
-import { runCommand } from "../../executor/index.js";
+import { runCommandArgs } from "../../executor/index.js";
 import { createSetuprError, printPlainError } from "../../errors/index.js";
 
 interface TemplateFlags {
@@ -22,7 +22,7 @@ export async function cmdTemplate(sub: string | undefined, cwd: string, flags: T
     default:
       printPlainError(createSetuprError({
         code: "UNKNOWN_SUBCOMMAND",
-        command: "template",
+        command: "templates",
         subcommand: sub,
         cwd,
         details: ["Valid: new <source>, list, save <name>, remove <name>"],
@@ -35,10 +35,10 @@ async function templateNew(cwd: string, flags: TemplateFlags): Promise<void> {
   if (!source) {
     printPlainError(createSetuprError({
       code: "TEMPLATE_NOT_FOUND",
-      command: "template",
+      command: "templates",
       subcommand: "new",
       cwd,
-      details: ["Usage: setup template new <github-repo-or-url>", "Examples:", "  setup template new user/repo", "  setup template new https://github.com/user/repo"],
+      details: ["Usage: setup templates new <github-repo-or-url>", "Examples:", "  setup templates new user/repo", "  setup templates new https://github.com/user/repo"],
     }));
     return;
   }
@@ -57,11 +57,11 @@ async function templateNew(cwd: string, flags: TemplateFlags): Promise<void> {
 
   console.log(chalk.blue(`Cloning template from: ${source}`));
 
-  const cloneResult = await runCommand(`git clone --depth 1 ${repoUrl} "${targetDir}/.__temp_template"`, cwd);
+  const cloneResult = await runCommandArgs("git", ["clone", "--depth", "1", repoUrl, join(targetDir, ".__temp_template")], cwd);
   if (cloneResult.exitCode !== 0) {
     printPlainError(createSetuprError({
       code: "TEMPLATE_FETCH_FAILED",
-      command: "template",
+      command: "templates",
       cwd,
       details: [cloneResult.stderr.slice(0, 300)],
     }));
@@ -106,7 +106,7 @@ async function templateList(cwd: string): Promise<void> {
     }
   }
 
-  console.log(chalk.dim("\n  Use: setup template new <name-or-github-repo>"));
+  console.log(chalk.dim("\n  Use: setup templates new <name-or-github-repo>"));
   console.log(chalk.dim("  Use: setup init <template-name> for built-in templates"));
 }
 

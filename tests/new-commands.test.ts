@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, writeFile, readFile, rm } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
+import { spawnSync } from "child_process";
 
 // Import the router to test command routing
 import { runNonTUICommand } from "../src/commands/plain/router.js";
@@ -25,6 +26,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await rm(TEST_DIR, { recursive: true, force: true });
+  process.exitCode = undefined;
 });
 
 describe("share command", () => {
@@ -73,6 +75,26 @@ describe("share command", () => {
       console.log = log;
     }
   });
+
+  it("should import configs from absolute paths", async () => {
+    const config = {
+      name: "absolute-import",
+      version: "1.0.0",
+      exportedAt: new Date().toISOString(),
+      envKeys: ["TOKEN"],
+    };
+    const absolutePath = join(TEST_DIR, "absolute-share.json");
+    await writeFile(absolutePath, JSON.stringify(config));
+
+    const log = console.log;
+    console.log = () => {};
+    try {
+      await runNonTUICommand("share", "import", TEST_DIR, { args: [absolutePath] });
+      expect(existsSync(join(TEST_DIR, ".setupr", "imported.json"))).toBe(true);
+    } finally {
+      console.log = log;
+    }
+  });
 });
 
 describe("secrets command", () => {
@@ -82,6 +104,8 @@ describe("secrets command", () => {
     try {
       await runNonTUICommand("secrets", "init", TEST_DIR, { args: [] });
       expect(existsSync(join(TEST_DIR, ".setupr", "secrets.key"))).toBe(true);
+      expect(existsSync(join(TEST_DIR, ".gitignore"))).toBe(true);
+      expect(await readFile(join(TEST_DIR, ".gitignore"), "utf-8")).toContain(".setupr/secrets.key");
     } finally {
       console.log = log;
     }
@@ -112,6 +136,20 @@ describe("secrets command", () => {
       await runNonTUICommand("secrets", "list", TEST_DIR, { args: [] });
       expect(outputs.some((o) => o.includes("KEY_ONE"))).toBe(true);
       expect(outputs.some((o) => o.includes("KEY_TWO"))).toBe(true);
+    } finally {
+      console.log = log;
+    }
+  });
+
+  it("should surface corrupt secrets files as structured errors", async () => {
+    const outputs: string[] = [];
+    const log = console.log;
+    console.log = (...args: unknown[]) => outputs.push(args.join(" "));
+    try {
+      await runNonTUICommand("secrets", "init", TEST_DIR, { args: [] });
+      await writeFile(join(TEST_DIR, ".setupr", "secrets.enc"), "{broken");
+      await runNonTUICommand("secrets", "list", TEST_DIR, { args: [] });
+      expect(outputs.some((o) => o.includes("SECRETS_FILE_CORRUPT"))).toBe(true);
     } finally {
       console.log = log;
     }
@@ -154,6 +192,25 @@ describe("workspace command", () => {
     try {
       await runNonTUICommand("workspace", "list", TEST_DIR, { args: [] });
       expect(outputs.some((o) => o.includes("@test/core") || o.includes("core"))).toBe(true);
+    } finally {
+      console.log = log;
+    }
+  });
+
+  it("should count missing src/lib folders as workspace check issues", async () => {
+    await writeFile(
+      join(TEST_DIR, "package.json"),
+      JSON.stringify({ name: "test-monorepo", private: true, workspaces: ["packages/*"], scripts: {} })
+    );
+    await mkdir(join(TEST_DIR, "packages", "core"), { recursive: true });
+    await writeFile(join(TEST_DIR, "packages", "core", "package.json"), JSON.stringify({ name: "@test/core", version: "1.0.0" }));
+
+    const outputs: string[] = [];
+    const log = console.log;
+    console.log = (...args: unknown[]) => outputs.push(args.join(" "));
+    try {
+      await runNonTUICommand("workspace", "check", TEST_DIR, { args: [] });
+      expect(outputs.join("\n")).toContain("issue(s) found");
     } finally {
       console.log = log;
     }
@@ -222,6 +279,19 @@ describe("templates command", () => {
   });
 });
 
+describe("scaffold command", () => {
+  it("should create parent directories for nested test paths", async () => {
+    const log = console.log;
+    console.log = () => {};
+    try {
+      await runNonTUICommand("scaffold", "test", TEST_DIR, { args: ["src/lib/math.ts"] });
+      expect(existsSync(join(TEST_DIR, "src", "lib", "math.test.ts"))).toBe(true);
+    } finally {
+      console.log = log;
+    }
+  });
+});
+
 describe("migrate command", () => {
   it("should error on unsupported migration target", async () => {
     const log = console.log;
@@ -247,6 +317,25 @@ describe("command routing for new commands", () => {
       await runNonTUICommand("git", "status", TEST_DIR, { args: [] });
     } catch {
       // Expected: not a git repo
+    } finally {
+      console.log = log;
+    }
+  });
+
+  it("should not execute shell metacharacters in git branch names", async () => {
+    const marker = join(TEST_DIR, "git-injection-marker");
+    spawnSync("git", ["init", "-b", "main"], { cwd: TEST_DIR });
+    spawnSync("git", ["config", "user.email", "test@example.com"], { cwd: TEST_DIR });
+    spawnSync("git", ["config", "user.name", "Tester"], { cwd: TEST_DIR });
+    await writeFile(join(TEST_DIR, "tracked.txt"), "hello\n");
+    spawnSync("git", ["add", "."], { cwd: TEST_DIR });
+    spawnSync("git", ["commit", "-m", "feat: initial"], { cwd: TEST_DIR });
+
+    const log = console.log;
+    console.log = () => {};
+    try {
+      await runNonTUICommand("git", "branch", TEST_DIR, { args: ["create", `bad; touch ${marker} #`] });
+      expect(existsSync(marker)).toBe(false);
     } finally {
       console.log = log;
     }

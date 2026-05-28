@@ -9,7 +9,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const cli = join(root, "dist", "setup.js");
 const keep = process.argv.includes("--keep");
 const includeTui = process.argv.includes("--tui");
-const temp = mkdtempSync(join(tmpdir(), "p-setup-smoke-"));
+const temp = mkdtempSync(join(tmpdir(), "setupr-smoke-"));
 const results = [];
 
 function main() {
@@ -27,12 +27,14 @@ function createFixtures() {
   dir("env-bad");
   dir("no-project");
   dir("js-failing");
-  dir("corrupt-home/.p-setup");
+  dir("js-new");
+  dir("corrupt-home/.setupr");
   dir("monorepo/packages/a");
+  dir("git-safe");
   dir("tui-empty");
 
   write("malformed-pkg/package.json", "{\"scripts\":{\"test\":\"node -e \\\\\\\"process.exit(1)\\\\\\\"\"}");
-  write("malformed-config/.p-setup.json", "{broken");
+  write("malformed-config/.setupr.json", "{broken");
   write("env-bad/.env.example", "DATABASE_URL=\nPORT=70000\nAPI_KEY=short\nEMAIL=bad\n");
   write("env-bad/.env", "DATABASE_URL=\nPORT=70000\nAPI_KEY=short\nEMAIL=bad\n");
   write("js-failing/package.json", JSON.stringify({
@@ -42,7 +44,18 @@ function createFixtures() {
     },
     dependencies: { "left-pad": "0.0.1" },
   }));
-  write("corrupt-home/.p-setup/secrets.json", "{broken");
+  write("js-new/package.json", JSON.stringify({
+    name: "js-new",
+    scripts: {
+      test: "node -e \"console.log('test ok')\"",
+      lint: "node -e \"console.log('lint ok')\"",
+      format: "node -e \"console.log('format ok')\"",
+      "format:check": "node -e \"console.log('format check ok')\"",
+    },
+    dependencies: { express: "^4.18.0" },
+  }));
+  write("js-new/.env.example", "API_KEY=\nDATABASE_URL=\n");
+  write("corrupt-home/.setupr/secrets.json", "{broken");
   write("monorepo/package.json", JSON.stringify({
     workspaces: ["packages/*"],
     scripts: { build: "node -e \"console.log(1)\"" },
@@ -51,11 +64,21 @@ function createFixtures() {
     name: "a",
     scripts: { dev: "node -e \"setInterval(()=>{},1000)\"" },
   }));
+  write("git-safe/package.json", JSON.stringify({
+    name: "git-safe",
+    scripts: { test: "node -e \"console.log(1)\"", lint: "node -e \"console.log(1)\"" },
+  }));
+  write("git-safe/file.txt", "one\n");
+  spawnSync("git", ["init", "-b", "main"], { cwd: join(temp, "git-safe"), encoding: "utf8" });
+  spawnSync("git", ["config", "user.email", "smoke@example.com"], { cwd: join(temp, "git-safe"), encoding: "utf8" });
+  spawnSync("git", ["config", "user.name", "Smoke Test"], { cwd: join(temp, "git-safe"), encoding: "utf8" });
+  spawnSync("git", ["add", "."], { cwd: join(temp, "git-safe"), encoding: "utf8" });
+  spawnSync("git", ["commit", "-m", "feat: initial"], { cwd: join(temp, "git-safe"), encoding: "utf8" });
 }
 
 function plainSmoke() {
   expectRun("malformed package", "malformed-pkg", ["info", "--plain"], ["MALFORMED_PROJECT_FILE", "package.json"]);
-  expectRun("malformed p-setup config", "malformed-config", ["info", "--plain"], ["PROJECT_CONFIG_INVALID", ".p-setup.json"]);
+  expectRun("malformed setupr config", "malformed-config", ["info", "--plain"], ["PROJECT_CONFIG_INVALID", ".setupr.json"]);
   expectRun("missing env template", "env-missing", ["env", "init", "--plain"], ["ENV_TEMPLATE_MISSING"]);
   expectRun("forced empty env", "env-missing", ["env", "init", "--plain", "--force"], ["Created empty .env"]);
   expectRun("bad env smart", "env-bad", ["env", "smart", "--plain"], ["ENV_SMART_FAILED", "4 issues"]);
@@ -69,6 +92,13 @@ function plainSmoke() {
   expectRun("missing lock/log/repo", "env-missing", ["diff", "--plain"], ["LOCK_STATE_MISSING"]);
   expectRun("missing logs", "env-missing", ["logs", "--plain"], ["LOG_FILE_MISSING"]);
   expectRun("missing remote", "env-missing", ["open", "repo", "--plain"], ["OPEN_TARGET_MISSING"]);
+  expectRun("new command ci", "js-new", ["ci", "github", "--plain"], ["Generated github CI config"]);
+  expectRun("new command docker", "js-new", ["docker", "generate", "--plain", "--force"], ["Dockerfile", "Docker files generated"]);
+  expectRun("new command secrets", "js-new", ["secrets", "init", "--plain", "--force"], ["Generated encryption key", "Added secrets.key to .gitignore"]);
+  expectRun("new command share", "js-new", ["share", "export", "--plain"], ["Exported"]);
+  expectRun("new command workspace", "monorepo", ["workspace", "list", "--plain"], ["Workspace Packages", "a"]);
+  expectRun("new command scaffold nested", "js-new", ["scaffold", "test", "src/lib/math.ts", "--plain"], ["Created test: src/lib/math.test.ts"]);
+  expectNoFile("git shell injection blocked", "git-safe", ["git", "branch", "create", `bad; touch ${join(temp, "git-pwned")} #`, "--plain"], join(temp, "git-pwned"));
 }
 
 function tuiSmoke() {
@@ -99,7 +129,7 @@ function tuiSmoke() {
     timeout: 12_000,
   });
   const output = `${result.stdout || ""}\n${result.stderr || ""}`;
-  const ok = output.includes("P-Setup Doctor") || output.includes("Diagnostics") || output.includes("Environment");
+  const ok = output.includes("Setupr Doctor") || output.includes("Diagnostics") || output.includes("Environment");
   if (ok) {
     results.push({ name: "tui doctor capture", ok: true, details: "captured TUI launch text" });
   } else {
@@ -124,6 +154,17 @@ function expectRun(name, fixture, args, expected, options = {}) {
   });
 }
 
+function expectNoFile(name, fixture, args, forbiddenPath, options = {}) {
+  const result = run(fixture, args, options);
+  results.push({
+    name,
+    ok: !fileExists(forbiddenPath),
+    details: fileExists(forbiddenPath)
+      ? `forbidden marker was created\n${trim(result.stdout + result.stderr)}`
+      : "marker not created",
+  });
+}
+
 function run(fixture, args, options = {}) {
   return spawnSync(process.execPath, [cli, ...args], {
     cwd: join(temp, fixture),
@@ -134,7 +175,7 @@ function run(fixture, args, options = {}) {
 }
 
 function report() {
-  console.log(`\nP-Setup fixture smoke`);
+  console.log(`\nSetupr fixture smoke`);
   console.log(`Fixtures: ${temp}${keep ? "" : " (will be removed)"}`);
   let failed = 0;
   for (const result of results) {
@@ -158,6 +199,14 @@ function dir(path) {
 
 function write(path, content) {
   writeFileSync(join(temp, path), content);
+}
+
+function fileExists(path) {
+  try {
+    return spawnSync("test", ["-e", path]).status === 0;
+  } catch {
+    return false;
+  }
 }
 
 function trim(value) {

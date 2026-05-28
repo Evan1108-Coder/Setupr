@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { runCommand } from "../../executor/index.js";
+import { runCommand, runCommandArgs } from "../../executor/index.js";
 import { createSetuprError, printPlainError } from "../../errors/index.js";
 import { scanProject } from "../../scanner/index.js";
 import { loadConfig } from "../../state/config.js";
@@ -71,7 +71,7 @@ async function gitInit(cwd: string, flags: GitFlags): Promise<void> {
   const config = await loadConfig();
   const branch = config.preferences.defaultBranch;
 
-  await runCommand(`git init -b ${branch}`, cwd);
+  await runCommandArgs("git", ["init", "-b", branch], cwd);
   console.log(chalk.green(`✓ Initialized git repository (branch: ${branch})`));
 
   const scan = await scanProject(cwd);
@@ -153,7 +153,7 @@ async function gitFlow(cwd: string, flags: GitFlags): Promise<void> {
       printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "flow", cwd, details: ["Usage: setup git flow feature <name>"] }));
       return;
     }
-    await runCommand(`git checkout -b feature/${name}`, cwd);
+    await runCommandArgs("git", ["checkout", "-b", `feature/${name}`], cwd);
     console.log(chalk.green(`✓ Created and switched to feature/${name}`));
   } else if (action === "hotfix") {
     const name = flags.args?.[1];
@@ -161,7 +161,9 @@ async function gitFlow(cwd: string, flags: GitFlags): Promise<void> {
       printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "flow", cwd, details: ["Usage: setup git flow hotfix <name>"] }));
       return;
     }
-    await runCommand(`git checkout ${main} && git pull && git checkout -b hotfix/${name}`, cwd);
+    await runCommandArgs("git", ["checkout", main], cwd);
+    await runCommandArgs("git", ["pull"], cwd);
+    await runCommandArgs("git", ["checkout", "-b", `hotfix/${name}`], cwd);
     console.log(chalk.green(`✓ Created hotfix/${name} from ${main}`));
   } else if (action === "release") {
     const version = flags.args?.[1];
@@ -169,13 +171,14 @@ async function gitFlow(cwd: string, flags: GitFlags): Promise<void> {
       printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "flow", cwd, details: ["Usage: setup git flow release <version>"] }));
       return;
     }
-    await runCommand(`git checkout -b release/${version}`, cwd);
+    await runCommandArgs("git", ["checkout", "-b", `release/${version}`], cwd);
     console.log(chalk.green(`✓ Created release/${version}`));
   } else if (action === "finish") {
     const result = await runCommand("git branch --show-current", cwd);
     const branch = result.stdout.trim();
     if (branch.startsWith("feature/") || branch.startsWith("hotfix/") || branch.startsWith("release/")) {
-      await runCommand(`git checkout ${main} && git merge --no-ff ${branch}`, cwd);
+      await runCommandArgs("git", ["checkout", main], cwd);
+      await runCommandArgs("git", ["merge", "--no-ff", branch], cwd);
       console.log(chalk.green(`✓ Merged ${branch} into ${main}`));
     } else {
       console.log(chalk.yellow("Not on a flow branch (feature/, hotfix/, release/)."));
@@ -244,7 +247,7 @@ async function gitCommit(cwd: string, flags: GitFlags): Promise<void> {
     }
   }
 
-  const result = await runCommand(`git commit -m "${message.replace(/"/g, '\\"')}"`, cwd);
+  const result = await runCommandArgs("git", ["commit", "-m", message], cwd);
   if (result.exitCode === 0) {
     console.log(chalk.green(`✓ Committed: ${message}`));
   } else {
@@ -277,7 +280,7 @@ async function gitBranch(cwd: string, flags: GitFlags): Promise<void> {
       printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "branch", cwd, details: ["Usage: setup git branch create <name>"] }));
       return;
     }
-    const result = await runCommand(`git checkout -b ${name}`, cwd);
+    const result = await runCommandArgs("git", ["checkout", "-b", name], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Created and switched to ${name}`));
     } else {
@@ -287,7 +290,7 @@ async function gitBranch(cwd: string, flags: GitFlags): Promise<void> {
     const name = flags.args?.[1];
     if (!name) return;
     const flag = flags.force ? "-D" : "-d";
-    const result = await runCommand(`git branch ${flag} ${name}`, cwd);
+    const result = await runCommandArgs("git", ["branch", flag, name], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Deleted branch ${name}`));
     } else {
@@ -296,14 +299,14 @@ async function gitBranch(cwd: string, flags: GitFlags): Promise<void> {
   } else if (action === "switch") {
     const name = flags.args?.[1];
     if (!name) return;
-    const result = await runCommand(`git checkout ${name}`, cwd);
+    const result = await runCommandArgs("git", ["checkout", name], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Switched to ${name}`));
     } else {
       printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "branch", cwd, details: [result.stderr] }));
     }
   } else {
-    const result = await runCommand(`git checkout ${action}`, cwd);
+    const result = await runCommandArgs("git", ["checkout", action], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Switched to ${action}`));
     } else {
@@ -323,7 +326,7 @@ async function gitPR(cwd: string, flags: GitFlags): Promise<void> {
     console.log(chalk.yellow("GitHub CLI (gh) not installed. Install from https://cli.github.com"));
     console.log(chalk.dim("  Falling back to push + URL..."));
     const branch = (await runCommand("git branch --show-current", cwd)).stdout.trim();
-    const pushResult = await runCommand(`git push -u origin ${branch}`, cwd);
+    const pushResult = await runCommandArgs("git", ["push", "-u", "origin", branch], cwd);
     if (pushResult.exitCode === 0) {
       const remote = (await runCommand("git remote get-url origin", cwd)).stdout.trim()
         .replace(/\.git$/, "").replace("git@github.com:", "https://github.com/");
@@ -337,8 +340,9 @@ async function gitPR(cwd: string, flags: GitFlags): Promise<void> {
   const action = flags.args?.[0] || "create";
   if (action === "create") {
     const title = flags.args?.[1] || flags.message;
-    const cmd = title ? `gh pr create --title "${title.replace(/"/g, '\\"')}" --fill` : "gh pr create --fill";
-    const result = await runCommand(cmd, cwd);
+    const result = title
+      ? await runCommandArgs("gh", ["pr", "create", "--title", title, "--fill"], cwd)
+      : await runCommandArgs("gh", ["pr", "create", "--fill"], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ PR created: ${result.stdout.trim()}`));
     } else {
@@ -363,8 +367,9 @@ async function gitStash(cwd: string, flags: GitFlags): Promise<void> {
 
   if (action === "push" || action === "save") {
     const message = flags.args?.slice(1).join(" ") || flags.message || "";
-    const cmd = message ? `git stash push -m "${message.replace(/"/g, '\\"')}"` : "git stash push";
-    const result = await runCommand(cmd, cwd);
+    const result = message
+      ? await runCommandArgs("git", ["stash", "push", "-u", "-m", message], cwd)
+      : await runCommandArgs("git", ["stash", "push", "-u"], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Stashed changes${message ? `: ${message}` : ""}`));
     } else {
@@ -387,7 +392,7 @@ async function gitStash(cwd: string, flags: GitFlags): Promise<void> {
     }
   } else if (action === "apply") {
     const index = flags.args?.[1] || "0";
-    const result = await runCommand(`git stash apply stash@{${index}}`, cwd);
+    const result = await runCommandArgs("git", ["stash", "apply", `stash@{${index}}`], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Applied stash@{${index}}`));
     } else {
@@ -395,7 +400,7 @@ async function gitStash(cwd: string, flags: GitFlags): Promise<void> {
     }
   } else if (action === "drop") {
     const index = flags.args?.[1] || "0";
-    const result = await runCommand(`git stash drop stash@{${index}}`, cwd);
+    const result = await runCommandArgs("git", ["stash", "drop", `stash@{${index}}`], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Dropped stash@{${index}}`));
     } else {
@@ -422,7 +427,7 @@ async function gitRebase(cwd: string, flags: GitFlags): Promise<void> {
     const config = await loadConfig();
     const main = config.preferences.defaultBranch;
     console.log(chalk.blue(`Rebasing onto ${main}...`));
-    const result = await runCommand(`git rebase ${main}`, cwd);
+    const result = await runCommandArgs("git", ["rebase", main], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Rebased onto ${main}`));
     } else {
@@ -442,7 +447,7 @@ async function gitRebase(cwd: string, flags: GitFlags): Promise<void> {
       printPlainError(createSetuprError({ code: "GIT_MERGE_CONFLICT", command: "git", subcommand: "rebase", cwd, details: [result.stderr] }));
     }
   } else {
-    const result = await runCommand(`git rebase ${target}`, cwd);
+    const result = await runCommandArgs("git", ["rebase", target], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Rebased onto ${target}`));
     } else {
@@ -476,7 +481,7 @@ async function gitTag(cwd: string, flags: GitFlags): Promise<void> {
       return;
     }
     const message = flags.message || `Release ${version}`;
-    const result = await runCommand(`git tag -a "${version}" -m "${message.replace(/"/g, '\\"')}"`, cwd);
+    const result = await runCommandArgs("git", ["tag", "-a", version, "-m", message], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Created tag ${version}`));
     } else {
@@ -492,12 +497,12 @@ async function gitTag(cwd: string, flags: GitFlags): Promise<void> {
   } else if (action === "delete") {
     const tag = flags.args?.[1];
     if (!tag) return;
-    await runCommand(`git tag -d ${tag}`, cwd);
+    await runCommandArgs("git", ["tag", "-d", tag], cwd);
     console.log(chalk.green(`✓ Deleted local tag ${tag}`));
   } else {
     const version = action;
     const message = flags.message || `Release ${version}`;
-    const result = await runCommand(`git tag -a "${version}" -m "${message.replace(/"/g, '\\"')}"`, cwd);
+    const result = await runCommandArgs("git", ["tag", "-a", version, "-m", message], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Created tag ${version}`));
     } else {
@@ -542,15 +547,15 @@ async function gitRelease(cwd: string, flags: GitFlags): Promise<void> {
   } catch {}
 
   await runCommand("git add -A", cwd);
-  await runCommand(`git commit -m "chore: release ${version}"`, cwd);
+  await runCommandArgs("git", ["commit", "-m", `chore: release ${version}`], cwd);
   console.log(chalk.green(`  ✓ Committed release`));
 
-  await runCommand(`git tag -a "v${version}" -m "Release ${version}"`, cwd);
+  await runCommandArgs("git", ["tag", "-a", `v${version}`, "-m", `Release ${version}`], cwd);
   console.log(chalk.green(`  ✓ Tagged v${version}`));
 
   const ghCheck = await runCommand("gh --version", cwd);
   if (ghCheck.exitCode === 0) {
-    const result = await runCommand(`gh release create "v${version}" --title "v${version}" --generate-notes`, cwd);
+    const result = await runCommandArgs("gh", ["release", "create", `v${version}`, "--title", `v${version}`, "--generate-notes"], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`  ✓ GitHub release created`));
     }
@@ -631,7 +636,7 @@ async function gitSync(cwd: string): Promise<void> {
     console.log(chalk.green("  ✓ Pushed local commits"));
   } else if (pushResult.exitCode !== 0 && pushResult.stderr.includes("no upstream")) {
     const branch = (await runCommand("git branch --show-current", cwd)).stdout.trim();
-    await runCommand(`git push -u origin ${branch}`, cwd);
+    await runCommandArgs("git", ["push", "-u", "origin", branch], cwd);
     console.log(chalk.green(`  ✓ Set upstream and pushed ${branch}`));
   }
 
@@ -649,7 +654,7 @@ async function gitClean(cwd: string, flags: GitFlags): Promise<void> {
   if (action === "merged") {
     const config = await loadConfig();
     const main = config.preferences.defaultBranch;
-    const result = await runCommand(`git branch --merged ${main}`, cwd);
+    const result = await runCommandArgs("git", ["branch", "--merged", main], cwd);
     const branches = result.stdout.trim().split("\n")
       .map(b => b.trim())
       .filter(b => b && !b.startsWith("*") && b !== main && b !== "master" && b !== "develop");
@@ -666,7 +671,7 @@ async function gitClean(cwd: string, flags: GitFlags): Promise<void> {
 
     if (flags.force) {
       for (const b of branches) {
-        await runCommand(`git branch -d ${b}`, cwd);
+        await runCommandArgs("git", ["branch", "-d", b], cwd);
       }
       console.log(chalk.green(`✓ Deleted ${branches.length} merged branches`));
     } else {
@@ -815,11 +820,9 @@ async function gitBlame(cwd: string, flags: GitFlags): Promise<void> {
   }
 
   const lineRange = flags.args?.[1];
-  const cmd = lineRange
-    ? `git blame -L ${lineRange} "${file}"`
-    : `git blame --color-lines "${file}" | head -40`;
-
-  const result = await runCommand(cmd, cwd);
+  const result = lineRange
+    ? await runCommandArgs("git", ["blame", "-L", lineRange, file], cwd)
+    : await runCommandArgs("git", ["blame", "--color-lines", file], cwd);
   if (result.exitCode === 0) {
     console.log(chalk.blue.bold(`\n  Blame: ${file}\n`));
     console.log(result.stdout);
@@ -852,7 +855,7 @@ async function gitCherryPick(cwd: string, flags: GitFlags): Promise<void> {
     return;
   }
 
-  const result = await runCommand(`git cherry-pick ${commit}`, cwd);
+  const result = await runCommandArgs("git", ["cherry-pick", commit], cwd);
   if (result.exitCode === 0) {
     console.log(chalk.green(`✓ Cherry-picked ${commit}`));
   } else {
@@ -879,7 +882,7 @@ async function gitWorktree(cwd: string, flags: GitFlags): Promise<void> {
       printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "worktree", cwd, details: ["Usage: setup git worktree add <branch> [path]"] }));
       return;
     }
-    const result = await runCommand(`git worktree add "${path}" ${branch}`, cwd);
+    const result = await runCommandArgs("git", ["worktree", "add", path, branch], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Created worktree at ${path} (branch: ${branch})`));
     } else {
@@ -888,7 +891,7 @@ async function gitWorktree(cwd: string, flags: GitFlags): Promise<void> {
   } else if (action === "remove") {
     const path = flags.args?.[1];
     if (!path) return;
-    const result = await runCommand(`git worktree remove "${path}"`, cwd);
+    const result = await runCommandArgs("git", ["worktree", "remove", path], cwd);
     if (result.exitCode === 0) {
       console.log(chalk.green(`✓ Removed worktree at ${path}`));
     } else {
@@ -915,7 +918,7 @@ async function gitBisect(cwd: string, flags: GitFlags): Promise<void> {
       printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "bisect", cwd, details: ["Usage: setup git bisect start [bad] <good>"] }));
       return;
     }
-    await runCommand(`git bisect start ${bad} ${good}`, cwd);
+    await runCommandArgs("git", ["bisect", "start", bad, good], cwd);
     console.log(chalk.green(`✓ Bisect started (bad: ${bad}, good: ${good})`));
     console.log(chalk.dim("  Test this commit, then run: setup git bisect good/bad"));
   } else if (action === "good") {

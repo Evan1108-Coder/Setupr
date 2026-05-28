@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { mkdir, writeFile } from "fs/promises";
 import { existsSync } from "fs";
-import { join } from "path";
+import { dirname, join } from "path";
 import { createSetuprError, printPlainError } from "../../errors/index.js";
 
 interface ScaffoldFlags {
@@ -269,6 +269,7 @@ describe("${moduleName}", () => {
 });
 `;
 
+  await mkdir(dirname(join(cwd, testPath)), { recursive: true });
   await writeFile(join(cwd, testPath), content);
   console.log(chalk.green(`✓ Created test: ${testPath}`));
 }

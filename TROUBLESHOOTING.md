@@ -147,5 +147,5 @@ Override detection with a `.setupr.json` file:
 
 - Run `setup --help` for command reference
 - Run `setup doctor` to diagnose environment issues
-- Run `npm run smoke:fixtures` from the repository before publishing or after large error/TUI/auth/env changes
+- Run `npm run smoke:fixtures` from the repository before publishing or after large error/TUI/auth/env/command-execution changes
 - File issues at: https://github.com/Evan1108-Coder/Setupr/issues

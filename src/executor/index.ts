@@ -208,6 +208,57 @@ export function runCommand(
   });
 }
 
+export function runCommandArgs(
+  command: string,
+  args: string[],
+  cwd: string,
+  onLine?: (line: string) => void,
+  signal?: AbortSignal
+): Promise<CommandResult> {
+  return new Promise((resolve) => {
+    const env = { ...process.env };
+    if (!env.NO_COLOR) env.FORCE_COLOR = "1";
+    const proc = spawn(command, args, {
+      cwd,
+      shell: false,
+      env,
+    });
+
+    if (signal) {
+      signal.addEventListener("abort", () => {
+        proc.kill("SIGTERM");
+      }, { once: true });
+    }
+
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout?.on("data", (data) => {
+      const str = data.toString();
+      stdout += str;
+      str.split("\n").filter(Boolean).forEach((line: string) => {
+        try { onLine?.(line); } catch {}
+      });
+    });
+
+    proc.stderr?.on("data", (data) => {
+      const str = data.toString();
+      stderr += str;
+      str.split("\n").filter(Boolean).forEach((line: string) => {
+        try { onLine?.(line); } catch {}
+      });
+    });
+
+    proc.on("close", (code) => {
+      resolve({ stdout, stderr, exitCode: code ?? 1 });
+    });
+
+    proc.on("error", (err) => {
+      resolve({ stdout, stderr: err.message, exitCode: 1 });
+    });
+  });
+}
+
 export async function executeAllSteps(
   steps: SetupStep[],
   cwd: string,

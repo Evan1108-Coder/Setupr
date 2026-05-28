@@ -139,17 +139,25 @@ function inputLinesForPanel(panelHeight: number): number {
 
 function buildFocusItems(width: number, height: number, mainWidth: number, sideWidth: number, stacked: boolean): FocusItem[] {
   if (stacked) {
+    const mainPanelHeight = Math.max(8, height - 11);
+    const inputHeight = inputBoundsHeightForPanel(mainPanelHeight);
     return [
-      { id: "diagnostics", row: 0, column: 0, redirectTo: "input", bounds: { x: 1, y: 2, width, height: Math.max(8, height - 11) } },
-      { id: "input", row: 1, column: 0, parentIds: ["diagnostics"], bounds: { x: 3, y: Math.max(4, height - 12), width: width - 4, height: 3 } },
+      { id: "diagnostics", row: 0, column: 0, redirectTo: "input", bounds: { x: 1, y: 2, width, height: mainPanelHeight } },
+      { id: "input", row: 1, column: 0, parentIds: ["diagnostics"], bounds: { x: 3, y: Math.max(4, 2 + mainPanelHeight - inputHeight - 1), width: width - 4, height: inputHeight } },
       { id: "environment", row: 2, column: 0, bounds: { x: 1, y: Math.max(3, height - 9), width, height: 8 } },
     ];
   }
+  const mainPanelHeight = height - 2;
+  const inputHeight = inputBoundsHeightForPanel(mainPanelHeight);
   return [
-    { id: "diagnostics", row: 0, column: 0, redirectTo: "input", bounds: { x: 1, y: 2, width: mainWidth, height: height - 2 } },
-    { id: "input", row: 1, column: 0, parentIds: ["diagnostics"], bounds: { x: 3, y: Math.max(4, height - 4), width: mainWidth - 4, height: 3 } },
+    { id: "diagnostics", row: 0, column: 0, redirectTo: "input", bounds: { x: 1, y: 2, width: mainWidth, height: mainPanelHeight } },
+    { id: "input", row: 1, column: 0, parentIds: ["diagnostics"], bounds: { x: 3, y: Math.max(4, height - inputHeight - 1), width: mainWidth - 4, height: inputHeight } },
     { id: "environment", row: 0, column: 1, bounds: { x: mainWidth + 1, y: 2, width: sideWidth, height: height - 2 } },
   ];
+}
+
+function inputBoundsHeightForPanel(panelHeight: number): number {
+  return inputLinesForPanel(panelHeight) + 2;
 }
 
 async function runDiagnostics(scan: ScanResult, cwd: string, noProject: boolean): Promise<Check[]> {

@@ -3,7 +3,6 @@ import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { scanProject } from "../../scanner/index.js";
 import { createSetuprError, printPlainError } from "../../errors/index.js";
-import { loadConfig } from "../../state/config.js";
 
 interface CIFlags {
   force?: boolean;

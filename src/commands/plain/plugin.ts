@@ -3,7 +3,7 @@ import { readFile, mkdir, rm } from "fs/promises";
 import { join } from "path";
 import { createSetuprError, printPlainError } from "../../errors/index.js";
 import { loadConfig, saveConfig } from "../../state/config.js";
-import { runCommand } from "../../executor/index.js";
+import { runCommandArgs } from "../../executor/index.js";
 
 interface PluginManifest {
   name: string;
@@ -69,18 +69,22 @@ async function pluginInstall(cwd: string, flags: { args?: string[]; force?: bool
   const pluginsDir = join(cwd, ".setupr", "plugins");
   await mkdir(pluginsDir, { recursive: true });
 
-  const isUrl = name.startsWith("http") || name.includes("/");
+  const isGitSource = name.startsWith("http://")
+    || name.startsWith("https://")
+    || name.startsWith("git@")
+    || name.startsWith("ssh://")
+    || name.endsWith(".git");
 
   try {
-    if (isUrl) {
+    if (isGitSource) {
       const pluginDir = join(pluginsDir, name.split("/").pop()?.replace(/\.git$/, "") || "plugin");
-      await runCommand(`git clone --depth 1 ${name} ${pluginDir}`, cwd);
+      await runCommandArgs("git", ["clone", "--depth", "1", name, pluginDir], cwd);
       console.log(chalk.green(`✓ Installed plugin from ${name}`));
     } else {
       // npm-style install from registry
-      const pluginDir = join(pluginsDir, name);
+      const pluginDir = join(pluginsDir, name.replace(/[\\/]/g, "__"));
       await mkdir(pluginDir, { recursive: true });
-      const result = await runCommand(`npm pack ${name} --pack-destination ${pluginDir}`, cwd);
+      const result = await runCommandArgs("npm", ["pack", name, "--pack-destination", pluginDir], cwd);
       if (result.exitCode !== 0) {
         printPlainError(
           createSetuprError({
@@ -101,7 +105,7 @@ async function pluginInstall(cwd: string, flags: { args?: string[]; force?: bool
     const plugins = config.plugins || [];
     const existing = plugins.find((p) => p.name === name);
     if (!existing) {
-      plugins.push({ name, version: "latest", enabled: true, source: isUrl ? "git" : "npm" });
+      plugins.push({ name, version: "latest", enabled: true, source: isGitSource ? "git" : "npm" });
       config.plugins = plugins;
       await saveConfig(config);
     }

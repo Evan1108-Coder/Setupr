@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { readFile, writeFile, mkdir } from "fs/promises";
-import { join, basename } from "path";
+import { isAbsolute, join, basename } from "path";
 import { createSetuprError, printPlainError } from "../../errors/index.js";
 import { scanProject } from "../../scanner/index.js";
 
@@ -51,7 +51,7 @@ export async function cmdShare(
 
 async function shareExport(cwd: string, flags: { args?: string[]; force?: boolean }): Promise<void> {
   const outputName = flags.args?.[0] || `${basename(cwd)}.setupr.json`;
-  const outputPath = join(cwd, outputName);
+  const outputPath = resolveSharePath(cwd, outputName);
 
   try {
     const scan = await scanProject(cwd);
@@ -118,7 +118,7 @@ async function shareImport(cwd: string, flags: { args?: string[]; force?: boolea
   }
 
   try {
-    const inputPath = join(cwd, inputName);
+    const inputPath = resolveSharePath(cwd, inputName);
     const raw = await readFile(inputPath, "utf-8");
     const config: ShareConfig = JSON.parse(raw);
 
@@ -195,7 +195,7 @@ async function shareInspect(cwd: string, flags: { args?: string[] }): Promise<vo
   }
 
   try {
-    const inputPath = join(cwd, inputName);
+    const inputPath = resolveSharePath(cwd, inputName);
     const raw = await readFile(inputPath, "utf-8");
     const config: ShareConfig = JSON.parse(raw);
 
@@ -242,4 +242,8 @@ async function shareInspect(cwd: string, flags: { args?: string[] }): Promise<vo
       })
     );
   }
+}
+
+function resolveSharePath(cwd: string, file: string): string {
+  return isAbsolute(file) ? file : join(cwd, file);
 }

@@ -1,5 +1,4 @@
 import { loadConfig, saveConfig } from "../state/config.js";
-import { createSetuprError } from "../errors/index.js";
 
 interface TelemetryEvent {
   event: string;

@@ -254,13 +254,14 @@ function buildFocusItems(layout: Layout): FocusItem[] {
     const stepsY = projectY + projectHeight;
     const diaryY = stepsY + stepHeight;
     const noticesY = diaryY + diaryHeight;
-    const inputY = Math.max(diaryY + 2, diaryY + diaryHeight - 3);
+    const inputHeight = inputBoundsHeightForPanel(diaryHeight);
+    const inputY = Math.max(diaryY + 2, diaryY + diaryHeight - inputHeight - 1);
 
     return [
       { id: "project", row: 0, column: 0, bounds: { x: 1, y: projectY, width: layout.width, height: projectHeight } },
       { id: "steps", row: 1, column: 0, bounds: { x: 1, y: stepsY, width: layout.width, height: stepHeight } },
       { id: "diary", row: 2, column: 0, redirectTo: "input", bounds: { x: 1, y: diaryY, width: layout.width, height: diaryHeight } },
-      { id: "input", row: 3, column: 0, parentIds: ["diary"], bounds: { x: 3, y: inputY, width: layout.width - 4, height: 3 } },
+      { id: "input", row: 3, column: 0, parentIds: ["diary"], bounds: { x: 3, y: inputY, width: layout.width - 4, height: inputHeight } },
       { id: "side", row: 4, column: 0, bounds: { x: 1, y: noticesY, width: layout.width, height: noticesHeight } },
     ];
   }
@@ -268,7 +269,8 @@ function buildFocusItems(layout: Layout): FocusItem[] {
   const [stepsW, projectW, depsW, envW, servicesW, currentW] = layout.infoWidths;
   const infoY = 2;
   const mainY = 2 + layout.infoHeight;
-  const inputY = Math.max(mainY + 3, layout.height - 4);
+  const inputHeight = inputBoundsHeightForPanel(layout.mainHeight);
+  const inputY = Math.max(mainY + 3, layout.height - inputHeight - 1);
   const sideX = layout.mainWidth + 1;
 
   let x = 1;
@@ -286,7 +288,7 @@ function buildFocusItems(layout: Layout): FocusItem[] {
   x += servicesW;
   items.push({ id: "current", row: 0, column: 5, bounds: { x, y: infoY, width: currentW, height: layout.infoHeight } });
   items.push({ id: "diary", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: mainY, width: layout.mainWidth, height: layout.mainHeight } });
-  items.push({ id: "input", row: 2, column: 0, parentIds: ["diary"], bounds: { x: 3, y: inputY, width: layout.mainWidth - 4, height: 3 } });
+  items.push({ id: "input", row: 2, column: 0, parentIds: ["diary"], bounds: { x: 3, y: inputY, width: layout.mainWidth - 4, height: inputHeight } });
   items.push({ id: "side", row: 1, column: 1, bounds: { x: sideX, y: mainY, width: layout.sideWidth, height: layout.mainHeight } });
   return items;
 }
@@ -843,6 +845,10 @@ interface WideSetupProps {
 
 function inputLinesForPanel(panelHeight: number): number {
   return Math.max(1, Math.floor(panelHeight / 4));
+}
+
+function inputBoundsHeightForPanel(panelHeight: number): number {
+  return inputLinesForPanel(panelHeight) + 2;
 }
 
 function stackedSectionHeights(height: number) {
