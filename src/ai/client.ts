@@ -54,6 +54,16 @@ export interface ChatOptions {
   timeoutMs?: number;
 }
 
+interface AnthropicResponse {
+  content?: Array<{ type?: string; text?: string }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+interface GoogleResponse {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  usageMetadata?: { totalTokenCount?: number };
+}
+
 export async function chat(
   messages: ChatMessage[],
   options?: ChatOptions
@@ -118,7 +128,7 @@ async function chatAnthropic(
   const systemMsg = messages.find((m) => m.role === "system");
   const nonSystemMessages = messages.filter((m) => m.role !== "system");
 
-  const body: any = {
+  const body: Record<string, unknown> = {
     model: model.id,
     max_tokens: options?.maxTokens ?? 2048,
     messages: nonSystemMessages.map((m) => ({ role: m.role, content: m.content })),
@@ -140,11 +150,11 @@ async function chatAnthropic(
   });
 
   if (!response.ok) {
-    const err = await response.text();
+    const err = (await response.text()).slice(0, 1000);
     throw new Error(`Anthropic API error: ${response.status} ${err}`);
   }
 
-  const data = await response.json() as any;
+  const data = await response.json() as AnthropicResponse;
   const content = data.content?.[0]?.text || "";
   const inputTokens = data.usage?.input_tokens || 0;
   const outputTokens = data.usage?.output_tokens || 0;
@@ -168,7 +178,7 @@ async function chatGoogle(
     parts: [{ text: m.content }],
   }));
 
-  const body: any = { contents };
+  const body: Record<string, unknown> = { contents };
   if (systemMsg) {
     body.systemInstruction = { parts: [{ text: systemMsg.content }] };
   }
@@ -186,11 +196,11 @@ async function chatGoogle(
   });
 
   if (!response.ok) {
-    const err = await response.text();
+    const err = (await response.text()).slice(0, 1000);
     throw new Error(`Google AI error: ${response.status} ${err}`);
   }
 
-  const data = await response.json() as any;
+  const data = await response.json() as GoogleResponse;
   const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
   const totalTokens = data.usageMetadata?.totalTokenCount || 0;
 

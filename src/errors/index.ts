@@ -161,10 +161,23 @@ export function classifyAIProviderError(error: unknown, context: Partial<PSetupE
 }
 
 export function sanitizeSecret(value: string): string {
-  return value
-    .replace(/sk-[A-Za-z0-9_-]{8,}/g, "sk-****")
-    .replace(/gh[pousr]_[A-Za-z0-9_]{8,}/g, "gh_****")
-    .replace(/([A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=)([^\\s]+)/gi, "$1****");
+  let result = value;
+  result = result.replace(
+    /([A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=)([^\s]+)/gi,
+    (_, prefix: string, val: string) => {
+      if (/^sk-ant-/i.test(val)) return `${prefix}sk-ant-****`;
+      if (/^sk-/i.test(val)) return `${prefix}sk-****`;
+      return `${prefix}****`;
+    }
+  );
+  result = result.replace(/\bsk-ant-[A-Za-z0-9_-]{8,}\b/g, "sk-ant-****");
+  result = result.replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, "sk-****");
+  result = result.replace(/\bgh[pousr]_[A-Za-z0-9_]{8,}\b/g, "gh_****");
+  result = result.replace(/\bgithub_pat_[A-Za-z0-9_]{8,}\b/g, "github_pat_****");
+  result = result.replace(/\bgsk_[A-Za-z0-9_]{8,}\b/g, "gsk_****");
+  result = result.replace(/\bAIza[A-Za-z0-9_-]{30,}\b/g, "AIza****");
+  result = result.replace(/\bxai-[A-Za-z0-9_-]{8,}\b/g, "xai-****");
+  return result;
 }
 
 function usefulExcerpt(value: string): string {

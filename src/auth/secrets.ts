@@ -47,6 +47,7 @@ export function secretsPath(): string {
 
 export function loadAuthSecretsSync(): AuthSecretsFile {
   if (!existsSync(secretsPath())) return emptySecrets();
+  ensureAuthFileModeSync();
   try {
     const parsed = JSON.parse(readFileSync(secretsPath(), "utf-8")) as Partial<AuthSecretsFile>;
     return {
@@ -59,8 +60,13 @@ export function loadAuthSecretsSync(): AuthSecretsFile {
 }
 
 export async function loadAuthSecrets(): Promise<AuthSecretsFile> {
+  const path = secretsPath();
+  if (!existsSync(path)) return emptySecrets();
   try {
-    const parsed = JSON.parse(await readFile(secretsPath(), "utf-8")) as Partial<AuthSecretsFile>;
+    await chmod(path, SECRET_FILE_MODE);
+  } catch {}
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf-8")) as Partial<AuthSecretsFile>;
     return {
       version: 1,
       providers: sanitizeProviders(parsed.providers || {}),

@@ -2,7 +2,7 @@ import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import type { ScanResult } from "../scanner/index.js";
 import type { SetupStep } from "./planner.js";
-import { sanitizeSecret } from "../errors/index.js";
+import { createPSetupError, sanitizeSecret } from "../errors/index.js";
 
 export type SetupTimelineEvent =
   | {
@@ -506,7 +506,15 @@ export async function mergeEnvValues(cwd: string, values: Record<string, string>
     if (!seen.has(key)) lines.push(`${key}=${value}`);
   }
 
-  await writeFile(envPath, lines.join("\n").replace(/\n*$/, "\n"));
+  try {
+    await writeFile(envPath, lines.join("\n").replace(/\n*$/, "\n"));
+  } catch (err) {
+    throw createPSetupError({
+      code: "ENV_WRITE_FAILED",
+      cwd,
+      details: [err instanceof Error ? err.message : String(err)],
+    });
+  }
 }
 
 export function envInterpretationToRecord(parsed: EnvBatchInterpretation): Record<string, string> {

@@ -386,6 +386,10 @@ async function cmdRun(script: string | undefined, cwd: string) {
     printPlainError(createPSetupError({ code: "MISSING_SCRIPT", command: "run", cwd, details: ["Usage: setup run <script>"] }));
     return;
   }
+  if (!/^[a-zA-Z0-9:._-]+$/.test(script)) {
+    printPlainError(createPSetupError({ code: "COMMAND_FAILED", command: "run", cwd, details: [`Invalid script name: ${script}`] }));
+    return;
+  }
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
   const cmd = `${pm} run ${script}`;
@@ -395,6 +399,10 @@ async function cmdRun(script: string | undefined, cwd: string) {
 async function cmdSwitch(version: string | undefined, cwd: string) {
   if (!version) {
     printPlainError(createPSetupError({ code: "MISSING_RUNTIME", command: "switch", cwd, details: ["Usage: setup switch <version>"] }));
+    return;
+  }
+  if (!/^[a-zA-Z0-9._-]+$/.test(version)) {
+    printPlainError(createPSetupError({ code: "COMMAND_FAILED", command: "switch", cwd, details: [`Invalid version format: ${version}`] }));
     return;
   }
   console.log(chalk.blue(`Switching to version: ${version}`));
@@ -407,6 +415,10 @@ async function cmdAdd(pkg: string | undefined, cwd: string) {
     printPlainError(createPSetupError({ code: "UNKNOWN_SUBCOMMAND", command: "add", cwd, details: ["Usage: setup add <package>"] }));
     return;
   }
+  if (!/^[@a-zA-Z0-9/_.-]+$/.test(pkg)) {
+    printPlainError(createPSetupError({ code: "COMMAND_FAILED", command: "add", cwd, details: [`Invalid package name: ${pkg}`] }));
+    return;
+  }
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
   const cmds: Record<string, string> = { npm: "npm install", yarn: "yarn add", pnpm: "pnpm add", bun: "bun add" };
@@ -417,6 +429,10 @@ async function cmdAdd(pkg: string | undefined, cwd: string) {
 async function cmdRemove(pkg: string | undefined, cwd: string) {
   if (!pkg) {
     printPlainError(createPSetupError({ code: "UNKNOWN_SUBCOMMAND", command: "remove", cwd, details: ["Usage: setup remove <package>"] }));
+    return;
+  }
+  if (!/^[@a-zA-Z0-9/_.-]+$/.test(pkg)) {
+    printPlainError(createPSetupError({ code: "COMMAND_FAILED", command: "remove", cwd, details: [`Invalid package name: ${pkg}`] }));
     return;
   }
   const scan = await scanProject(cwd);

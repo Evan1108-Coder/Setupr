@@ -33,23 +33,32 @@ export async function scanProject(cwd: string): Promise<ScanResult> {
   const configResult = await detectFromConfig(cwd);
   const configuredRuntime = normalizeRuntime(configResult?.runtime);
 
-  const [language, framework, packageManager, runtime, services, monorepo] =
-    await Promise.all([
-      configResult?.language
-        ? Promise.resolve(configResult.language)
-        : detectLanguage(cwd),
-      configResult?.framework
-        ? Promise.resolve(configResult.framework)
-        : detectFramework(cwd),
-      configResult?.packageManager
-        ? Promise.resolve(configResult.packageManager)
-        : detectPackageManager(cwd),
-      configuredRuntime
-        ? Promise.resolve(configuredRuntime)
-        : detectRuntime(cwd),
-      detectServices(cwd),
-      detectMonorepo(cwd),
-    ]);
+  const results = await Promise.allSettled([
+    configResult?.language
+      ? Promise.resolve(configResult.language)
+      : detectLanguage(cwd),
+    configResult?.framework
+      ? Promise.resolve(configResult.framework)
+      : detectFramework(cwd),
+    configResult?.packageManager
+      ? Promise.resolve(configResult.packageManager)
+      : detectPackageManager(cwd),
+    configuredRuntime
+      ? Promise.resolve(configuredRuntime)
+      : detectRuntime(cwd),
+    detectServices(cwd),
+    detectMonorepo(cwd),
+  ]);
+
+  const settled = <T>(r: PromiseSettledResult<T>, fallback: T): T =>
+    r.status === "fulfilled" ? r.value : fallback;
+
+  const language = settled(results[0], null) as string | null;
+  const framework = settled(results[1], null) as string | null;
+  const packageManager = settled(results[2], null) as string | null;
+  const runtime = settled(results[3], null) as ScanResult["runtime"];
+  const services = settled(results[4], []) as string[];
+  const monorepo = settled(results[5], null) as ScanResult["monorepo"];
 
   const scripts = await getScripts(cwd, packageManager);
   const deps = await getDependencyCounts(cwd);
@@ -143,8 +152,16 @@ async function getDependencyCounts(
   // Try go.mod (Go)
   try {
     const content = await readFile(join(cwd, "go.mod"), "utf-8");
-    const reqs = content.split("\n").filter((l) => l.trim().startsWith("require") || (l.startsWith("\t") && l.includes("/")));
-    return { prod: Math.max(reqs.length - 1, 0), dev: 0 };
+    let inRequireBlock = false;
+    let count = 0;
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("require (")) { inRequireBlock = true; continue; }
+      if (trimmed === ")" && inRequireBlock) { inRequireBlock = false; continue; }
+      if (inRequireBlock && trimmed && !trimmed.startsWith("//") && trimmed.includes("/")) { count++; continue; }
+      if (trimmed.startsWith("require ") && !trimmed.includes("(") && trimmed.includes("/")) { count++; }
+    }
+    return { prod: count, dev: 0 };
   } catch {}
 
   return { prod: 0, dev: 0 };
