@@ -4,29 +4,58 @@ import { homedir } from "os";
 
 const CONFIG_FILE = "config.json";
 
+export interface AIConfig {
+  apiKey?: string;
+  model?: string;
+  enabled: boolean;
+  timeoutMs: number;
+  maxRetries: number;
+  retryDelayMs: number;
+  rateLimitPerMinute: number;
+}
+
+export interface PluginEntry {
+  name: string;
+  version: string;
+  enabled: boolean;
+  source: string;
+}
+
 export interface UserConfig {
-  ai: {
-    apiKey?: string;
-    model?: string;
-    enabled: boolean;
-  };
+  ai: AIConfig;
   preferences: {
     theme: "dark" | "light";
     confirmBeforeInstall: boolean;
     autoUpdate: boolean;
     telemetry: boolean;
+    defaultBranch: string;
+    commitConvention: "conventional" | "angular" | "none";
+    ciPlatform: "github" | "gitlab" | "bitbucket" | "circleci" | "auto";
   };
-  remembered: Record<string, string>; // "don't ask again" answers
+  plugins: PluginEntry[];
+  telemetryId?: string;
+  lastUpdateCheck?: number;
+  remembered: Record<string, string>;
 }
 
 const DEFAULT_CONFIG: UserConfig = {
-  ai: { enabled: true },
+  ai: {
+    enabled: true,
+    timeoutMs: 30000,
+    maxRetries: 3,
+    retryDelayMs: 1000,
+    rateLimitPerMinute: 20,
+  },
   preferences: {
     theme: "dark",
     confirmBeforeInstall: true,
     autoUpdate: false,
     telemetry: false,
+    defaultBranch: "main",
+    commitConvention: "conventional",
+    ciPlatform: "auto",
   },
+  plugins: [],
   remembered: {},
 };
 
@@ -37,10 +66,13 @@ export async function loadConfig(): Promise<UserConfig> {
     return {
       ai: { ...DEFAULT_CONFIG.ai, ...(parsed.ai || {}) },
       preferences: { ...DEFAULT_CONFIG.preferences, ...(parsed.preferences || {}) },
+      plugins: Array.isArray(parsed.plugins) ? parsed.plugins : DEFAULT_CONFIG.plugins,
+      telemetryId: parsed.telemetryId,
+      lastUpdateCheck: parsed.lastUpdateCheck,
       remembered: { ...DEFAULT_CONFIG.remembered, ...(parsed.remembered || {}) },
     };
   } catch {
-    return DEFAULT_CONFIG;
+    return { ...DEFAULT_CONFIG };
   }
 }
 
@@ -52,6 +84,9 @@ export async function saveConfig(config: UserConfig): Promise<void> {
 export type UserConfigUpdates = {
   ai?: Partial<UserConfig["ai"]>;
   preferences?: Partial<UserConfig["preferences"]>;
+  plugins?: PluginEntry[];
+  telemetryId?: string;
+  lastUpdateCheck?: number;
   remembered?: Record<string, string>;
 };
 
@@ -60,6 +95,9 @@ export async function updateConfig(updates: UserConfigUpdates): Promise<UserConf
   const merged: UserConfig = {
     ai: { ...current.ai, ...(updates.ai || {}) },
     preferences: { ...current.preferences, ...(updates.preferences || {}) },
+    plugins: updates.plugins ?? current.plugins,
+    telemetryId: updates.telemetryId ?? current.telemetryId,
+    lastUpdateCheck: updates.lastUpdateCheck ?? current.lastUpdateCheck,
     remembered: { ...current.remembered, ...(updates.remembered || {}) },
   };
   await saveConfig(merged);

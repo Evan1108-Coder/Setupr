@@ -69,6 +69,59 @@ export const ERROR_CATALOG: Record<PSetupErrorCode, Template> = {
   FILESYSTEM_PERMISSION_DENIED: fs("Permission denied", "The operating system refused a file operation.", ["Check ownership and permissions."]),
   FILESYSTEM_READ_ONLY: fs("Filesystem is read-only", "P-Setup cannot write to this location.", ["Move the project or change filesystem permissions."]),
   NETWORK_UNAVAILABLE: network("Network unavailable", "A network request failed before the service could respond.", ["Check internet/VPN/proxy settings."]),
+
+  GIT_NOT_INSTALLED: git("Git not installed", "Git is not available on PATH.", ["Install git and rerun."]),
+  GIT_NOT_A_REPO: git("Not a git repository", "This directory is not inside a git repository.", ["Run setup git init or git init."]),
+  GIT_DIRTY_WORKING_TREE: git("Uncommitted changes", "The working tree has uncommitted changes that would be lost.", ["Commit or stash changes first."]),
+  GIT_BRANCH_EXISTS: git("Branch already exists", "A branch with that name already exists.", ["Choose a different name or delete the existing branch."]),
+  GIT_MERGE_CONFLICT: git("Merge conflict", "Git encountered merge conflicts that must be resolved manually.", ["Resolve conflicts, then run git add and git commit."]),
+  GIT_PUSH_FAILED: git("Push failed", "Git could not push to the remote.", ["Check remote access and branch protection rules."]),
+  GIT_REMOTE_MISSING: git("No remote configured", "This repository has no remote origin.", ["Run git remote add origin <url>."]),
+  GIT_HOOK_FAILED: git("Git hook failed", "A git hook exited with an error.", ["Fix the hook issue or use --no-verify to skip."]),
+  GIT_COMMAND_FAILED: git("Git command failed", "A git command exited with a non-zero status.", ["Check the git output for details."]),
+
+  PLUGIN_NOT_FOUND: plugin("Plugin not found", "The requested plugin is not installed.", ["Run setup plugin install <name>."]),
+  PLUGIN_INVALID: plugin("Plugin invalid", "The plugin does not export the required interface.", ["Check the plugin README for compatibility."]),
+  PLUGIN_LOAD_FAILED: plugin("Plugin failed to load", "The plugin threw an error during initialization.", ["Check plugin logs and version compatibility."]),
+  PLUGIN_REGISTRY_FAILED: plugin("Plugin registry unreachable", "Could not fetch plugin list from the registry.", ["Check network access."]),
+
+  MIGRATE_UNSUPPORTED: migration("Migration not supported", "P-Setup cannot migrate between these package managers.", ["Check supported migrations: npm↔yarn↔pnpm↔bun."]),
+  MIGRATE_LOCKFILE_CONFLICT: migration("Lockfile conflict", "Multiple lockfiles exist, which could cause conflicts.", ["Remove the old lockfile before migrating."]),
+  MIGRATE_FAILED: migration("Migration failed", "The package manager migration did not complete successfully.", ["Check output and manually resolve conflicts."]),
+
+  CI_PLATFORM_UNKNOWN: ci("CI platform not recognized", "P-Setup could not detect or does not support this CI platform.", ["Specify platform: github, gitlab, bitbucket, circleci."]),
+  CI_GENERATE_FAILED: ci("CI config generation failed", "P-Setup could not generate a valid CI configuration.", ["Check project structure and try a different platform."]),
+
+  DOCKER_NOT_INSTALLED: docker("Docker not installed", "Docker CLI is not available on PATH.", ["Install Docker and rerun."]),
+  DOCKER_GENERATE_FAILED: docker("Dockerfile generation failed", "P-Setup could not generate a Dockerfile for this project.", ["Check detected language/framework and try manually."]),
+
+  SECRETS_ENCRYPTION_FAILED: secrets("Encryption failed", "P-Setup could not encrypt the secrets file.", ["Check that the encryption key is set."]),
+  SECRETS_DECRYPTION_FAILED: secrets("Decryption failed", "P-Setup could not decrypt the secrets file.", ["Verify the correct key is set."]),
+  SECRETS_KEY_MISSING: secrets("Encryption key missing", "No encryption key is configured for secrets.", ["Run setup secrets init to generate a key."]),
+  SECRETS_FILE_CORRUPT: secrets("Secrets file corrupt", "The encrypted secrets file could not be parsed.", ["Restore from backup or reinitialize."]),
+
+  TEMPLATE_NOT_FOUND: template("Template not found", "The requested project template does not exist.", ["Run setup template list to see available templates."]),
+  TEMPLATE_FETCH_FAILED: template("Template fetch failed", "Could not download the template from the remote source.", ["Check network and URL."]),
+  TEMPLATE_INVALID: template("Template invalid", "The template does not have a valid structure.", ["Check the template repository for a valid p-setup template."]),
+
+  WORKSPACE_NO_PACKAGES: workspace("No workspace packages found", "P-Setup could not find packages in this workspace.", ["Ensure workspace config lists package paths."]),
+  WORKSPACE_COMMAND_FAILED: workspace("Workspace command failed", "A command failed in one or more workspace packages.", ["Check individual package errors."]),
+
+  HEALTH_CHECK_FAILED: executor("Health check failed", "One or more health checks did not pass.", ["Review the failing checks and fix issues."]),
+
+  SHARE_EXPORT_FAILED: fs("Share export failed", "P-Setup could not export the project configuration.", ["Check file permissions."]),
+  SHARE_IMPORT_FAILED: fs("Share import failed", "P-Setup could not import the shared configuration.", ["Check the config file format."]),
+
+  INIT_ALREADY_EXISTS: project("Project already initialized", "This directory already contains project files.", ["Use --force to reinitialize."]),
+  INIT_TEMPLATE_FAILED: project("Init template failed", "P-Setup could not scaffold the project from the selected template.", ["Check network and template availability."]),
+
+  TELEMETRY_SEND_FAILED: info("telemetry", "Telemetry send failed", "Anonymous usage data could not be sent.", ["This is not critical; P-Setup continues normally."]),
+
+  UPDATE_AVAILABLE: info("config", "Update available", "A newer version of P-Setup is available.", ["Run npm install -g p-setup to update."]),
+  UPDATE_FETCH_FAILED: network("Update check failed", "P-Setup could not check for updates.", ["Check network access."]),
+
+  AI_RETRY_EXHAUSTED: provider("AI retries exhausted", "All retry attempts to the AI provider have failed.", ["Try again later, switch providers, or continue without AI."]),
+
   UNKNOWN_ERROR: fatal("Unexpected error", "P-Setup hit an unexpected failure.", ["Rerun with debug logs or report the command and project state."]),
 };
 
@@ -89,5 +142,13 @@ function fs(title: string, explanation: string, nextSteps: string[]) { return en
 function executor(title: string, explanation: string, nextSteps: string[]) { return entry("executor", "error", title, explanation, nextSteps); }
 function tui(title: string, explanation: string, nextSteps: string[]) { return entry("tui", "warning", title, explanation, nextSteps, true); }
 function network(title: string, explanation: string, nextSteps: string[]) { return entry("network", "error", title, explanation, nextSteps, true); }
+function git(title: string, explanation: string, nextSteps: string[]) { return entry("git", "error", title, explanation, nextSteps); }
+function plugin(title: string, explanation: string, nextSteps: string[]) { return entry("plugin", "error", title, explanation, nextSteps); }
+function migration(title: string, explanation: string, nextSteps: string[]) { return entry("migration", "error", title, explanation, nextSteps); }
+function ci(title: string, explanation: string, nextSteps: string[]) { return entry("ci", "error", title, explanation, nextSteps); }
+function docker(title: string, explanation: string, nextSteps: string[]) { return entry("docker", "error", title, explanation, nextSteps); }
+function secrets(title: string, explanation: string, nextSteps: string[]) { return entry("secrets", "error", title, explanation, nextSteps); }
+function template(title: string, explanation: string, nextSteps: string[]) { return entry("template", "error", title, explanation, nextSteps); }
+function workspace(title: string, explanation: string, nextSteps: string[]) { return entry("workspace", "error", title, explanation, nextSteps); }
 function info(category: PSetupErrorCategory, title: string, explanation: string, nextSteps: string[]) { return entry(category, "info", title, explanation, nextSteps, true); }
 function fatal(title: string, explanation: string, nextSteps: string[]) { return entry("unknown", "fatal", title, explanation, nextSteps); }

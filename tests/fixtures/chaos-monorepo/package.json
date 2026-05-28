@@ -1,0 +1,15 @@
+{
+  "name": "chaos-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "echo 'build all'",
+    "test": "echo 'test all'",
+    "lint": "echo 'lint all'"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

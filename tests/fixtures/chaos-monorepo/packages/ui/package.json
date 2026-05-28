@@ -1,0 +1,12 @@
+{
+  "name": "@chaos/ui",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "echo 'ui built'",
+    "test": "echo 'ui tested'",
+    "dev": "echo 'ui dev'"
+  },
+  "dependencies": {
+    "@chaos/core": "workspace:*"
+  }
+}

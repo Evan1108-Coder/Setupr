@@ -13,29 +13,45 @@ const cli = meow(
     $ setup <command> [options]
 
   Commands
-    setup     Full project setup (scan, install, configure)
-    start     Detect and run project
-    doctor    Diagnose environment health
-    update    Check for dependency updates
-    clean     Remove artifacts (--deps, --share, --all)
-    env       Manage .env files (init, check, sync, smart)
-    auth      Manage P-Setup AI provider API keys and models
-    info      Show project summary
-    list      List available scripts/commands
-    run       Run a project script
-    switch    Switch runtime version
-    add       Smart add dependency
-    remove    Remove dependency
-    port      Check/find/kill port
-    deps      Dependency tree, outdated, audit
-    config    Manage p-setup config
-    lock      Snapshot environment state
-    diff      Compare current vs locked state
-    logs      Tail project logs
-    test      Run test suite
-    build     Run build command
-    deploy    Run deploy scripts
-    open      Open in browser/IDE/repo
+    setup       Full project setup (scan, install, configure)
+    start       Detect and run project
+    doctor      Diagnose environment health
+    update      Check for dependency updates
+    clean       Remove artifacts (--deps, --share, --all)
+
+    env         Manage .env files (init, check, sync, smart)
+    auth        Manage AI provider API keys and models
+    info        Show project summary
+    list        List available scripts/commands
+    run         Run a project script
+    switch      Switch runtime version
+    add         Smart add dependency
+    remove      Remove dependency
+    port        Check/find/kill port
+    deps        Dependency tree, outdated, audit
+    config      Manage p-setup config (show, set, reset, models)
+    lock        Snapshot environment state
+    diff        Compare current vs locked state
+    logs        Tail project logs
+    test        Run test suite
+    build       Run build command
+    deploy      Run deploy scripts
+    open        Open in browser/IDE/repo
+
+    git         Git workflows (init, hooks, flow, commit, branch, pr, stash, rebase, tag, release, status, log, sync, clean)
+    init        Scaffold a new project (node, python, rust, go, templates)
+    migrate     Migrate package manager (npm, yarn, pnpm, bun)
+    ci          Generate CI/CD config (github, gitlab, bitbucket, circleci)
+    docker      Dockerfile & compose (generate, compose, check)
+    secrets     Encrypted secrets management (init, set, get, list, remove, export, import, rotate)
+    templates   Project templates (new, list, save, remove)
+    workspace   Monorepo workspace commands (list, run, exec, add, info, check)
+    health      Project health checks (full, deps, security, outdated, size)
+    share       Export/import project config (export, import, inspect)
+    plugin      Plugin management (install, remove, list, info, enable, disable)
+    lint        Run or setup linting (run, setup, fix)
+    format      Run or setup code formatting (run, check, setup)
+    scaffold    Generate project files (component, page, api, hook, model, test, service, middleware)
 
   Options
     --force     Skip all prompts
@@ -52,6 +68,10 @@ const cli = meow(
     $ setup doctor
     $ setup auth login
     $ setup env smart
+    $ setup git flow feature my-feature
+    $ setup init --template react-app
+    $ setup ci github
+    $ setup secrets set API_KEY
     $ setup --force
     $ setup clean --all
 `,
@@ -122,6 +142,8 @@ function validateCliRequest(command: string, subCommand: string | undefined, cwd
   const known = new Set([
     "setup", "start", "doctor", "update", "clean", "env", "auth", "info", "list", "run", "switch",
     "add", "remove", "port", "deps", "config", "lock", "diff", "logs", "test", "build", "deploy", "open",
+    "git", "init", "migrate", "ci", "docker", "secrets", "templates", "workspace", "health", "share", "plugin",
+    "lint", "format", "scaffold",
   ]);
   if (!known.has(command)) {
     printPlainError(createPSetupError({ code: "UNKNOWN_COMMAND", command, cwd, details: [`Received: ${command}`] }));

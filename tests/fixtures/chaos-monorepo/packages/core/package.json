@@ -1,0 +1,8 @@
+{
+  "name": "@chaos/core",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "echo 'core built'",
+    "test": "echo 'core tested'"
+  }
+}

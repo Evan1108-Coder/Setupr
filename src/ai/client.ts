@@ -8,6 +8,8 @@ import {
   type AIModel,
   type AIProvider,
 } from "./models.js";
+import { withRetry, acquireRateToken } from "./retry.js";
+import { loadConfig } from "../state/config.js";
 
 const clients = new Map<AIProvider, { apiKey: string; client: OpenAI }>();
 
@@ -73,22 +75,39 @@ export async function chat(
   const client = getClientForProvider(model.provider);
 
   if (!client) {
-    const config = PROVIDERS[model.provider];
+    const providerConfig = PROVIDERS[model.provider];
     throw new Error(
-      `No API key for ${model.provider}. Run setup auth set-key ${model.provider}, or set ${config.envKey} in your environment for this shell.`
+      `No API key for ${model.provider}. Run setup auth set-key ${model.provider}, or set ${providerConfig.envKey} in your environment for this shell.`
     );
   }
 
-  if (model.provider === "anthropic") {
-    return chatAnthropic(model, messages, options);
-  }
+  const config = await loadConfig();
 
-  if (model.provider === "google") {
-    return chatGoogle(model, messages, options);
-  }
+  await acquireRateToken(model.provider);
 
-  // OpenAI, Groq, MiniMax, Moonshot, and GitHub Models are OpenAI-compatible.
-  return chatOpenAICompatible(client, model, messages, options);
+  return withRetry(
+    async (signal) => {
+      const opts: ChatOptions = {
+        ...options,
+        timeoutMs: options?.timeoutMs ?? config.ai.timeoutMs,
+      };
+
+      if (model.provider === "anthropic") {
+        return chatAnthropic(model, messages, opts, signal);
+      }
+
+      if (model.provider === "google") {
+        return chatGoogle(model, messages, opts, signal);
+      }
+
+      return chatOpenAICompatible(client, model, messages, opts);
+    },
+    {
+      maxRetries: config.ai.maxRetries,
+      baseDelayMs: config.ai.retryDelayMs,
+      timeoutMs: config.ai.timeoutMs,
+    }
+  );
 }
 
 async function chatOpenAICompatible(
@@ -120,7 +139,8 @@ async function chatOpenAICompatible(
 async function chatAnthropic(
   model: AIModel,
   messages: ChatMessage[],
-  options?: ChatOptions
+  options?: ChatOptions,
+  signal?: AbortSignal
 ): Promise<{ content: string; tokens: number; model: string }> {
   const apiKey = getAIEnvValue("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
@@ -146,7 +166,7 @@ async function chatAnthropic(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
-    signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
+    signal: signal || (options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined),
   });
 
   if (!response.ok) {
@@ -165,7 +185,8 @@ async function chatAnthropic(
 async function chatGoogle(
   model: AIModel,
   messages: ChatMessage[],
-  options?: ChatOptions
+  options?: ChatOptions,
+  signal?: AbortSignal
 ): Promise<{ content: string; tokens: number; model: string }> {
   const apiKey = getAIEnvValue("GOOGLE_API_KEY");
   if (!apiKey) throw new Error("GOOGLE_API_KEY not set");
@@ -192,7 +213,7 @@ async function chatGoogle(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-    signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
+    signal: signal || (options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined),
   });
 
   if (!response.ok) {

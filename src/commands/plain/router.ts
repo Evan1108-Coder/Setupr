@@ -75,6 +75,76 @@ export async function runNonTUICommand(
     case "open":
       await cmdOpen(sub, cwd);
       break;
+    case "git": {
+      const { cmdGit } = await import("./git.js");
+      await cmdGit(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "init": {
+      const { cmdInit } = await import("./init.js");
+      await cmdInit(cwd, { ...flags, args: sub ? [sub, ...(flags.args || [])] : flags.args || [] });
+      break;
+    }
+    case "migrate": {
+      const { cmdMigrate } = await import("./migrate.js");
+      await cmdMigrate(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "ci": {
+      const { cmdCI } = await import("./ci.js");
+      await cmdCI(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "docker": {
+      const { cmdDocker } = await import("./docker.js");
+      await cmdDocker(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "secrets": {
+      const { cmdSecrets } = await import("./secrets.js");
+      await cmdSecrets(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "templates": {
+      const { cmdTemplate } = await import("./templates.js");
+      await cmdTemplate(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "workspace": {
+      const { cmdWorkspace } = await import("./workspace.js");
+      await cmdWorkspace(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "health": {
+      const { cmdHealth } = await import("./health.js");
+      await cmdHealth(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "share": {
+      const { cmdShare } = await import("./share.js");
+      await cmdShare(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "plugin": {
+      const { cmdPlugin } = await import("./plugin.js");
+      await cmdPlugin(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "lint": {
+      const { cmdLint } = await import("./lint.js");
+      await cmdLint(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "format": {
+      const { cmdFormat } = await import("./format.js");
+      await cmdFormat(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "scaffold": {
+      const { cmdScaffold } = await import("./scaffold.js");
+      await cmdScaffold(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
     default:
       printPlainError(createPSetupError({
         code: "UNKNOWN_COMMAND",
@@ -562,8 +632,9 @@ async function cmdConfig(sub: string | undefined, cwd: string, flags?: Flags) {
 
   if (sub === "reset") {
     await saveConfig({
-      ai: { enabled: true },
-      preferences: { theme: "dark", confirmBeforeInstall: true, autoUpdate: false, telemetry: false },
+      ai: { enabled: true, timeoutMs: 30000, maxRetries: 3, retryDelayMs: 1000, rateLimitPerMinute: 20 },
+      preferences: { theme: "dark", confirmBeforeInstall: true, autoUpdate: false, telemetry: false, defaultBranch: "main", commitConvention: "conventional", ciPlatform: "auto" },
+      plugins: [],
       remembered: {},
     });
     console.log(chalk.green("✓ Config reset to defaults"));
