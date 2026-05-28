@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { writeFile, readFile } from "fs/promises";
+import { writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
 import { createPSetupError, printPlainError } from "../../errors/index.js";
@@ -30,7 +30,7 @@ export async function cmdLint(sub: string | undefined, cwd: string, flags: LintF
   }
 }
 
-async function lintRun(cwd: string, flags: LintFlags): Promise<void> {
+async function lintRun(cwd: string, _flags: LintFlags): Promise<void> {
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
 
@@ -124,7 +124,7 @@ async function lintSetup(cwd: string, flags: LintFlags): Promise<void> {
   }
 }
 
-async function lintFix(cwd: string, flags: LintFlags): Promise<void> {
+async function lintFix(cwd: string, _flags: LintFlags): Promise<void> {
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
 

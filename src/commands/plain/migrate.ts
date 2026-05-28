@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { existsSync } from "fs";
-import { readFile, writeFile, rm, unlink } from "fs/promises";
+import { readFile, writeFile, rm } from "fs/promises";
 import { join } from "path";
 import { runCommand } from "../../executor/index.js";
 import { createPSetupError, printPlainError } from "../../errors/index.js";

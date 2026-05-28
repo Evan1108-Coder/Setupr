@@ -30,7 +30,7 @@ export async function cmdFormat(sub: string | undefined, cwd: string, flags: For
   }
 }
 
-async function formatRun(cwd: string, flags: FormatFlags): Promise<void> {
+async function formatRun(cwd: string, _flags: FormatFlags): Promise<void> {
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
 
@@ -68,7 +68,7 @@ async function formatRun(cwd: string, flags: FormatFlags): Promise<void> {
   }
 }
 
-async function formatCheck(cwd: string, flags: FormatFlags): Promise<void> {
+async function formatCheck(cwd: string, _flags: FormatFlags): Promise<void> {
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
 

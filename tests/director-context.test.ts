@@ -40,6 +40,9 @@ describe("director context packet", () => {
 
     expect(parsed.project.scan.framework).toBe("React");
     expect(parsed.system.nodeVersion).toBe(process.version);
+    expect(parsed.capabilities.commands.map((item: { command: string }) => item.command)).toContain("git");
+    expect(parsed.capabilities.commands.map((item: { command: string }) => item.command)).toContain("docker");
+    expect(parsed.capabilities.commands.map((item: { command: string }) => item.command)).toContain("workspace");
     expect(parsed.plan.steps[0].command).toBe("npm install");
     expect(parsed.tuiState.envVars[0].value).not.toContain("sk-secret-value");
     expect(parsed.terminalDiary[0].content).not.toContain("sk-secret-value");

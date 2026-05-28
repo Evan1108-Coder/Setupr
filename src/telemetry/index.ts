@@ -1,5 +1,4 @@
 import { loadConfig, saveConfig } from "../state/config.js";
-import { createPSetupError } from "../errors/index.js";
 
 interface TelemetryEvent {
   event: string;
@@ -11,7 +10,7 @@ interface TelemetryEvent {
 }
 
 let sessionEvents: TelemetryEvent[] = [];
-let sessionStart = Date.now();
+const sessionStart = Date.now();
 
 export function trackEvent(event: string, metadata?: TelemetryEvent["metadata"]): void {
   sessionEvents.push({
@@ -78,6 +77,7 @@ export async function flushTelemetry(): Promise<void> {
         : undefined,
     })),
   };
+  void payload;
 
   sessionEvents = [];
 

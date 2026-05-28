@@ -65,6 +65,20 @@ setup --plain
 | `build` | Detect and run build command |
 | `deploy` | Run deploy scripts |
 | `open [repo\|ide]` | Open in browser/IDE/repo |
+| `git` | Git workflows: init, hooks, flow, commit, branch, PR, stash, rebase, tag, release, status, log, sync, clean, ignore, changelog, blame, cherry-pick, worktree, bisect, contributors, undo |
+| `init` | Scaffold new projects from stacks or templates |
+| `migrate <npm\|yarn\|pnpm\|bun>` | Migrate package manager metadata and lockfiles |
+| `ci <github\|gitlab\|bitbucket\|circleci>` | Generate CI/CD config |
+| `docker <generate\|compose\|check>` | Generate Dockerfile/compose files or check Docker readiness |
+| `secrets <init\|set\|get\|list\|remove\|export\|import\|rotate>` | Manage encrypted project-local secrets |
+| `templates <new\|list\|save\|remove>` | Create, save, list, or remove templates |
+| `workspace <list\|run\|exec\|add\|info\|check>` | Operate on monorepo workspaces |
+| `health [full\|deps\|security\|outdated\|size]` | Run project health checks |
+| `share <export\|import\|inspect>` | Export/import shareable setup bundles |
+| `plugin <install\|remove\|list\|info\|enable\|disable>` | Manage P-Setup plugins |
+| `lint <run\|setup\|fix>` | Run or set up linting |
+| `format <run\|check\|setup>` | Run or set up formatting |
+| `scaffold <type> <name>` | Generate components, pages, APIs, hooks, models, tests, services, or middleware |
 
 ## Features
 
@@ -155,6 +169,7 @@ The `setup` TUI is an agent workspace, not just a log viewer:
 - The AI director can also act on natural language while setup is open: change models, answer the current prompt, fill env values from pasted text, skip or rewrite plan steps, summarize status, and continue with the updated plan.
 - The AI director stays centered on the current setup task, while still allowing brief adjacent questions, clarifications, and steering without being overly strict.
 - For live AI decisions, the director receives a sanitized context packet with project scan data, OS/terminal details, config parameters, current plan, TUI state, notices, dependency/service/port state, terminal diary, and chat history. Secret values are masked before model calls.
+- The same packet includes P-Setup's current command capabilities, so the director can recommend or explain git, Docker, CI, workspace, secrets, template, health, plugin, lint, format, and scaffold workflows when they are relevant.
 - User replies appear on the right side of the timeline; AI reasoning and decisions appear inline before execution.
 - `--force` skips safe prompts and uses defaults where possible, but it does not invent secrets and still stops for serious blockers or destructive choices.
 

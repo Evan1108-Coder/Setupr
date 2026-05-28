@@ -19,8 +19,39 @@ describe("help routing", () => {
 
     expect(showHelp(["auth"])).toBe(true);
     expect(showHelp(["auth", "set-key"])).toBe(true);
+    expect(showHelp(["git"])).toBe(true);
+    expect(showHelp(["docker"])).toBe(true);
+    expect(showHelp(["workspace"])).toBe(true);
     expect(showHelp(["not-real"])).toBe(false);
     expect(process.exitCode).toBe(1);
     expect(log).toHaveBeenCalled();
+  });
+
+  it("keeps the rich help index aligned with the expanded command surface", () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((line = "") => {
+      lines.push(String(line));
+    });
+
+    expect(showHelp()).toBe(true);
+    const output = lines.join("\n");
+    for (const command of [
+      "git",
+      "init",
+      "migrate",
+      "ci",
+      "docker",
+      "secrets",
+      "templates",
+      "workspace",
+      "health",
+      "share",
+      "plugin",
+      "lint",
+      "format",
+      "scaffold",
+    ]) {
+      expect(output).toContain(command);
+    }
   });
 });

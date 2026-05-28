@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { readFile, writeFile, mkdir, readdir, rm } from "fs/promises";
+import { readFile, mkdir, rm } from "fs/promises";
 import { join } from "path";
 import { createPSetupError, printPlainError } from "../../errors/index.js";
 import { loadConfig, saveConfig } from "../../state/config.js";
@@ -145,7 +145,7 @@ async function pluginRemove(cwd: string, flags: { args?: string[] }): Promise<vo
   console.log(chalk.green(`✓ Removed plugin: ${name}`));
 }
 
-async function pluginList(cwd: string): Promise<void> {
+async function pluginList(_cwd: string): Promise<void> {
   const config = await loadConfig();
   const plugins = config.plugins || [];
 

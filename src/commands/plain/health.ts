@@ -18,7 +18,7 @@ interface HealthCheck {
   message: string;
 }
 
-export async function cmdHealth(sub: string | undefined, cwd: string, flags: HealthFlags): Promise<void> {
+export async function cmdHealth(sub: string | undefined, cwd: string, _flags: HealthFlags): Promise<void> {
   const mode = sub || "full";
 
   switch (mode) {
@@ -152,7 +152,6 @@ function checkScripts(scan: ReturnType<typeof scanProject> extends Promise<infer
 }
 
 function checkConfigFiles(scan: ReturnType<typeof scanProject> extends Promise<infer T> ? T : never): HealthCheck {
-  const good = ["tsconfig.json", "eslint.config.js", ".eslintrc.json", ".eslintrc.js"];
   const hasTypeSafety = scan.configFiles.some(f => f.includes("tsconfig"));
   const hasLint = scan.configFiles.some(f => f.includes("eslint") || f.includes("prettier"));
 

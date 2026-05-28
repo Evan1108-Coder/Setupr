@@ -190,7 +190,7 @@ CMD ["node", "src/index.js"]
 `;
 }
 
-function generatePythonDockerfile(scan: { scripts: Record<string, string> }): string {
+function generatePythonDockerfile(_scan: { scripts: Record<string, string> }): string {
   return `FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt .
@@ -201,7 +201,7 @@ CMD ["python", "-m", "src.main"]
 `;
 }
 
-function generateGoDockerfile(scan: { scripts: Record<string, string> }): string {
+function generateGoDockerfile(_scan: { scripts: Record<string, string> }): string {
   return `# Build stage
 FROM golang:1.22-alpine AS builder
 WORKDIR /app
@@ -220,7 +220,7 @@ ENTRYPOINT ["/server"]
 `;
 }
 
-function generateRustDockerfile(scan: { scripts: Record<string, string> }): string {
+function generateRustDockerfile(_scan: { scripts: Record<string, string> }): string {
   return `# Build stage
 FROM rust:1.77-alpine AS builder
 WORKDIR /app

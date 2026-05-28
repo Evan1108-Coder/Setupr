@@ -30,6 +30,19 @@ setup doctor
 setup info
 ```
 
+### Command Discovery
+
+Use the built-in help tree when you are not sure which workflow to run:
+
+```bash
+setup help
+setup help git
+setup help docker
+setup workspace --help
+```
+
+The rich help output lists the full command surface, including setup, auth, env, git, CI, Docker, secrets, templates, workspace, health, share, plugin, lint, format, and scaffold commands.
+
 ### Development Setup
 
 ```bash

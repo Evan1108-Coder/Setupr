@@ -121,7 +121,7 @@ async function templateSave(cwd: string, flags: TemplateFlags): Promise<void> {
   await mkdir(templatesDir, { recursive: true });
 
   const filesToSave = ["package.json", "tsconfig.json", ".env.example", "Dockerfile", "docker-compose.yml"];
-  const { readFile, copyFile } = await import("fs/promises");
+  const { copyFile } = await import("fs/promises");
   let saved = 0;
 
   for (const file of filesToSave) {
