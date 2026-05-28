@@ -14,30 +14,76 @@ npm run build
 
 ### TUI doesn't render properly
 
-**Cause**: Terminal doesn't support Unicode or alternate screen buffer.
+**Cause**: Terminal doesn't support Unicode, the alternate screen buffer, or SGR mouse reporting.
 
 **Fix**: Use `--plain` flag for basic terminal output:
 ```bash
 setup --plain
 ```
 
-### AI features not working
+For the full TUI, use a modern terminal such as Terminal.app, iTerm2, Ghostty, WezTerm, Alacritty, or Kitty. P-Setup does not force a background color; it inherits the active terminal profile. If the screen looks stuck after an interrupted run, reset the terminal with:
 
-**Cause**: No AI provider API key configured.
-
-**Fix**: Set any one of the supported provider keys:
 ```bash
-export OPENAI_API_KEY=your-key       # or
-export ANTHROPIC_API_KEY=your-key    # or
-export GOOGLE_API_KEY=your-key       # or
-export GROQ_API_KEY=your-key         # or
-export MINIMAX_API_KEY=your-key      # or
-export MOONSHOT_API_KEY=your-key
+printf '\033[0m\033[?1000l\033[?1006l\033[?25h\033[?1049l'
+clear
 ```
 
-Check configured providers: `setup config models`
+The TUI uses Unicode box-drawing characters. Small visual gaps in vertical lines usually come from the terminal font or line-height settings rather than P-Setup drawing separate graphical rectangles.
+
+### Mouse or scroll codes appear in the input
+
+If you see text like `[<0;78;17m` after clicking or scrolling, the terminal left mouse reporting enabled after an interrupted process. P-Setup disables mouse reporting on exit and strips those reports from inputs, but you can manually reset the terminal with:
+
+```bash
+printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l'
+```
+
+Modern Terminal.app, iTerm2, and Ghostty all support the mouse protocol P-Setup uses.
+
+### AI features not working
+
+**Cause**: Missing API key.
+
+**Fix**: Save at least one AI provider key in global P-Setup auth storage:
+
+```bash
+setup auth login
+# Or: setup auth set-key github
+```
+
+You can test provider connectivity and select a specific model with:
+
+```bash
+setup auth test
+setup auth use kimi-k2-turbo-preview
+```
 
 P-Setup works without AI — it falls back to pattern matching and heuristics.
+
+### Error codes
+
+P-Setup errors include a stable code, explanation, details, and next steps. Useful examples:
+
+| Code | Meaning |
+|------|---------|
+| `ENV_TEMPLATE_MISSING` | `.env.example` is missing, so P-Setup cannot infer app env variables |
+| `ENV_CHECK_FAILED` | required env values are missing, empty, or invalid |
+| `AUTH_STORAGE_INVALID` | `~/.p-setup/secrets.json` is corrupt or not valid JSON |
+| `AUTH_STORAGE_FAILED` | P-Setup could not read or write global auth storage |
+| `AI_PROVIDER_AUTH_FAILED` | provider rejected the API key |
+| `AI_PROVIDER_QUOTA_EXHAUSTED` | provider reported no remaining credits/quota |
+| `COMMAND_NOT_FOUND` | a required command is not available on PATH |
+| `INSTALL_FAILED`, `BUILD_FAILED`, `TEST_FAILED` | project command failed in that phase |
+| `CLEAN_TARGET_FAILED` | a clean target could not be removed |
+
+If `AUTH_STORAGE_INVALID` appears, P-Setup stops rather than treating all keys as missing. Fix the JSON file or move it aside:
+
+```bash
+mv ~/.p-setup/secrets.json ~/.p-setup/secrets.json.broken
+setup auth login
+```
+
+Raw API keys and token-like values are masked in error output and AI context.
 
 ### "Permission denied" on install
 
@@ -59,6 +105,16 @@ Or fix npm permissions: https://docs.npmjs.com/resolving-eacces-permissions-erro
 2. Check network connectivity
 3. Try running the install command manually
 
+In `--plain` mode, setup stops after the failed step and exits non-zero. Fix the failing command, then rerun `setup --plain`.
+
+### `.env` was not created
+
+P-Setup creates `.env` from `.env.example` when a template is present. If `.env` already exists, `setup env init` leaves it unchanged unless you pass:
+
+```bash
+setup env init --force
+```
+
 ### Port conflicts
 
 Use the port command to check:
@@ -69,15 +125,10 @@ setup port  # Check all common ports
 
 ### Checkpoint issues
 
-If a checkpoint is corrupted or stale, use `--force` to start fresh:
-```bash
-setup --force
-```
-
-Or manually remove it:
+If a checkpoint is corrupted or stale:
 ```bash
 rm -rf .p-setup/checkpoint.json
-setup
+setup  # Start fresh
 ```
 
 ### Wrong language/framework detected
@@ -87,6 +138,7 @@ Override detection with a `.p-setup.json` file:
 {
   "language": "TypeScript",
   "framework": "Next.js",
+  "runtime": "node",
   "packageManager": "pnpm"
 }
 ```
@@ -95,4 +147,5 @@ Override detection with a `.p-setup.json` file:
 
 - Run `setup --help` for command reference
 - Run `setup doctor` to diagnose environment issues
+- Run `npm run smoke:fixtures` from the repository before publishing or after large error/TUI/auth/env changes
 - File issues at: https://github.com/Evan1108-Coder/P-Setup/issues

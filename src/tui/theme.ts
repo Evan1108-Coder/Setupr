@@ -70,8 +70,8 @@ export const borders = {
 
 export const shortcuts = [
   { key: "Ctrl+C", desc: "abort" },
-  { key: "Ctrl+S", desc: "save checkpoint" },
-  { key: "Tab", desc: "skip field" },
-  { key: "↕↔", desc: "scroll log" },
-  { key: "?", desc: "help" },
+  { key: "Tab", desc: "next panel" },
+  { key: "←/↑/↓/→", desc: "navigate" },
+  { key: "Esc", desc: "back" },
+  { key: "q", desc: "quit" },
 ];

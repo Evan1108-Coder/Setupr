@@ -1,8 +1,10 @@
 import chalk from "chalk";
 import { scanProject } from "../../scanner/index.js";
 import { runCommand } from "../../executor/index.js";
-import { readFile, writeFile, access, readdir, stat } from "fs/promises";
+import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
+import { initEnvFile, normalizeEnvKey, parseEnvKeys, parseEnvPairs } from "../../env/index.js";
+import { createPSetupError, printPlainError, classifyCommandFailure } from "../../errors/index.js";
 
 interface Flags {
   force?: boolean;
@@ -18,8 +20,13 @@ export async function runNonTUICommand(
 ): Promise<void> {
   switch (command) {
     case "env":
-      await cmdEnv(sub, cwd);
+      await cmdEnv(sub, cwd, flags);
       break;
+    case "auth": {
+      const { cmdAuth } = await import("./auth.js");
+      await cmdAuth(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
     case "info":
       await cmdInfo(cwd);
       break;
@@ -69,26 +76,57 @@ export async function runNonTUICommand(
       await cmdOpen(sub, cwd);
       break;
     default:
-      console.log(chalk.red(`Unknown command: ${command}`));
-      console.log(chalk.dim("Run 'setup --help' for available commands."));
-      process.exit(1);
+      printPlainError(createPSetupError({
+        code: "UNKNOWN_COMMAND",
+        command,
+        cwd,
+        details: [`Received: ${command}`],
+      }));
   }
 }
 
-async function cmdEnv(sub: string | undefined, cwd: string) {
+async function cmdEnv(sub: string | undefined, cwd: string, flags: Flags) {
   const envPath = join(cwd, ".env");
   const examplePath = join(cwd, ".env.example");
 
   switch (sub) {
     case "init": {
+      let result;
       try {
-        await access(examplePath);
-        const content = await readFile(examplePath, "utf-8");
-        await writeFile(envPath, content);
+        result = await initEnvFile(cwd, { overwrite: flags.force });
+      } catch (err) {
+        printPlainError(createPSetupError({
+          code: "ENV_WRITE_FAILED",
+          command: "env",
+          subcommand: "init",
+          cwd,
+          details: [err instanceof Error ? err.message : String(err)],
+          forceBehavior: "Force mode can overwrite files, but it cannot write through directories, locked files, or denied permissions.",
+        }));
+        return;
+      }
+      if (result.skipped) {
+        if (result.reason === "missing-example") {
+          printPlainError(createPSetupError({
+            code: "ENV_TEMPLATE_MISSING",
+            command: "env",
+            subcommand: "init",
+            cwd,
+            forceBehavior: "With --force, P-Setup creates an empty .env and tells you no variables were inferred.",
+          }));
+        } else {
+          printPlainError(createPSetupError({
+            code: "ENV_ALREADY_EXISTS",
+            command: "env",
+            subcommand: "init",
+            cwd,
+          }));
+        }
+      } else if (result.source === ".env.example") {
         console.log(chalk.green("✓ Created .env from .env.example"));
-      } catch {
-        await writeFile(envPath, "# Environment variables\n");
-        console.log(chalk.green("✓ Created empty .env file"));
+      } else {
+        console.log(chalk.yellow("⚠ Created empty .env because --force was used and no .env.example was found."));
+        console.log(chalk.dim("  No required variables could be inferred."));
       }
       break;
     }
@@ -98,15 +136,29 @@ async function cmdEnv(sub: string | undefined, cwd: string) {
         const env = await readFile(envPath, "utf-8").catch(() => "");
         const required = parseEnvKeys(example);
         const defined = parseEnvKeys(env);
-        const missing = required.filter((k) => !defined.includes(k));
+        const currentPairs = parseEnvPairs(env);
+        const missing = required.filter((k) => !defined.includes(k) || !currentPairs[k]?.trim());
         if (missing.length === 0) {
           console.log(chalk.green("✓ All environment variables are set"));
         } else {
-          console.log(chalk.yellow(`⚠ Missing ${missing.length} variables:`));
-          missing.forEach((k) => console.log(chalk.dim(`  • ${k}`)));
+          printPlainError(createPSetupError({
+            code: "ENV_CHECK_FAILED",
+            command: "env",
+            subcommand: "check",
+            cwd,
+            details: [`Missing ${missing.length} variable${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}`],
+            canContinue: false,
+          }));
         }
-      } catch {
-        console.log(chalk.dim("No .env.example found"));
+      } catch (err) {
+        printPlainError(createPSetupError({
+          code: envReadErrorCode(err),
+          command: "env",
+          subcommand: "check",
+          cwd,
+          details: [err instanceof Error ? err.message : String(err)],
+          canContinue: false,
+        }));
       }
       break;
     }
@@ -114,13 +166,14 @@ async function cmdEnv(sub: string | undefined, cwd: string) {
       try {
         const example = await readFile(examplePath, "utf-8");
         const env = await readFile(envPath, "utf-8").catch(() => "");
-        const required = parseEnvKeys(example);
         const currentPairs = parseEnvPairs(env);
         let newContent = "";
         for (const line of example.split("\n")) {
-          const key = line.split("=")[0].trim();
+          const rawKey = line.split("=")[0].trim();
+          const key = normalizeEnvKey(rawKey);
           if (key && !key.startsWith("#") && currentPairs[key]) {
-            newContent += `${key}=${currentPairs[key]}\n`;
+            const prefix = rawKey.startsWith("export ") ? "export " : "";
+            newContent += `${prefix}${key}=${currentPairs[key]}\n`;
           } else {
             newContent += line + "\n";
           }
@@ -128,7 +181,13 @@ async function cmdEnv(sub: string | undefined, cwd: string) {
         await writeFile(envPath, newContent);
         console.log(chalk.green("✓ Synced .env with .env.example structure"));
       } catch (e) {
-        console.log(chalk.red("Failed to sync: " + (e as Error).message));
+        printPlainError(createPSetupError({
+          code: "ENV_SYNC_FAILED",
+          command: "env",
+          subcommand: "sync",
+          cwd,
+          details: [(e as Error).message],
+        }));
       }
       break;
     }
@@ -241,8 +300,15 @@ async function cmdEnv(sub: string | undefined, cwd: string) {
             console.log(chalk.dim(`    (${extra.length} extra vars present, not in .env.example)`));
           }
         } else {
-          console.log(chalk.yellow(`  Summary: ${issues} issue${issues > 1 ? "s" : ""} found`));
-          console.log(chalk.dim("  Run interactively in a TTY to fix, or manually edit .env"));
+          printPlainError(createPSetupError({
+            code: "ENV_SMART_FAILED",
+            command: "env",
+            subcommand: "smart",
+            cwd,
+            details: [`${issues} issue${issues > 1 ? "s" : ""} found. Run interactively in a TTY to fix, or manually edit .env.`],
+            canContinue: false,
+          }));
+          return;
         }
 
         // Write reorganized .env
@@ -252,9 +318,11 @@ async function cmdEnv(sub: string | undefined, cwd: string) {
             output += line + "\n";
             continue;
           }
-          const key = line.split("=")[0].trim();
+          const rawKey = line.split("=")[0].trim();
+          const key = normalizeEnvKey(rawKey);
           if (currentPairs[key]) {
-            output += `${key}=${currentPairs[key]}\n`;
+            const prefix = rawKey.startsWith("export ") ? "export " : "";
+            output += `${prefix}${key}=${currentPairs[key]}\n`;
           } else {
             output += line + "\n";
           }
@@ -264,14 +332,25 @@ async function cmdEnv(sub: string | undefined, cwd: string) {
         }
         await writeFile(envPath, output);
         console.log(chalk.green("  ✓ Saved .env (reorganized, matched .env.example order)"));
-      } catch {
-        console.log(chalk.red("No .env.example found for smart analysis"));
-        console.log(chalk.dim("  Create a .env.example with required variable names to enable smart mode"));
+      } catch (err) {
+        printPlainError(createPSetupError({
+          code: envReadErrorCode(err),
+          command: "env",
+          subcommand: "smart",
+          cwd,
+          details: ["Smart analysis needs .env.example so it can compare expected values to current values."],
+        }));
       }
       break;
     }
     default:
-      console.log(chalk.blue("Usage: setup env [init|check|sync|smart]"));
+      printPlainError(createPSetupError({
+        code: "UNKNOWN_SUBCOMMAND",
+        command: "env",
+        subcommand: sub,
+        cwd,
+        details: ["Valid subcommands: init, check, sync, smart."],
+      }));
   }
 }
 
@@ -304,21 +383,18 @@ async function cmdList(cwd: string) {
 
 async function cmdRun(script: string | undefined, cwd: string) {
   if (!script) {
-    console.log(chalk.red("Usage: setup run <script>"));
+    printPlainError(createPSetupError({ code: "MISSING_SCRIPT", command: "run", cwd, details: ["Usage: setup run <script>"] }));
     return;
   }
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
   const cmd = `${pm} run ${script}`;
-  console.log(chalk.blue(`Running: ${cmd}`));
-  const { spawn } = await import("child_process");
-  const proc = spawn(cmd, { shell: true, cwd, stdio: "inherit" });
-  proc.on("exit", (code) => process.exit(code || 0));
+  await runPlainCommand(cmd, cwd, { stepType: "script", stepLabel: script });
 }
 
 async function cmdSwitch(version: string | undefined, cwd: string) {
   if (!version) {
-    console.log(chalk.red("Usage: setup switch <version>"));
+    printPlainError(createPSetupError({ code: "MISSING_RUNTIME", command: "switch", cwd, details: ["Usage: setup switch <version>"] }));
     return;
   }
   console.log(chalk.blue(`Switching to version: ${version}`));
@@ -328,32 +404,26 @@ async function cmdSwitch(version: string | undefined, cwd: string) {
 
 async function cmdAdd(pkg: string | undefined, cwd: string) {
   if (!pkg) {
-    console.log(chalk.red("Usage: setup add <package>"));
+    printPlainError(createPSetupError({ code: "UNKNOWN_SUBCOMMAND", command: "add", cwd, details: ["Usage: setup add <package>"] }));
     return;
   }
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
   const cmds: Record<string, string> = { npm: "npm install", yarn: "yarn add", pnpm: "pnpm add", bun: "bun add" };
   const cmd = `${cmds[pm] || `${pm} install`} ${pkg}`;
-  console.log(chalk.blue(`Running: ${cmd}`));
-  const { spawn } = await import("child_process");
-  const proc = spawn(cmd, { shell: true, cwd, stdio: "inherit" });
-  proc.on("exit", (code) => process.exit(code || 0));
+  await runPlainCommand(cmd, cwd, { stepType: "deps", stepLabel: `Add ${pkg}` });
 }
 
 async function cmdRemove(pkg: string | undefined, cwd: string) {
   if (!pkg) {
-    console.log(chalk.red("Usage: setup remove <package>"));
+    printPlainError(createPSetupError({ code: "UNKNOWN_SUBCOMMAND", command: "remove", cwd, details: ["Usage: setup remove <package>"] }));
     return;
   }
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
   const cmds: Record<string, string> = { npm: "npm uninstall", yarn: "yarn remove", pnpm: "pnpm remove", bun: "bun remove" };
   const cmd = `${cmds[pm] || `${pm} remove`} ${pkg}`;
-  console.log(chalk.blue(`Running: ${cmd}`));
-  const { spawn } = await import("child_process");
-  const proc = spawn(cmd, { shell: true, cwd, stdio: "inherit" });
-  proc.on("exit", (code) => process.exit(code || 0));
+  await runPlainCommand(cmd, cwd, { stepType: "deps", stepLabel: `Remove ${pkg}` });
 }
 
 async function cmdPort(port: string | undefined, cwd: string) {
@@ -392,11 +462,15 @@ async function cmdDeps(cwd: string) {
   const pm = scan.packageManager || "npm";
   console.log(chalk.blue(`Dependencies (${pm}):`));
   const result = await runCommand(`${pm} list --depth=0`, cwd);
-  console.log(result.stdout || result.stderr);
+  if (result.exitCode !== 0) {
+    printPlainError(classifyCommandFailure({ command: `${pm} list --depth=0`, cwd, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }));
+  } else {
+    console.log(result.stdout || result.stderr);
+  }
 }
 
 async function cmdConfig(sub: string | undefined, cwd: string, flags?: Flags) {
-  const { loadConfig, saveConfig, updateConfig } = await import("../../state/config.js");
+  const { loadConfig, saveConfig } = await import("../../state/config.js");
   const config = await loadConfig();
 
   if (!sub || sub === "show") {
@@ -417,8 +491,13 @@ async function cmdConfig(sub: string | undefined, cwd: string, flags?: Flags) {
     const value = args.slice(1).join(" ");
 
     if (!key || !value) {
-      console.log(chalk.red("Usage: setup config set <key> <value>"));
-      console.log(chalk.dim("  Keys: model, theme, confirm, autoupdate, ai"));
+      printPlainError(createPSetupError({
+        code: "UNKNOWN_SUBCOMMAND",
+        command: "config",
+        subcommand: "set",
+        cwd,
+        details: ["Usage: setup config set <key> <value>", "Keys: model, theme, confirm, autoupdate, ai"],
+      }));
       return;
     }
 
@@ -430,7 +509,13 @@ async function cmdConfig(sub: string | undefined, cwd: string, flags?: Flags) {
         if (value === "dark" || value === "light") {
           config.preferences.theme = value;
         } else {
-          console.log(chalk.red("Theme must be 'dark' or 'light'"));
+          printPlainError(createPSetupError({
+            code: "PROJECT_CONFIG_INVALID",
+            command: "config",
+            subcommand: "set",
+            cwd,
+            details: [`Theme must be 'dark' or 'light'. Received: ${value}`],
+          }));
           return;
         }
         break;
@@ -444,8 +529,13 @@ async function cmdConfig(sub: string | undefined, cwd: string, flags?: Flags) {
         config.ai.enabled = value === "true" || value === "1" || value === "yes";
         break;
       default:
-        console.log(chalk.red(`Unknown config key: ${key}`));
-        console.log(chalk.dim("  Valid keys: model, theme, confirm, autoupdate, ai"));
+        printPlainError(createPSetupError({
+          code: "PROJECT_CONFIG_INVALID",
+          command: "config",
+          subcommand: "set",
+          cwd,
+          details: [`Unknown key: ${key}`, "Valid keys: model, theme, confirm, autoupdate, ai"],
+        }));
         return;
     }
 
@@ -455,7 +545,6 @@ async function cmdConfig(sub: string | undefined, cwd: string, flags?: Flags) {
   }
 
   if (sub === "reset") {
-    const { updateConfig } = await import("../../state/config.js");
     await saveConfig({
       ai: { enabled: true },
       preferences: { theme: "dark", confirmBeforeInstall: true, autoUpdate: false, telemetry: false },
@@ -466,26 +555,35 @@ async function cmdConfig(sub: string | undefined, cwd: string, flags?: Flags) {
   }
 
   if (sub === "models") {
-    const { MODELS, PROVIDERS, getAvailableModels } = await import("../../ai/models.js");
+    const { MODELS, PROVIDERS, formatModelPrice, getAvailableModels, getDefaultModel, getProviderEnvValue } = await import("../../ai/models.js");
     const available = getAvailableModels();
+    const active = getDefaultModel();
     console.log(chalk.blue.bold("\n  Available AI Models\n"));
 
     const providers = [...new Set(MODELS.map((m) => m.provider))];
     for (const provider of providers) {
       const providerConfig = PROVIDERS[provider];
-      const hasKey = !!process.env[providerConfig.envKey];
+      const hasKey = !!getProviderEnvValue(provider);
       const providerModels = MODELS.filter((m) => m.provider === provider);
-      console.log(`  ${hasKey ? chalk.green("●") : chalk.red("○")} ${chalk.white(provider)} ${chalk.dim(`(${providerConfig.envKey})`)}`);
+      const keys = [providerConfig.envKey, ...(providerConfig.envAliases || [])].join(" or ");
+      console.log(`  ${hasKey ? chalk.green("●") : chalk.red("○")} ${chalk.white(provider)} ${chalk.dim(`(${keys})`)}`);
       for (const model of providerModels) {
         const isAvailable = available.includes(model);
-        console.log(`    ${isAvailable ? chalk.green(model.id) : chalk.dim(model.id)} — ${model.name}`);
+        const marker = model.id === active.id ? chalk.yellow("★ ") : "  ";
+        console.log(`  ${marker}${isAvailable ? chalk.green(model.id) : chalk.dim(model.id)} — ${model.name} ${chalk.dim(formatModelPrice(model))}`);
       }
     }
     console.log(chalk.dim(`\n  ${available.length} models available (set API keys to unlock more)`));
     return;
   }
 
-  console.log(chalk.dim("Usage: setup config [show|set|reset|models]"));
+  printPlainError(createPSetupError({
+    code: "UNKNOWN_SUBCOMMAND",
+    command: "config",
+    subcommand: sub,
+    cwd,
+    details: ["Valid subcommands: show, set, reset, models."],
+  }));
 }
 
 async function cmdLock(cwd: string) {
@@ -499,7 +597,7 @@ async function cmdDiff(cwd: string) {
   const { loadCheckpoint } = await import("../../state/checkpoint.js");
   const cp = await loadCheckpoint(cwd);
   if (!cp) {
-    console.log(chalk.dim("No locked state found. Run 'setup lock' first."));
+    printPlainError(createPSetupError({ code: "LOCK_STATE_MISSING", command: "diff", cwd }));
     return;
   }
   const scan = await scanProject(cwd);
@@ -523,19 +621,26 @@ async function cmdLogs(cwd: string) {
       return;
     } catch {}
   }
-  console.log(chalk.dim("No log files found."));
+  printPlainError(createPSetupError({
+    code: "LOG_FILE_MISSING",
+    command: "logs",
+    cwd,
+    details: [`Checked: ${logFiles.join(", ")}`],
+  }));
 }
 
 async function cmdTest(cwd: string) {
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
   if (scan.scripts.test) {
-    console.log(chalk.blue(`Running: ${pm} run test`));
-    const { spawn } = await import("child_process");
-    const proc = spawn(`${pm} run test`, { shell: true, cwd, stdio: "inherit" });
-    proc.on("exit", (code) => process.exit(code || 0));
+    await runPlainCommand(`${pm} run test`, cwd, { stepType: "script", stepLabel: "test" });
   } else {
-    console.log(chalk.dim("No test script found in package.json."));
+    printPlainError(createPSetupError({
+      code: "MISSING_SCRIPT",
+      command: "test",
+      cwd,
+      details: ["No test script found in package.json."],
+    }));
   }
 }
 
@@ -543,12 +648,14 @@ async function cmdBuild(cwd: string) {
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
   if (scan.scripts.build) {
-    console.log(chalk.blue(`Running: ${pm} run build`));
-    const { spawn } = await import("child_process");
-    const proc = spawn(`${pm} run build`, { shell: true, cwd, stdio: "inherit" });
-    proc.on("exit", (code) => process.exit(code || 0));
+    await runPlainCommand(`${pm} run build`, cwd, { stepType: "script", stepLabel: "build" });
   } else {
-    console.log(chalk.dim("No build script found."));
+    printPlainError(createPSetupError({
+      code: "MISSING_SCRIPT",
+      command: "build",
+      cwd,
+      details: ["No build script found in package.json."],
+    }));
   }
 }
 
@@ -556,12 +663,14 @@ async function cmdDeploy(cwd: string) {
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
   if (scan.scripts.deploy) {
-    console.log(chalk.blue(`Running: ${pm} run deploy`));
-    const { spawn } = await import("child_process");
-    const proc = spawn(`${pm} run deploy`, { shell: true, cwd, stdio: "inherit" });
-    proc.on("exit", (code) => process.exit(code || 0));
+    await runPlainCommand(`${pm} run deploy`, cwd, { stepType: "script", stepLabel: "deploy" });
   } else {
-    console.log(chalk.dim("No deploy script found. Add a 'deploy' script to package.json."));
+    printPlainError(createPSetupError({
+      code: "MISSING_SCRIPT",
+      command: "deploy",
+      cwd,
+      details: ["No deploy script found. Add a 'deploy' script to package.json."],
+    }));
   }
 }
 
@@ -575,7 +684,13 @@ async function cmdOpen(target: string | undefined, cwd: string) {
         await runCommand(`${openCmd} ${url}`, cwd);
         console.log(chalk.green(`Opened: ${url}`));
       } else {
-        console.log(chalk.dim("No git remote found."));
+        printPlainError(createPSetupError({
+          code: "OPEN_TARGET_MISSING",
+          command: "open",
+          subcommand: "repo",
+          cwd,
+          details: ["No git remote origin was found."],
+        }));
       }
       break;
     }
@@ -589,30 +704,24 @@ async function cmdOpen(target: string | undefined, cwd: string) {
   }
 }
 
-function parseEnvKeys(content: string): string[] {
-  return content
-    .split("\n")
-    .filter((l) => l.trim() && !l.startsWith("#"))
-    .map((l) => l.split("=")[0].trim())
-    .filter(Boolean);
+async function runPlainCommand(command: string, cwd: string, context: { stepType?: string; stepLabel?: string } = {}) {
+  console.log(chalk.blue(`Running: ${command}`));
+  const result = await runCommand(command, cwd, (line) => console.log(line));
+  if (result.exitCode !== 0) {
+    printPlainError(classifyCommandFailure({
+      command,
+      cwd,
+      exitCode: result.exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      ...context,
+    }));
+  }
 }
 
-function parseEnvPairs(content: string): Record<string, string> {
-  const pairs: Record<string, string> = {};
-  for (const line of content.split("\n")) {
-    if (!line.trim() || line.trim().startsWith("#")) continue;
-    const eqIdx = line.indexOf("=");
-    if (eqIdx > 0) {
-      const key = line.slice(0, eqIdx).trim();
-      let value = line.slice(eqIdx + 1).trim();
-      if ((value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
-      }
-      pairs[key] = value;
-    }
-  }
-  return pairs;
+function envReadErrorCode(error: unknown): "ENV_TEMPLATE_MISSING" | "ENV_CHECK_FAILED" {
+  const code = (error as { code?: string } | undefined)?.code;
+  return code === "ENOENT" ? "ENV_TEMPLATE_MISSING" : "ENV_CHECK_FAILED";
 }
 
 function isLikelyInvalid(key: string, value: string): boolean {

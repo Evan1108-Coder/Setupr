@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
 import { colors, icons } from "../theme.js";
+import { BoundedTextInput } from "./BoundedTextInput.js";
+import type { FocusBounds, FocusState } from "../hooks/useFocusNavigation.js";
+import { stripTerminalControlInput } from "../terminalInput.js";
 
 interface EnvInputProps {
   varKey: string;
@@ -9,20 +11,31 @@ interface EnvInputProps {
   onSubmit: (value: string) => void;
   onSkip: () => void;
   isSensitive?: boolean;
+  focusState?: FocusState;
+  width?: number;
+  maxLines?: number;
+  scrollBounds?: FocusBounds;
 }
 
-export function EnvInput({ varKey, remainingCount, onSubmit, onSkip, isSensitive = false }: EnvInputProps) {
+export function EnvInput({ varKey, remainingCount, onSubmit, onSkip, isSensitive = false, focusState, width, maxLines = 4, scrollBounds }: EnvInputProps) {
   const [value, setValue] = useState("");
+  const focused = focusState === "focused";
+  const boxWidth = Math.max(12, (width || 80) - 2);
+  const inputWidth = Math.max(8, boxWidth - 6);
 
   useInput((input, key) => {
     if (key.escape) {
       onSkip();
     }
-  });
+  }, { isActive: focused });
 
   const handleSubmit = (text: string) => {
-    onSubmit(text);
+    onSubmit(stripTerminalControlInput(text));
     setValue("");
+  };
+
+  const handleChange = (text: string) => {
+    setValue(stripTerminalControlInput(text));
   };
 
   const sensitive = isSensitive || varKey.includes("SECRET") || varKey.includes("KEY") || varKey.includes("TOKEN") || varKey.includes("PASSWORD");
@@ -36,16 +49,21 @@ export function EnvInput({ varKey, remainingCount, onSubmit, onSkip, isSensitive
       </Box>
       <Box
         borderStyle="single"
-        borderColor={colors.borderActive}
+        borderColor={focused ? colors.borderActive : colors.border}
         paddingX={1}
-        width="60%"
+        width={boxWidth}
+        flexShrink={1}
       >
-        <TextInput
+        <BoundedTextInput
           value={value}
-          onChange={setValue}
+          onChange={handleChange}
           onSubmit={handleSubmit}
+          focus={focused}
           placeholder=""
           mask={sensitive ? "•" : undefined}
+          width={inputWidth}
+          maxLines={maxLines}
+          scrollBounds={scrollBounds}
         />
       </Box>
       <Box>

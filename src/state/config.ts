@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { join } from "path";
+import { homedir } from "os";
 
-const CONFIG_DIR = join(process.env.HOME || "~", ".p-setup");
 const CONFIG_FILE = "config.json";
 
 export interface UserConfig {
@@ -32,7 +32,7 @@ const DEFAULT_CONFIG: UserConfig = {
 
 export async function loadConfig(): Promise<UserConfig> {
   try {
-    const raw = await readFile(join(CONFIG_DIR, CONFIG_FILE), "utf-8");
+    const raw = await readFile(configPath(), "utf-8");
     const parsed = JSON.parse(raw);
     return {
       ai: { ...DEFAULT_CONFIG.ai, ...(parsed.ai || {}) },
@@ -45,11 +45,17 @@ export async function loadConfig(): Promise<UserConfig> {
 }
 
 export async function saveConfig(config: UserConfig): Promise<void> {
-  await mkdir(CONFIG_DIR, { recursive: true });
-  await writeFile(join(CONFIG_DIR, CONFIG_FILE), JSON.stringify(config, null, 2));
+  await mkdir(configDir(), { recursive: true });
+  await writeFile(configPath(), JSON.stringify(config, null, 2));
 }
 
-export async function updateConfig(updates: Partial<UserConfig>): Promise<UserConfig> {
+export type UserConfigUpdates = {
+  ai?: Partial<UserConfig["ai"]>;
+  preferences?: Partial<UserConfig["preferences"]>;
+  remembered?: Record<string, string>;
+};
+
+export async function updateConfig(updates: UserConfigUpdates): Promise<UserConfig> {
   const current = await loadConfig();
   const merged: UserConfig = {
     ai: { ...current.ai, ...(updates.ai || {}) },
@@ -69,4 +75,12 @@ export async function rememberChoice(key: string, value: string): Promise<void> 
 export async function getRememberedChoice(key: string): Promise<string | null> {
   const config = await loadConfig();
   return config.remembered[key] || null;
+}
+
+function configDir(): string {
+  return join(process.env.HOME || homedir() || process.cwd(), ".p-setup");
+}
+
+function configPath(): string {
+  return join(configDir(), CONFIG_FILE);
 }

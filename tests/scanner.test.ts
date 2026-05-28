@@ -81,6 +81,22 @@ describe("Scanner", () => {
     expect(result.services).toContain("MongoDB");
   });
 
+  it("does not treat generic EMAIL env keys as a mail service", async () => {
+    await writeFile(join(tempDir, "package.json"), JSON.stringify({ dependencies: {} }));
+    await writeFile(join(tempDir, ".env.example"), "EMAIL=person@example.com\nAPI_KEY=abc\n");
+
+    const result = await scanProject(tempDir);
+    expect(result.services).not.toContain("Mail");
+  });
+
+  it("detects mail services from SMTP env keys", async () => {
+    await writeFile(join(tempDir, "package.json"), JSON.stringify({ dependencies: {} }));
+    await writeFile(join(tempDir, ".env.example"), "SMTP_HOST=smtp.example.com\n");
+
+    const result = await scanProject(tempDir);
+    expect(result.services).toContain("Mail");
+  });
+
   it("detects monorepo with npm workspaces", async () => {
     await writeFile(
       join(tempDir, "package.json"),
@@ -106,6 +122,44 @@ describe("Scanner", () => {
     expect(result.framework).toBe("Phoenix");
   });
 
+  it("respects runtime and package manager overrides from .p-setup.json", async () => {
+    await writeFile(
+      join(tempDir, ".p-setup.json"),
+      JSON.stringify({ runtime: "python", packageManager: "pip" })
+    );
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ dependencies: { react: "18" } })
+    );
+
+    const result = await scanProject(tempDir);
+    expect(result.packageManager).toBe("pip");
+    expect(result.runtime?.name).toBe("python");
+  });
+
+  it("respects package.json p-setup runtime and package manager overrides", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({
+        packageManager: "pnpm@9.0.0",
+        dependencies: { react: "18" },
+        "p-setup": {
+          language: "Python",
+          framework: "FastAPI",
+          runtime: { name: "python", version: ">=3.11" },
+          packageManager: "pip",
+        },
+      })
+    );
+
+    const result = await scanProject(tempDir);
+    expect(result.language).toBe("Python");
+    expect(result.framework).toBe("FastAPI");
+    expect(result.packageManager).toBe("pip");
+    expect(result.runtime?.name).toBe("python");
+    expect(result.runtime?.version).toBe(">=3.11");
+  });
+
   it("handles empty directory gracefully", async () => {
     const result = await scanProject(tempDir);
     expect(result.language).toBeNull();
@@ -120,6 +174,30 @@ describe("Scanner", () => {
 
     const result = await scanProject(tempDir);
     expect(result.packageManager).toBe("pnpm");
+  });
+
+  it("lists pnpm-workspace.yaml as a config file", async () => {
+    await writeFile(join(tempDir, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
+    await mkdir(join(tempDir, "packages/app"), { recursive: true });
+    await writeFile(join(tempDir, "packages/app/package.json"), "{}");
+
+    const result = await scanProject(tempDir);
+    expect(result.packageManager).toBe("pnpm");
+    expect(result.monorepo?.type).toBe("pnpm-workspaces");
+    expect(result.configFiles).toContain("pnpm-workspace.yaml");
+  });
+
+  it("prefers Turborepo detection over generic npm workspaces", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ workspaces: ["apps/*"] })
+    );
+    await writeFile(join(tempDir, "turbo.json"), "{}");
+    await mkdir(join(tempDir, "apps/web"), { recursive: true });
+    await writeFile(join(tempDir, "apps/web/package.json"), "{}");
+
+    const result = await scanProject(tempDir);
+    expect(result.monorepo?.type).toBe("turborepo");
   });
 
   it("detects node version from .nvmrc", async () => {

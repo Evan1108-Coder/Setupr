@@ -13,7 +13,7 @@ export interface SetupStep {
 }
 
 export async function planSteps(scan: ScanResult): Promise<SetupStep[]> {
-  if (hasAIKey()) {
+  if (hasAIKey() && shouldUseAIPlanner(scan)) {
     try {
       return await planStepsWithAI(scan);
     } catch {
@@ -21,6 +21,26 @@ export async function planSteps(scan: ScanResult): Promise<SetupStep[]> {
     }
   }
   return planStepsHeuristic(scan);
+}
+
+export function shouldUseAIPlanner(scan: ScanResult): boolean {
+  if (!scan.language && !scan.framework && !scan.packageManager && scan.configFiles.length > 0) {
+    return true;
+  }
+
+  if (scan.configFiles.some((file) => file === ".p-setup.json")) {
+    return false;
+  }
+
+  const knownSignals = [
+    scan.language,
+    scan.framework,
+    scan.packageManager,
+    scan.runtime?.name,
+    scan.monorepo?.type,
+  ].filter(Boolean);
+
+  return knownSignals.length === 0 && scan.configFiles.length > 0;
 }
 
 async function planStepsWithAI(scan: ScanResult): Promise<SetupStep[]> {
@@ -39,7 +59,7 @@ Be practical and specific to the detected stack.`,
     },
   ];
 
-  const result = await chat(messages, { temperature: 0.1 });
+  const result = await chat(messages, { temperature: 0.1, maxTokens: 1200, timeoutMs: 8000 });
 
   try {
     const jsonMatch = result.content.match(/\[[\s\S]*\]/);

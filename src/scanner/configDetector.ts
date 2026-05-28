@@ -4,7 +4,7 @@ import { join } from "path";
 export interface ConfigResult {
   language?: string;
   framework?: string;
-  runtime?: string;
+  runtime?: string | { name?: string; version?: string | null };
   packageManager?: string;
 }
 
@@ -15,7 +15,7 @@ export async function detectFromConfig(
   try {
     const raw = await readFile(join(cwd, ".p-setup.json"), "utf-8");
     const config = JSON.parse(raw);
-    if (config.language || config.framework) {
+    if (config.language || config.framework || config.runtime || config.packageManager) {
       return {
         language: config.language,
         framework: config.framework,

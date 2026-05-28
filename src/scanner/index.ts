@@ -5,6 +5,7 @@ import { detectPackageManager } from "./packageManager.js";
 import { detectRuntime } from "./runtimeDetector.js";
 import { detectServices } from "./serviceDetector.js";
 import { detectMonorepo } from "./monorepoDetector.js";
+import { createPSetupError } from "../errors/index.js";
 
 export interface ScanResult {
   language: string | null;
@@ -18,8 +19,19 @@ export interface ScanResult {
   configFiles: string[];
 }
 
+function normalizeRuntime(
+  runtime: string | { name?: string; version?: string | null } | undefined
+): ScanResult["runtime"] | null {
+  if (!runtime) return null;
+  if (typeof runtime === "string") return { name: runtime, version: null };
+  if (!runtime.name) return null;
+  return { name: runtime.name, version: runtime.version ?? null };
+}
+
 export async function scanProject(cwd: string): Promise<ScanResult> {
+  await validateProjectFiles(cwd);
   const configResult = await detectFromConfig(cwd);
+  const configuredRuntime = normalizeRuntime(configResult?.runtime);
 
   const [language, framework, packageManager, runtime, services, monorepo] =
     await Promise.all([
@@ -29,8 +41,12 @@ export async function scanProject(cwd: string): Promise<ScanResult> {
       configResult?.framework
         ? Promise.resolve(configResult.framework)
         : detectFramework(cwd),
-      detectPackageManager(cwd),
-      detectRuntime(cwd),
+      configResult?.packageManager
+        ? Promise.resolve(configResult.packageManager)
+        : detectPackageManager(cwd),
+      configuredRuntime
+        ? Promise.resolve(configuredRuntime)
+        : detectRuntime(cwd),
       detectServices(cwd),
       detectMonorepo(cwd),
     ]);
@@ -42,14 +58,35 @@ export async function scanProject(cwd: string): Promise<ScanResult> {
   return {
     language: configResult?.language || language,
     framework: configResult?.framework || framework,
-    packageManager,
-    runtime,
+    packageManager: configResult?.packageManager || packageManager,
+    runtime: configuredRuntime || runtime,
     services,
     monorepo,
     scripts,
     dependencies: deps,
     configFiles,
   };
+}
+
+async function validateProjectFiles(cwd: string): Promise<void> {
+  const { readFile } = await import("fs/promises");
+  const { join } = await import("path");
+  for (const file of ["package.json", ".p-setup.json", "lerna.json"]) {
+    try {
+      const raw = await readFile(join(cwd, file), "utf-8");
+      JSON.parse(raw);
+    } catch (err) {
+      const code = (err as { code?: string } | undefined)?.code;
+      if (code === "ENOENT") continue;
+      const message = err instanceof Error ? err.message : String(err);
+      throw createPSetupError({
+        code: file === ".p-setup.json" ? "PROJECT_CONFIG_INVALID" : "MALFORMED_PROJECT_FILE",
+        cwd,
+        details: [`File: ${file}`, message],
+        canContinue: false,
+      });
+    }
+  }
 }
 
 async function getScripts(
@@ -72,7 +109,7 @@ async function getScripts(
 async function getDependencyCounts(
   cwd: string
 ): Promise<{ prod: number; dev: number }> {
-  const { readFile, access } = await import("fs/promises");
+  const { readFile } = await import("fs/promises");
   const { join } = await import("path");
 
   // Try package.json first
@@ -118,6 +155,10 @@ async function findConfigFiles(cwd: string): Promise<string[]> {
   const configs: string[] = [];
   const known = [
     "package.json",
+    "pnpm-workspace.yaml",
+    "turbo.json",
+    "lerna.json",
+    "nx.json",
     "tsconfig.json",
     "vite.config.ts",
     "next.config.js",

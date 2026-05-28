@@ -1,0 +1,79 @@
+const ESC = String.fromCharCode(27);
+const BEL = String.fromCharCode(7);
+
+export interface SgrMouseReport {
+  code: number;
+  x: number;
+  y: number;
+  final: "M" | "m";
+  action: "press" | "release" | "scroll" | "move";
+}
+
+const SGR_MOUSE_PATTERN = "\\[<\\d+;\\d+;\\d+[mM]";
+const PARTIAL_SGR_MOUSE_PATTERN = "\\[<\\d*(?:;\\d*){0,2}$";
+let pendingMouseContinuation = false;
+
+export function stripTerminalControlInput(value: string): string {
+  let input = value;
+  if (pendingMouseContinuation) {
+    const continuation = input.match(/^\d*(?:;\d*){0,2}[mM]?/);
+    if (continuation?.[0]) {
+      input = input.slice(continuation[0].length);
+    }
+    pendingMouseContinuation = !/[mM]/.test(continuation?.[0] || "");
+  }
+
+  if (new RegExp(`${escapeRegExp(ESC)}?${PARTIAL_SGR_MOUSE_PATTERN}`).test(input)) {
+    pendingMouseContinuation = true;
+  }
+
+  const stripped = input
+    .replace(new RegExp(`${escapeRegExp(ESC)}${SGR_MOUSE_PATTERN}`, "g"), "")
+    .replace(new RegExp(SGR_MOUSE_PATTERN, "g"), "")
+    .replace(new RegExp(`${escapeRegExp(ESC)}\\[[0-?]*[ -/]*[@-~]`, "g"), "")
+    .replace(new RegExp(`${escapeRegExp(ESC)}\\][^${escapeRegExp(BEL)}]*(?:${escapeRegExp(BEL)}|${escapeRegExp(ESC)}\\\\)`, "g"), "")
+    .replace(new RegExp(`${escapeRegExp(ESC)}\\[M.{0,3}`, "g"), "")
+    .replace(new RegExp(PARTIAL_SGR_MOUSE_PATTERN), "")
+    .split(ESC).join("");
+  return stripC0Controls(stripped);
+}
+
+export function parseSgrMouse(input: string): SgrMouseReport | null {
+  const match = new RegExp(`${escapeRegExp(ESC)}?${SGR_MOUSE_PATTERN}`).exec(input);
+  if (!match) return null;
+
+  const parts = match[0].split(ESC).join("").match(/\[<(\d+);(\d+);(\d+)([mM])/);
+  if (!parts) return null;
+
+  const code = Number(parts[1]);
+  const final = parts[4] as "M" | "m";
+
+  return {
+    code,
+    x: Number(parts[2]),
+    y: Number(parts[3]),
+    final,
+    action: classifySgrMouse(code, final),
+  };
+}
+
+function classifySgrMouse(code: number, final: "M" | "m"): SgrMouseReport["action"] {
+  if (final === "m") return "release";
+  if ((code & 64) === 64) return "scroll";
+  if ((code & 32) === 32) return "move";
+  return "press";
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripC0Controls(value: string): string {
+  let clean = "";
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if ((code >= 0 && code <= 8) || (code >= 11 && code <= 31) || code === 127) continue;
+    clean += char;
+  }
+  return clean;
+}

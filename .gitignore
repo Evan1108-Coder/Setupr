@@ -6,3 +6,9 @@ dist/
 .DS_Store
 coverage/
 .p-setup/
+
+# Local visual smoke-test artifacts
+tui-screenshots/
+tui-live-screenshots/
+tui-live-test-project/
+tui-empty-test-project/

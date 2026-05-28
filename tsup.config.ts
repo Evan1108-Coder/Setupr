@@ -15,7 +15,7 @@ export default defineConfig({
   external: ["react-devtools-core", "yoga-wasm-web"],
   treeshake: true,
   minify: false,
-  shims: true,
+  shims: false,
   esbuildOptions(options) {
     options.define = {
       "process.env.NODE_ENV": '"production"',

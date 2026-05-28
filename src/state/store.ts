@@ -51,6 +51,33 @@ export interface NoticeInfo {
   message: string;
 }
 
+export interface AgentPromptOption {
+  id: string;
+  label: string;
+  description?: string;
+  sensitive?: boolean;
+}
+
+export interface AgentPrompt {
+  id: string;
+  type: "choice" | "confirm" | "input" | "secret";
+  title: string;
+  message?: string;
+  options?: AgentPromptOption[];
+  includeOther?: boolean;
+  otherLabel?: string;
+  sensitive?: boolean;
+  placeholder?: string;
+  createdAt: number;
+}
+
+export interface AgentPromptResponse {
+  promptId: string;
+  value: string;
+  optionId?: string;
+  timestamp: number;
+}
+
 export interface AppState {
   // Navigation
   activePanel: number;
@@ -73,6 +100,8 @@ export interface AppState {
   // Chat
   messages: AppMessage[];
   inputValue: string;
+  pendingPrompt: AgentPrompt | null;
+  promptResponse: AgentPromptResponse | null;
 
   // Log stream (timestamped execution log)
   logs: LogEntry[];
@@ -115,6 +144,9 @@ export interface AppState {
   addMessage: (msg: Omit<AppMessage, "id" | "timestamp">) => void;
   addLog: (entry: Omit<LogEntry, "id" | "timestamp">) => void;
   setInput: (value: string) => void;
+  setPendingPrompt: (prompt: AgentPrompt | null) => void;
+  answerPrompt: (response: Omit<AgentPromptResponse, "timestamp">) => void;
+  clearPromptResponse: () => void;
   setActivePanel: (index: number) => void;
   setRunning: (running: boolean) => void;
   setComplete: (complete: boolean) => void;
@@ -133,7 +165,7 @@ export interface AppState {
 export function createAppStore(cwd: string) {
   const projectName = cwd.split("/").pop() || "project";
 
-  return createStore<AppState>((set, get) => ({
+  return createStore<AppState>((set) => ({
     activePanel: 0,
     panelCount: 4,
     cwd,
@@ -148,6 +180,8 @@ export function createAppStore(cwd: string) {
     elapsed: 0,
     messages: [],
     inputValue: "",
+    pendingPrompt: null,
+    promptResponse: null,
     logs: [],
     envVars: [],
     envSource: "",
@@ -198,6 +232,12 @@ export function createAppStore(cwd: string) {
       }),
 
     setInput: (inputValue) => set({ inputValue }),
+    setPendingPrompt: (pendingPrompt) => set({ pendingPrompt }),
+    answerPrompt: (response) => set({
+      promptResponse: { ...response, timestamp: Date.now() },
+      pendingPrompt: null,
+    }),
+    clearPromptResponse: () => set({ promptResponse: null }),
     setActivePanel: (activePanel) => set({ activePanel }),
     setRunning: (isRunning) => set({ isRunning }),
     setComplete: (isComplete) => set({ isComplete }),

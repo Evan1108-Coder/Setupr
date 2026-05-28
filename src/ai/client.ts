@@ -2,34 +2,35 @@ import OpenAI from "openai";
 import {
   PROVIDERS,
   getDefaultModel,
-  getModelById,
+  getAIEnvValue,
+  getProviderEnvValue,
+  resolveModel,
   type AIModel,
   type AIProvider,
 } from "./models.js";
 
-const clients = new Map<AIProvider, OpenAI>();
+const clients = new Map<AIProvider, { apiKey: string; client: OpenAI }>();
 
 function getClientForProvider(provider: AIProvider): OpenAI | null {
-  if (clients.has(provider)) return clients.get(provider)!;
-
   const config = PROVIDERS[provider];
-  const apiKey = process.env[config.envKey];
+  const apiKey = getProviderEnvValue(provider);
 
   if (!apiKey) return null;
+  const cached = clients.get(provider);
+  if (cached?.apiKey === apiKey) return cached.client;
 
   const client = new OpenAI({
     apiKey,
     baseURL: config.baseURL,
   });
 
-  clients.set(provider, client);
+  clients.set(provider, { apiKey, client });
   return client;
 }
 
 export function hasAIKey(): boolean {
   const model = getDefaultModel();
-  const config = PROVIDERS[model.provider];
-  return !!process.env[config.envKey];
+  return !!getProviderEnvValue(model.provider);
 }
 
 export function getModel(): string {
@@ -50,6 +51,7 @@ export interface ChatOptions {
   maxTokens?: number;
   model?: string;
   stream?: boolean;
+  timeoutMs?: number;
 }
 
 export async function chat(
@@ -57,13 +59,13 @@ export async function chat(
   options?: ChatOptions
 ): Promise<{ content: string; tokens: number; model: string }> {
   const modelId = options?.model || getModel();
-  const model = getModelById(modelId) || getDefaultModel();
+  const model = resolveModel(modelId) || getDefaultModel();
   const client = getClientForProvider(model.provider);
 
   if (!client) {
     const config = PROVIDERS[model.provider];
     throw new Error(
-      `No API key for ${model.provider}. Set ${config.envKey} in your environment.`
+      `No API key for ${model.provider}. Run setup auth set-key ${model.provider}, or set ${config.envKey} in your environment for this shell.`
     );
   }
 
@@ -75,7 +77,7 @@ export async function chat(
     return chatGoogle(model, messages, options);
   }
 
-  // OpenAI, Groq, MiniMax, Moonshot — all OpenAI-compatible
+  // OpenAI, Groq, MiniMax, Moonshot, and GitHub Models are OpenAI-compatible.
   return chatOpenAICompatible(client, model, messages, options);
 }
 
@@ -90,6 +92,9 @@ async function chatOpenAICompatible(
     messages,
     temperature: options?.temperature ?? 0.3,
     max_tokens: options?.maxTokens ?? 2048,
+  }, {
+    timeout: options?.timeoutMs,
+    maxRetries: 0,
   });
 
   const choice = response.choices[0];
@@ -107,7 +112,7 @@ async function chatAnthropic(
   messages: ChatMessage[],
   options?: ChatOptions
 ): Promise<{ content: string; tokens: number; model: string }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = getAIEnvValue("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
   const systemMsg = messages.find((m) => m.role === "system");
@@ -131,6 +136,7 @@ async function chatAnthropic(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
+    signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
   });
 
   if (!response.ok) {
@@ -151,7 +157,7 @@ async function chatGoogle(
   messages: ChatMessage[],
   options?: ChatOptions
 ): Promise<{ content: string; tokens: number; model: string }> {
-  const apiKey = process.env.GOOGLE_API_KEY;
+  const apiKey = getAIEnvValue("GOOGLE_API_KEY");
   if (!apiKey) throw new Error("GOOGLE_API_KEY not set");
 
   const systemMsg = messages.find((m) => m.role === "system");
@@ -176,6 +182,7 @@ async function chatGoogle(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: options?.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
   });
 
   if (!response.ok) {
@@ -192,8 +199,8 @@ async function chatGoogle(
 
 export function listConfiguredProviders(): AIProvider[] {
   const configured: AIProvider[] = [];
-  for (const [provider, config] of Object.entries(PROVIDERS)) {
-    if (process.env[config.envKey]) {
+  for (const provider of Object.keys(PROVIDERS)) {
+    if (getProviderEnvValue(provider as AIProvider)) {
       configured.push(provider as AIProvider);
     }
   }

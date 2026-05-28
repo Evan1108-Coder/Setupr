@@ -1,0 +1,93 @@
+import type { PSetupErrorCode, PSetupErrorInput, PSetupErrorCategory, PSetupErrorSeverity } from "./types.js";
+
+type Template = Omit<PSetupErrorInput, "code" | "command" | "subcommand" | "cwd" | "metadata" | "cause">;
+
+export const ERROR_CATALOG: Record<PSetupErrorCode, Template> = {
+  UNKNOWN_COMMAND: usage("Unknown command", "P-Setup does not have a command with that name.", ["Run setup help to see every available command."]),
+  UNKNOWN_SUBCOMMAND: usage("Unknown subcommand", "That subcommand is not available for this command.", ["Run setup help <command> to see valid subcommands."]),
+  INVALID_FLAG: usage("Flag is not valid here", "The flag was accepted by the shell parser but does not apply to this command.", ["Remove the flag or run setup help <command>."]),
+  INVALID_FLAG_COMBINATION: usage("Flags conflict", "Two or more flags request incompatible behavior.", ["Pick one mode and rerun the command."]),
+  NON_INTERACTIVE_CONFIRMATION_REQUIRED: usage("Confirmation required", "This action needs confirmation, but the current terminal cannot accept interactive input.", ["Rerun in an interactive terminal or pass --force if you accept the risk."]),
+  NON_INTERACTIVE_INPUT_REQUIRED: usage("Input required", "This command needs a value, but the current terminal cannot prompt for it.", ["Pass the value as an option, or rerun in an interactive terminal."]),
+
+  NO_PROJECT_DETECTED: project("No project detected", "This directory does not contain recognizable project files.", ["Open a folder with package.json, pyproject.toml, Cargo.toml, go.mod, or similar."]),
+  MALFORMED_PROJECT_FILE: project("Project file could not be parsed", "A project/config file exists but is malformed.", ["Fix the file syntax and rerun the command."]),
+  PROJECT_CONFIG_INVALID: config("P-Setup project config is invalid", "A P-Setup config file exists but does not match the expected shape.", ["Fix the config or remove it to let P-Setup auto-detect."]),
+  MISSING_PACKAGE_JSON: project("package.json missing", "This command needs package.json but none was found.", ["Run this from a JavaScript project root."]),
+  MISSING_PACKAGE_MANAGER: pkg("Package manager missing", "The detected package manager is not installed or not available on PATH.", ["Install the package manager or switch to one that is available."]),
+  MISSING_SCRIPT: project("Script missing", "The requested package script does not exist.", ["Add the script to package.json or choose another script."]),
+  MISSING_RUNTIME: runtime("Runtime missing", "The project runtime is not installed or not available on PATH.", ["Install the runtime and rerun doctor/setup."]),
+
+  ENV_TEMPLATE_MISSING: env("No .env.example found", "P-Setup cannot infer the app's environment variables without a template.", ["Create .env.example, or rerun with --force to create an empty .env."]),
+  ENV_ALREADY_EXISTS: envWarn("Existing .env left unchanged", ".env already exists, so P-Setup did not overwrite it.", ["Use --force if you intentionally want to overwrite it."]),
+  ENV_SYNC_FAILED: env("Env sync failed", "P-Setup could not sync .env with .env.example.", ["Check file permissions and .env.example syntax."]),
+  ENV_CHECK_FAILED: env("Env check failed", "P-Setup found missing or empty environment values.", ["Fill the missing values in .env."]),
+  ENV_SMART_FAILED: env("Env smart analysis failed", "P-Setup could not complete smart env analysis.", ["Fix the reported env issues, rerun interactively, or update .env manually."]),
+  ENV_WRITE_FAILED: fs("Could not write env file", "P-Setup could not create or update the env file.", ["Check file permissions and whether .env is a directory or locked file."]),
+  ENV_INVALID_VALUE: envWarn("Environment value looks invalid", "One or more values look like placeholders or invalid formats.", ["Replace placeholders with real values."]),
+  ENV_DUPLICATE_KEY: envWarn("Duplicate environment key", "The same environment key appeared more than once.", ["Keep one value for each key."]),
+
+  AUTH_PROVIDER_REQUIRED: auth("Provider required", "This auth command needs a provider name.", ["Use one of: openai, anthropic, google, groq, minimax, moonshot, github."]),
+  AUTH_PROVIDER_UNKNOWN: auth("Unknown provider", "P-Setup does not recognize that AI provider.", ["Run setup auth models to see supported providers."]),
+  AUTH_KEY_MISSING: auth("API key missing", "The selected provider does not have a configured API key.", ["Run setup auth set-key <provider>."]),
+  AUTH_KEY_EMPTY: auth("API key empty", "No API key was entered, so nothing was saved.", ["Rerun setup auth set-key <provider>."]),
+  AUTH_KEY_REPLACE_CANCELLED: info("auth", "Auth key unchanged", "You cancelled replacing the existing key.", ["No action is needed."]),
+  AUTH_STORAGE_FAILED: fs("Auth storage failed", "P-Setup could not read or write global auth storage.", ["Check ~/.p-setup permissions."]),
+  AUTH_STORAGE_INVALID: auth("Auth storage is invalid", "The saved auth file could not be parsed safely, so P-Setup stopped instead of treating keys as missing.", ["Fix or remove ~/.p-setup/secrets.json, then rerun setup auth doctor."]),
+  AUTH_MIGRATION_FAILED: auth("Auth migration failed", "P-Setup could not migrate provider keys out of project .env.", ["Check file permissions and rerun setup auth migrate."]),
+
+  AI_MODEL_REQUIRED: ai("Model required", "This command needs a model id.", ["Run setup auth models, then setup auth use <model>."]),
+  AI_MODEL_UNKNOWN: ai("Unknown AI model", "The requested model is not in the catalog and is not a valid GitHub Models id.", ["Run setup auth models."]),
+  AI_MODEL_UNAVAILABLE: ai("AI model unavailable", "The model exists, but its provider is not configured.", ["Configure the provider key or choose an available model."]),
+  AI_KEY_MISSING: ai("AI key missing", "AI features need a configured provider key.", ["Run setup auth login or setup auth set-key <provider>."]),
+  AI_PROVIDER_TIMEOUT: provider("AI provider timed out", "The provider did not respond before the timeout.", ["Retry, switch models, or continue without AI."]),
+  AI_PROVIDER_AUTH_FAILED: provider("AI provider rejected the key", "The provider returned an authentication or authorization error.", ["Replace the key or check provider access."]),
+  AI_PROVIDER_RATE_LIMITED: provider("AI provider rate-limited the request", "The provider is asking P-Setup to slow down.", ["Wait and retry, or switch to another configured provider."]),
+  AI_PROVIDER_QUOTA_EXHAUSTED: provider("AI credits or quota exhausted", "The provider says the account has no remaining quota or credits.", ["Add credits, switch model/provider, or continue without AI."]),
+  AI_PROVIDER_UNAVAILABLE: provider("AI provider unavailable", "The provider returned a server or service error.", ["Retry later or switch to another provider."]),
+  AI_PROVIDER_PROTOCOL_ERROR: provider("AI provider response was invalid", "The provider returned a response P-Setup could not understand.", ["Retry or switch provider."]),
+  AI_PROVIDER_REQUEST_FAILED: provider("AI request failed", "The AI provider request failed.", ["Retry, switch provider, or continue without AI."]),
+
+  COMMAND_FAILED: executor("Command failed", "A command exited with a non-zero status.", ["Read the command output, fix the underlying issue, and rerun."]),
+  COMMAND_NOT_FOUND: executor("Command not found", "The shell could not find the command to run.", ["Install the missing tool or fix PATH."]),
+  COMMAND_TIMEOUT: executor("Command timed out", "The command took too long and was stopped.", ["Retry, check network/service state, or run the command manually."]),
+  COMMAND_ABORTED: executor("Command aborted", "The command was interrupted before it finished.", ["Rerun when ready."]),
+  INSTALL_FAILED: executor("Dependency install failed", "The package manager failed while installing dependencies.", ["Check package manager output, network, lockfile, and dependency conflicts."]),
+  BUILD_FAILED: executor("Build failed", "The project's build command failed.", ["Fix the build error, then rerun setup build or setup."]),
+  TEST_FAILED: executor("Tests failed", "The project's test command failed.", ["Fix failing tests, then rerun setup test."]),
+  UPDATE_CHECK_FAILED: pkg("Update check failed", "P-Setup could not check outdated packages.", ["Check package manager availability and registry/network access."]),
+  CLEAN_TARGET_FAILED: fs("Clean target failed", "P-Setup could not remove one of the requested files or folders.", ["Check permissions or close processes using the file."]),
+  CLEAN_MODE_INVALID: usage("Invalid clean mode", "Clean mode must be deps, share, or all.", ["Run setup clean --deps, setup clean --share, or setup clean --all."]),
+  PORT_CHECK_FAILED: executor("Port check failed", "P-Setup could not inspect the requested port.", ["Check platform tools such as lsof/netstat."]),
+  LOCK_STATE_MISSING: info("config", "No locked state found", "There is no saved environment lock to compare against.", ["Run setup lock first."]),
+  LOG_FILE_MISSING: info("filesystem", "No log file found", "P-Setup could not find a known package-manager or P-Setup log file in this project.", ["Run the failing command again, or check package-manager logs manually."]),
+  OPEN_TARGET_MISSING: project("Open target missing", "P-Setup could not find the requested URL, remote, or local app target.", ["Check project metadata and rerun."]),
+
+  TUI_TERMINAL_TOO_SMALL: tui("Terminal too small", "The current terminal is too small to render the full TUI.", ["Resize the terminal or run with --plain."]),
+  TUI_MOUSE_PROTOCOL_LEFT_ON: tui("Mouse reporting left on", "The terminal appears to be emitting mouse escape reports.", ["Reset the terminal or restart the shell."]),
+  TUI_RENDER_FAILED: tui("TUI render failed", "The terminal UI could not render safely.", ["Rerun with --plain and report the terminal size."]),
+  FILESYSTEM_PERMISSION_DENIED: fs("Permission denied", "The operating system refused a file operation.", ["Check ownership and permissions."]),
+  FILESYSTEM_READ_ONLY: fs("Filesystem is read-only", "P-Setup cannot write to this location.", ["Move the project or change filesystem permissions."]),
+  NETWORK_UNAVAILABLE: network("Network unavailable", "A network request failed before the service could respond.", ["Check internet/VPN/proxy settings."]),
+  UNKNOWN_ERROR: fatal("Unexpected error", "P-Setup hit an unexpected failure.", ["Rerun with debug logs or report the command and project state."]),
+};
+
+function entry(category: PSetupErrorCategory, severity: PSetupErrorSeverity, title: string, explanation: string, nextSteps: string[], canContinue = false): Template {
+  return { category, severity, title, explanation, nextSteps, canContinue, exitCode: severity === "info" || severity === "warning" ? 0 : 1 };
+}
+function usage(title: string, explanation: string, nextSteps: string[]) { return entry("usage", "error", title, explanation, nextSteps); }
+function project(title: string, explanation: string, nextSteps: string[]) { return entry("project", "error", title, explanation, nextSteps); }
+function config(title: string, explanation: string, nextSteps: string[]) { return entry("config", "warning", title, explanation, nextSteps, true); }
+function env(title: string, explanation: string, nextSteps: string[]) { return entry("env", "error", title, explanation, nextSteps); }
+function envWarn(title: string, explanation: string, nextSteps: string[]) { return entry("env", "warning", title, explanation, nextSteps, true); }
+function auth(title: string, explanation: string, nextSteps: string[]) { return entry("auth", "error", title, explanation, nextSteps); }
+function ai(title: string, explanation: string, nextSteps: string[]) { return entry("ai", "error", title, explanation, nextSteps, true); }
+function provider(title: string, explanation: string, nextSteps: string[]) { return entry("provider", "error", title, explanation, nextSteps, true); }
+function runtime(title: string, explanation: string, nextSteps: string[]) { return entry("runtime", "error", title, explanation, nextSteps); }
+function pkg(title: string, explanation: string, nextSteps: string[]) { return entry("package-manager", "error", title, explanation, nextSteps); }
+function fs(title: string, explanation: string, nextSteps: string[]) { return entry("filesystem", "error", title, explanation, nextSteps); }
+function executor(title: string, explanation: string, nextSteps: string[]) { return entry("executor", "error", title, explanation, nextSteps); }
+function tui(title: string, explanation: string, nextSteps: string[]) { return entry("tui", "warning", title, explanation, nextSteps, true); }
+function network(title: string, explanation: string, nextSteps: string[]) { return entry("network", "error", title, explanation, nextSteps, true); }
+function info(category: PSetupErrorCategory, title: string, explanation: string, nextSteps: string[]) { return entry(category, "info", title, explanation, nextSteps, true); }
+function fatal(title: string, explanation: string, nextSteps: string[]) { return entry("unknown", "fatal", title, explanation, nextSteps); }

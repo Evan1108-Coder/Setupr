@@ -3,8 +3,9 @@ import chalk from "chalk";
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 export async function showTransition(command: string): Promise<void> {
-  // Clear screen
-  process.stdout.write("\x1B[2J\x1B[0;0H");
+  // Reset SGR attributes before clearing so a prior command cannot leave
+  // reverse-video or background color active in the launch screen.
+  process.stdout.write("\x1B[0m\x1B[2J\x1B[1;1H");
 
   const label = `Launching ${command}...`;
   const cols = process.stdout.columns || 80;
@@ -22,7 +23,7 @@ export async function showTransition(command: string): Promise<void> {
   }
 
   // Clear for TUI
-  process.stdout.write("\x1B[2J\x1B[0;0H");
+  process.stdout.write("\x1B[0m\x1B[2J\x1B[1;1H");
 }
 
 function sleep(ms: number): Promise<void> {

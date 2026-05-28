@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile, readdir, rm, cp } from "fs/promises";
+import { mkdir, writeFile, readFile, readdir, rm } from "fs/promises";
 import { join } from "path";
 
 const SNAPSHOT_DIR = ".p-setup/snapshots";

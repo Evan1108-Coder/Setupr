@@ -1,20 +1,22 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useApp } from "ink";
 import { Panel } from "../components/Panel.js";
 import { StatusBar } from "../components/StatusBar.js";
 import { Spinner } from "../components/Spinner.js";
-import { useNavigation } from "../hooks/useNavigation.js";
+import { useFocusNavigation, type FocusItem } from "../hooks/useFocusNavigation.js";
+import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { colors, icons } from "../theme.js";
-import { runCommand } from "../../executor/index.js";
 import type { ScanResult } from "../../scanner/index.js";
-import { stat, rm, readdir } from "fs/promises";
+import { stat, rm } from "fs/promises";
 import { join } from "path";
+import { createPSetupError, type PSetupError } from "../../errors/index.js";
 
 interface CleanTarget {
   path: string;
   size: string;
   type: "deps" | "build" | "cache" | "sensitive";
-  status: "pending" | "removing" | "done";
+  status: "pending" | "removing" | "done" | "failed";
+  error?: PSetupError;
 }
 
 interface CleanLayoutProps {
@@ -23,9 +25,17 @@ interface CleanLayoutProps {
   mode: "deps" | "share" | "all";
 }
 
-export function CleanLayout({ scan, cwd, mode }: CleanLayoutProps) {
+export function CleanLayout({ cwd, mode }: CleanLayoutProps) {
   const { exit } = useApp();
-  const { activePanel } = useNavigation({ panelCount: 2, onQuit: () => exit() });
+  const terminal = useTerminalSize();
+  const stacked = terminal.width < 90;
+  const mainWidth = stacked ? terminal.width : Math.max(44, Math.floor(terminal.width * 0.64));
+  const sideWidth = stacked ? terminal.width : terminal.width - mainWidth;
+  const focusItems = useMemo(
+    () => buildFocusItems(terminal.width, terminal.height, mainWidth, sideWidth, stacked),
+    [terminal.width, terminal.height, mainWidth, sideWidth, stacked]
+  );
+  const focus = useFocusNavigation({ items: focusItems, onQuit: () => exit() });
   const [targets, setTargets] = useState<CleanTarget[]>([]);
   const [loading, setLoading] = useState(true);
   const [cleaning, setCleaning] = useState(false);
@@ -50,23 +60,24 @@ export function CleanLayout({ scan, cwd, mode }: CleanLayoutProps) {
   }, [loading, targets.length, cleaning, done]);
 
   return (
-    <Box flexDirection="column" width="100%">
-      <Box justifyContent="space-between">
+    <Box flexDirection="column" width={terminal.width} height={terminal.height}>
+      <Box height={1} justifyContent="space-between">
         <Text color={colors.primary} bold> P-Setup Clean</Text>
         <Text color={colors.textDim}>mode: {mode}</Text>
       </Box>
 
-      <Box flexDirection="row" flexGrow={1}>
-        <Panel title="Targets" active={activePanel === 0} width="60%">
+      <Box flexDirection={stacked ? "column" : "row"} width="100%" flexGrow={1} minHeight={8}>
+        <Panel title="Targets" focusState={focus.focusState("targets")} width={stacked ? "100%" : mainWidth} height={stacked ? undefined : "100%"} flexGrow={stacked ? 1 : undefined}>
           <Box flexDirection="column">
             {loading && <Spinner label="Scanning for removable files..." />}
             {targets.map((t) => (
-              <Box key={t.path}>
-                <Text color={getTargetColor(t)}>
-                  {t.status === "done" ? icons.check : t.status === "removing" ? icons.spinner[0] : icons.circle}
+              <Box key={t.path} minWidth={0}>
+                <Text color={getTargetColor(t)} wrap="truncate">
+                  {t.status === "done" ? icons.check : t.status === "failed" ? icons.cross : t.status === "removing" ? icons.spinner[0] : icons.circle}
                   {" "}{t.path}
                 </Text>
                 <Text color={colors.textDim}> ({t.size})</Text>
+                {t.error && <Text color={colors.error} wrap="truncate"> {t.error.code}</Text>}
               </Box>
             ))}
             {!loading && targets.length === 0 && (
@@ -75,12 +86,21 @@ export function CleanLayout({ scan, cwd, mode }: CleanLayoutProps) {
           </Box>
         </Panel>
 
-        <Panel title="Info" active={activePanel === 1} width="40%">
+        <Panel title="Info" focusState={focus.focusState("info")} width={stacked ? "100%" : sideWidth} height={stacked ? 9 : "100%"}>
           <Box flexDirection="column">
             <Text color={colors.textBright} bold>Mode: {mode}</Text>
-            {mode === "deps" && <Text color={colors.text}>Removes installed dependencies</Text>}
-            {mode === "share" && <Text color={colors.text}>Removes sensitive + system files</Text>}
-            {mode === "all" && <Text color={colors.text}>Removes everything non-essential</Text>}
+            {mode === "deps" && <Text color={colors.text}>Removes installed dependencies and dependency caches.</Text>}
+            {mode === "share" && <Text color={colors.text}>Removes sensitive and system-local files.</Text>}
+            {mode === "all" && <Text color={colors.text}>Removes dependencies, build output, caches, and local env files.</Text>}
+            <Text> </Text>
+            <Text color={colors.heading} bold>STATE</Text>
+            <Text color={colors.text}>Targets: {targets.length}</Text>
+            <Text color={targets.some((target) => target.status === "failed") ? colors.error : colors.textDim}>
+              Failed: {targets.filter((target) => target.status === "failed").length}
+            </Text>
+            <Text color={cleaning ? colors.warning : done ? colors.success : colors.textDim}>
+              {done ? "Complete" : cleaning ? "Cleaning..." : loading ? "Scanning..." : "Ready"}
+            </Text>
           </Box>
         </Panel>
       </Box>
@@ -88,6 +108,19 @@ export function CleanLayout({ scan, cwd, mode }: CleanLayoutProps) {
       <StatusBar stepProgress={done ? "clean complete" : cleaning ? "cleaning..." : "scanning"} />
     </Box>
   );
+}
+
+function buildFocusItems(width: number, height: number, mainWidth: number, sideWidth: number, stacked: boolean): FocusItem[] {
+  if (stacked) {
+    return [
+      { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width, height: Math.max(8, height - 10) } },
+      { id: "info", row: 1, column: 0, bounds: { x: 1, y: Math.max(3, height - 8), width, height: 7 } },
+    ];
+  }
+  return [
+    { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: mainWidth, height: height - 2 } },
+    { id: "info", row: 0, column: 1, bounds: { x: mainWidth + 1, y: 2, width: sideWidth, height: height - 2 } },
+  ];
 }
 
 async function findCleanTargets(cwd: string, mode: string): Promise<CleanTarget[]> {
@@ -131,8 +164,17 @@ async function cleanTargets(cwd: string, targets: CleanTarget[]): Promise<CleanT
     try {
       await rm(join(cwd, results[i].path), { recursive: true, force: true });
       results[i] = { ...results[i], status: "done" };
-    } catch {
-      results[i] = { ...results[i], status: "done" };
+    } catch (err) {
+      results[i] = {
+        ...results[i],
+        status: "failed",
+        error: createPSetupError({
+          code: "CLEAN_TARGET_FAILED",
+          command: "clean",
+          cwd,
+          details: [`Target: ${results[i].path}`, err instanceof Error ? err.message : String(err)],
+        }),
+      };
     }
   }
   return results;
@@ -165,6 +207,7 @@ function formatSize(bytes: number): string {
 
 function getTargetColor(t: CleanTarget): string {
   if (t.status === "done") return colors.success;
+  if (t.status === "failed") return colors.error;
   if (t.status === "removing") return colors.accent;
   return colors.text;
 }

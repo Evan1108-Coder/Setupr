@@ -1,26 +1,25 @@
 import { scanProject } from "../scanner/index.js";
-import { loadCheckpoint, formatCheckpointAge } from "../state/checkpoint.js";
+import { createPreExecutionWarning } from "../ai/setupFlow.js";
+import { describeDefaultModelSelection } from "../ai/models.js";
+import { createPSetupError, printPlainError } from "../errors/index.js";
+import { formatCheckpointAge, loadCheckpoint } from "../state/checkpoint.js";
 import chalk from "chalk";
 
-export async function showPreWarning(command: string, cwd: string, force: boolean): Promise<void> {
+interface PreWarningOptions {
+  requireConfirmation?: boolean;
+}
+
+export async function showPreWarning(
+  command: string,
+  cwd: string,
+  force: boolean,
+  subCommand?: string,
+  options: PreWarningOptions = {}
+): Promise<boolean> {
+  setNeutralTitle(`P-Setup ${command}`);
   const scan = await scanProject(cwd);
 
-  const warnings: Record<string, string> = {
-    setup: scan.language
-      ? `Will scan and configure ${scan.language}${scan.framework ? ` / ${scan.framework}` : ""} project. Dependencies will be installed.`
-      : "Will scan this directory and attempt to set up the project.",
-    start: scan.scripts.dev
-      ? `Will run: ${scan.packageManager || "npm"} run dev`
-      : "Will detect and run the project's dev server.",
-    doctor: "Will check your environment for issues (runtimes, deps, ports, etc).",
-    update: "Will check all dependencies for available updates. No changes without confirmation.",
-    clean: "Will remove build artifacts and generated files. Source code is not affected.",
-  };
-
-  const msg = warnings[command] || "Will execute the requested operation.";
-
   console.log("");
-
   if (command === "setup" && !force) {
     const checkpoint = await loadCheckpoint(cwd);
     if (checkpoint) {
@@ -28,24 +27,58 @@ export async function showPreWarning(command: string, cwd: string, force: boolea
       const done = checkpoint.completedSteps.length;
       const total = checkpoint.steps.length;
       console.log(chalk.cyan(`  ↻  Found interrupted setup from ${age} (${done}/${total} steps done). Will resume automatically.`));
-      console.log(chalk.dim(`     Use --force to start fresh instead.`));
+      console.log(chalk.dim("     Use --force to start fresh instead."));
       console.log("");
     }
   }
-
-  console.log(chalk.yellow(`  ⚠  ${msg}`));
+  console.log(chalk.yellow(`  ⚠  P-Setup ${command}${subCommand ? ` ${subCommand}` : ""}`));
+  for (const line of createPreExecutionWarning(scan, command, force)) {
+    console.log(chalk.dim("  • ") + line);
+  }
+  if (command === "setup") {
+    console.log(chalk.dim("  • ") + `AI director model: ${describeDefaultModelSelection()}.`);
+  }
+  if (command === "clean") {
+    const mode = subCommand || "deps";
+    const modeMessage = mode === "all"
+      ? "Clean mode all can delete dependency folders, build outputs, caches, and local share-sensitive files."
+      : mode === "share"
+        ? "Clean mode share removes local sensitive files intended to stay off shared machines."
+        : "Clean mode deps removes dependency/install artifacts such as node_modules where detected.";
+    console.log(chalk.dim("  • ") + chalk.yellow(modeMessage));
+  }
   console.log("");
 
   if (!force) {
     console.log(chalk.dim("  Press Enter to continue, Ctrl+C to cancel..."));
-    await waitForEnter();
+    const confirmed = await waitForEnter();
+    if (!confirmed && options.requireConfirmation) {
+      printPlainError(createPSetupError({
+        code: "NON_INTERACTIVE_CONFIRMATION_REQUIRED",
+        command,
+        subcommand: subCommand,
+        cwd,
+        forceBehavior: "With --force, P-Setup skips ordinary confirmations but still stops before serious damage.",
+      }));
+      return false;
+    }
   }
+
+  return true;
 }
 
-function waitForEnter(): Promise<void> {
+function setNeutralTitle(title: string): void {
+  if (!process.stdout.isTTY) return;
+  const escape = String.fromCharCode(27);
+  const bell = String.fromCharCode(7);
+  const clean = title.split(escape).join("").split(bell).join("").slice(0, 80);
+  process.stdout.write(`${escape}]0;${clean}${bell}`);
+}
+
+function waitForEnter(): Promise<boolean> {
   return new Promise((resolve) => {
-    if (!process.stdin.isTTY) {
-      resolve();
+    if (!process.stdin.isTTY || typeof process.stdin.setRawMode !== "function") {
+      resolve(false);
       return;
     }
     process.stdin.setRawMode(true);
@@ -55,10 +88,16 @@ function waitForEnter(): Promise<void> {
       process.stdin.pause();
       const key = data.toString();
       if (key === "\x03") {
-        console.log(chalk.dim("\n  Cancelled."));
-        process.exit(0);
+        console.log("");
+        printPlainError(createPSetupError({
+          code: "COMMAND_ABORTED",
+          details: ["Cancelled before the TUI launched."],
+          exitCode: 130,
+        }));
+        resolve(false);
+        return;
       }
-      resolve();
+      resolve(true);
     });
   });
 }

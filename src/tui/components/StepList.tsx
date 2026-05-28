@@ -12,13 +12,13 @@ export function StepList({ steps, currentIndex }: StepListProps) {
   return (
     <Box flexDirection="column">
       {steps.map((step, i) => (
-        <StepItem key={step.id} step={step} isCurrent={i === currentIndex} index={i} />
+        <StepItem key={step.id} step={step} isCurrent={i === currentIndex} />
       ))}
     </Box>
   );
 }
 
-function StepItem({ step, isCurrent, index }: { step: SetupStep; isCurrent: boolean; index: number }) {
+function StepItem({ step, isCurrent }: { step: SetupStep; isCurrent: boolean }) {
   const icon = getStepIcon(step.status);
   const color = getStepColor(step.status, isCurrent);
 

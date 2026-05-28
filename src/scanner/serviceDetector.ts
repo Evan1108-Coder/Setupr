@@ -64,15 +64,42 @@ async function checkPackageDeps(cwd: string, services: Set<string>) {
 async function checkEnvExample(cwd: string, services: Set<string>) {
   try {
     const content = await readFile(join(cwd, ".env.example"), "utf-8");
-    const lower = content.toLowerCase();
-    if (lower.includes("database_url") || lower.includes("db_host")) {
-      if (lower.includes("postgres")) services.add("PostgreSQL");
-      else if (lower.includes("mysql")) services.add("MySQL");
-      else if (lower.includes("mongo")) services.add("MongoDB");
+    const entries = content
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#"))
+      .map((line) => {
+        const [rawKey, ...rawValue] = line.split("=");
+        return {
+          key: (rawKey || "").trim().toLowerCase(),
+          value: rawValue.join("=").trim().toLowerCase(),
+        };
+      });
+
+    const haystack = entries.map((entry) => `${entry.key}=${entry.value}`).join("\n");
+    if (entries.some((entry) => entry.key === "database_url" || entry.key === "db_host")) {
+      if (haystack.includes("postgres")) services.add("PostgreSQL");
+      else if (haystack.includes("mysql")) services.add("MySQL");
+      else if (haystack.includes("mongo")) services.add("MongoDB");
       else services.add("Database");
     }
-    if (lower.includes("redis")) services.add("Redis");
-    if (lower.includes("smtp") || lower.includes("mail")) services.add("Mail");
-    if (lower.includes("s3") || lower.includes("aws")) services.add("S3");
+    if (entries.some((entry) => entry.key.includes("redis") || entry.value.includes("redis://"))) services.add("Redis");
+    if (entries.some(isMailServiceEntry)) services.add("Mail");
+    if (entries.some((entry) => entry.key.startsWith("s3_") || entry.key.startsWith("aws_") || entry.value.includes("s3://"))) services.add("S3");
   } catch {}
+}
+
+function isMailServiceEntry(entry: { key: string; value: string }): boolean {
+  return (
+    entry.key.startsWith("smtp_") ||
+    entry.key === "smtp" ||
+    entry.key === "mail_host" ||
+    entry.key === "mailhog_host" ||
+    entry.key === "mailtrap_host" ||
+    entry.key.startsWith("mailgun_") ||
+    entry.key === "email_server" ||
+    entry.value.includes("smtp://") ||
+    entry.value.includes("mailhog") ||
+    entry.value.includes("mailtrap")
+  );
 }

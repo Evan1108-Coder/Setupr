@@ -1,4 +1,4 @@
-import { readFile, access, readdir } from "fs/promises";
+import { readFile, access } from "fs/promises";
 import { join } from "path";
 import { glob } from "glob";
 
@@ -12,6 +12,17 @@ export async function detectMonorepo(
     return { type: "pnpm-workspaces", packages };
   } catch {}
 
+  // Turborepo
+  try {
+    await access(join(cwd, "turbo.json"));
+    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf-8"));
+    const patterns = Array.isArray(pkg.workspaces)
+      ? pkg.workspaces
+      : pkg.workspaces?.packages || ["packages/*", "apps/*"];
+    const packages = await resolveWorkspacePackages(cwd, patterns);
+    return { type: "turborepo", packages };
+  } catch {}
+
   // npm/yarn workspaces (package.json)
   try {
     const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf-8"));
@@ -22,17 +33,6 @@ export async function detectMonorepo(
       const packages = await resolveWorkspacePackages(cwd, patterns);
       return { type: "npm-workspaces", packages };
     }
-  } catch {}
-
-  // Turborepo
-  try {
-    await access(join(cwd, "turbo.json"));
-    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf-8"));
-    const patterns = Array.isArray(pkg.workspaces)
-      ? pkg.workspaces
-      : pkg.workspaces?.packages || ["packages/*", "apps/*"];
-    const packages = await resolveWorkspacePackages(cwd, patterns);
-    return { type: "turborepo", packages };
   } catch {}
 
   // Lerna

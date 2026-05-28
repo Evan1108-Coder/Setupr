@@ -1,6 +1,7 @@
 import { chat, hasAIKey, type ChatMessage } from "./client.js";
 import { getCached, setCache, buildCacheKey } from "./cache.js";
 import type { ScanResult } from "../scanner/index.js";
+import { classifyAIProviderError, errorSummary } from "../errors/index.js";
 
 export type IntelligenceLevel = "pattern" | "cached" | "live";
 
@@ -8,6 +9,11 @@ export interface IntelligenceResult {
   response: string;
   level: IntelligenceLevel;
   cost: number;
+}
+
+export interface IntelligenceOptions {
+  messages?: ChatMessage[];
+  directorContext?: string;
 }
 
 // Pattern rules: instant, free answers
@@ -71,8 +77,12 @@ export async function intelligentResponse(
   query: string,
   scan: ScanResult,
   contextDSL: string,
-  messages?: ChatMessage[]
+  optionsOrMessages?: ChatMessage[] | IntelligenceOptions
 ): Promise<IntelligenceResult> {
+  const options = Array.isArray(optionsOrMessages)
+    ? { messages: optionsOrMessages }
+    : optionsOrMessages || {};
+
   // Level 0: Pattern matching (free, instant)
   for (const rule of PATTERN_RULES) {
     if (rule.match(query, scan)) {
@@ -81,7 +91,7 @@ export async function intelligentResponse(
   }
 
   // Level 1: Cache hit (free, instant)
-  const cacheKey = buildCacheKey(query, contextDSL);
+  const cacheKey = buildCacheKey(query, `${contextDSL}\n${options.directorContext || ""}`);
   const cached = await getCached(cacheKey);
   if (cached) {
     return { response: cached.response, level: "cached", cost: 0 };
@@ -90,7 +100,7 @@ export async function intelligentResponse(
   // Level 2: Live AI call
   if (!hasAIKey()) {
     return {
-      response: "AI features require an API key. Set one of: MINIMAX_API_KEY, MOONSHOT_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY.",
+      response: "AI features require an API key. Run setup auth login or setup auth set-key <provider>. Shell environment keys still work for temporary use.",
       level: "pattern",
       cost: 0,
     };
@@ -98,11 +108,21 @@ export async function intelligentResponse(
 
   const systemMsg: ChatMessage = {
     role: "system",
-    content: `You are P-Setup's AI brain — an intelligent project setup assistant. Context: ${contextDSL}. Be concise, helpful, and specific to this project.`,
+    content: [
+      "You are P-Setup's AI director — the worker and coordinator for this project setup session.",
+      `Project context: ${contextDSL}.`,
+      options.directorContext
+        ? `Full director context packet: ${options.directorContext}.`
+        : "Full director context packet was not available for this command.",
+      "Stay oriented to the user's current project, setup plan, environment, commands, and troubleshooting.",
+      "If the user asks something adjacent, answer briefly and connect it back to the project when useful.",
+      "If the user asks something clearly unrelated, be friendly, keep it short, and gently return focus to the setup work.",
+      "Do not be rigid: useful clarification, small explanations, and user steering are part of staying on task.",
+    ].join(" "),
   };
 
   const userMsg: ChatMessage = { role: "user", content: query };
-  const allMessages = [systemMsg, ...(messages || []), userMsg];
+  const allMessages = [systemMsg, ...(options.messages || []), userMsg];
 
   try {
     const result = await chat(allMessages);
@@ -114,8 +134,9 @@ export async function intelligentResponse(
       cost: result.tokens * costPerToken,
     };
   } catch (err) {
+    const psetupError = classifyAIProviderError(err, { command: "ai-director" });
     return {
-      response: `AI unavailable: ${err instanceof Error ? err.message : "unknown error"}`,
+      response: `AI unavailable: ${errorSummary(psetupError)} ${psetupError.nextSteps?.join(" ") || ""}`,
       level: "pattern",
       cost: 0,
     };

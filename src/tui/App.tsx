@@ -1,21 +1,32 @@
 import React, { useEffect } from "react";
-import { Box } from "ink";
 import { SetupLayout } from "./layouts/SetupLayout.js";
 import { DoctorLayout } from "./layouts/DoctorLayout.js";
 import { StartLayout } from "./layouts/StartLayout.js";
 import { UpdateLayout } from "./layouts/UpdateLayout.js";
 import { CleanLayout } from "./layouts/CleanLayout.js";
-import type { AppStore } from "../state/store.js";
+import { AuthLayout } from "./layouts/AuthLayout.js";
 import type { ScanResult } from "../scanner/index.js";
 import { scanProject } from "../scanner/index.js";
 import { collectContext } from "../context/collector.js";
-import { contextToDSL } from "../ai/dsl.js";
-import { planSteps } from "../ai/planner.js";
+import { planSteps, shouldUseAIPlanner } from "../ai/planner.js";
 import { executeAllSteps } from "../executor/index.js";
-import { loadCheckpoint, deleteCheckpoint, formatCheckpointAge } from "../state/checkpoint.js";
-import { chat, hasAIKey, type ChatMessage } from "../ai/client.js";
+import { hasProjectSignals } from "./projectSignals.js";
+import { getProviderEnvValue } from "../ai/models.js";
+import { fromUnknownError, errorSummary } from "../errors/index.js";
+import { deleteCheckpoint, formatCheckpointAge, loadCheckpoint } from "../state/checkpoint.js";
+import type { AgentPrompt, AgentPromptResponse, AppStore } from "../state/store.js";
+import {
+  applyPlanTextAdjustment,
+  createConfirmationSummary,
+  envInterpretationToRecord,
+  formatConfirmationSummary,
+  formatPlanningMessage,
+  interpretEnvBatch,
+  maskEnvVars,
+  mergeEnvValues,
+} from "../ai/setupFlow.js";
 
-export type TUICommand = "setup" | "start" | "doctor" | "update" | "clean";
+export type TUICommand = "setup" | "start" | "doctor" | "update" | "clean" | "auth";
 
 interface AppProps {
   command: TUICommand;
@@ -28,7 +39,7 @@ interface AppProps {
 export function App({ command, cwd, store, cleanMode = "deps", force = false }: AppProps) {
   useEffect(() => {
     if (command === "setup") {
-      runSetupFlow(cwd, store, force);
+      runSetupFlow(cwd, store, { force });
     }
   }, []);
 
@@ -45,57 +56,55 @@ export function App({ command, cwd, store, cleanMode = "deps", force = false }: 
       return scan ? <UpdateLayout scan={scan} cwd={cwd} /> : <SetupLayout store={store} />;
     case "clean":
       return scan ? <CleanLayout scan={scan} cwd={cwd} mode={cleanMode} /> : <SetupLayout store={store} />;
+    case "auth":
+      return <AuthLayout />;
     default:
       return <SetupLayout store={store} />;
   }
 }
 
-async function runSetupFlow(cwd: string, store: AppStore, force = false) {
+async function runSetupFlow(cwd: string, store: AppStore, options: { force: boolean }) {
   try {
-    if (force) {
+    if (options.force) {
       await deleteCheckpoint(cwd);
     }
-
-    const checkpoint = force ? null : await loadCheckpoint(cwd);
-
+    const checkpoint = options.force ? null : await loadCheckpoint(cwd);
     if (checkpoint) {
       const age = formatCheckpointAge(checkpoint.timestamp);
       const completed = checkpoint.completedSteps.length;
       const total = checkpoint.steps.length;
-      const remaining = total - completed;
-
       store.getState().addLog({ content: `Found checkpoint from ${age} (${completed}/${total} steps done)`, type: "warning" });
-      store.getState().addLog({ content: `Resuming — ${remaining} step(s) remaining...`, type: "info" });
       store.getState().addMessage({
         role: "assistant",
         content: `Resuming interrupted setup (${completed}/${total} steps completed ${age}). Picking up where we left off.`,
         level: "pattern",
         cost: 0,
       });
-
       store.getState().setScan(checkpoint.scan);
       store.getState().setSteps(checkpoint.steps);
-
-      await populateKeyDeps(cwd, store, checkpoint.scan);
+      await populateKeyDeps(cwd, store);
       await populateEnvVars(cwd, store);
       populatePorts(store, checkpoint.scan);
       populateServices(store, checkpoint.scan);
-
       const context = await collectContext(cwd, checkpoint.scan);
       store.getState().setContext(context);
 
       store.getState().addLog({ content: "Resuming execution...", type: "info" });
       store.getState().setRunning(true);
-      const result = await executeAllSteps(checkpoint.steps, cwd, store, checkpoint.currentStepIndex);
+      const execution = await executeAllSteps(checkpoint.steps, cwd, store, checkpoint.currentStepIndex);
       store.getState().setRunning(false);
-      store.getState().setComplete(true);
-      store.getState().setCheckpoint(true);
 
-      if (result.success) {
-        await deleteCheckpoint(cwd);
+      if (!execution.success) {
+        store.getState().addLog({ content: "Setup stopped because a step failed.", type: "error" });
+        store.getState().addMessage({
+          role: "assistant",
+          content: "Setup stopped because a step failed. Review the failed step above before continuing.",
+        });
+        return;
       }
 
-      finishSetup(store, cwd);
+      await deleteCheckpoint(cwd);
+      await finishSuccessfulSetup(cwd, store);
       return;
     }
 
@@ -106,6 +115,23 @@ async function runSetupFlow(cwd: string, store: AppStore, force = false) {
     store.getState().setScan(scan);
 
     const stackParts = [scan.framework, scan.language, ...(scan.services || [])].filter(Boolean);
+    if (!hasProjectSignals(scan)) {
+      store.getState().addNotice({
+        type: "warning",
+        message: "No project files were detected in this directory. Open a project folder, then run setup again.",
+      });
+      store.getState().addLog({
+        content: "No package, runtime, framework, dependency, or config files were detected.",
+        type: "warning",
+      });
+      store.getState().addMessage({
+        role: "assistant",
+        content: "I did not find project files in this directory. Move into a project folder before running setup.",
+      });
+      store.getState().setComplete(true);
+      return;
+    }
+
     store.getState().addLog({ content: `Detected: ${stackParts.join(" + ")}`, type: "success" });
     store.getState().addLog({ content: `Found: ${scan.configFiles.join(", ")}`, type: "info" });
     store.getState().addMessage({
@@ -115,7 +141,7 @@ async function runSetupFlow(cwd: string, store: AppStore, force = false) {
       cost: 0,
     });
 
-    await populateKeyDeps(cwd, store, scan);
+    await populateKeyDeps(cwd, store);
     await populateEnvVars(cwd, store);
     populatePorts(store, scan);
     populateServices(store, scan);
@@ -126,63 +152,151 @@ async function runSetupFlow(cwd: string, store: AppStore, force = false) {
     store.getState().addLog({ content: "Planning setup steps...", type: "info" });
     store.getState().addMessage({ role: "thinking", content: "Planning setup steps..." });
     const steps = await planSteps(scan);
+    const planLevel = shouldUseAIPlanner(scan) && hasAIKeyCheck() ? "live" : "pattern";
     store.getState().setSteps(steps);
     store.getState().addLog({ content: `Plan ready: ${steps.length} steps to execute.`, type: "success" });
-
-    const stackDesc = [scan.language, scan.framework, ...(scan.services || [])].filter(Boolean).join(" + ");
-    const stepNames = steps.map((s) => s.label).join(", ");
-    const planNarration = await aiNarrate(
-      `Explain the setup plan briefly. Steps: ${stepNames}`,
-      `Stack: ${stackDesc}, PM: ${scan.packageManager || "none"}`
-    );
+    store.getState().addMessage({
+      role: "thinking",
+      content: formatPlanningMessage(scan, steps, options.force),
+      level: planLevel,
+      cost: 0,
+    });
     store.getState().addMessage({
       role: "assistant",
-      content: planNarration || `Plan ready: ${steps.length} steps to execute.`,
-      level: planNarration ? "live" : "pattern",
+      content: `Plan ready: ${steps.length} steps to execute.`,
+      level: planLevel,
       cost: 0,
     });
 
+    const pendingEnvValues = await collectInteractiveInputs(cwd, scan, store, options.force);
+    if (store.getState().isComplete) return;
+    if (pendingEnvValues && Object.keys(pendingEnvValues).length > 0) {
+      await mergeEnvValues(cwd, pendingEnvValues);
+      store.getState().addLog({
+        content: `Applied ${Object.keys(pendingEnvValues).length} confirmed environment value${Object.keys(pendingEnvValues).length === 1 ? "" : "s"} to .env.`,
+        type: "success",
+      });
+    }
+    const executableSteps = store.getState().steps;
+
     store.getState().addLog({ content: "Beginning execution...", type: "info" });
     store.getState().setRunning(true);
-    const result = await executeAllSteps(steps, cwd, store);
+    const execution = await executeAllSteps(executableSteps, cwd, store);
     store.getState().setRunning(false);
-    store.getState().setComplete(true);
     store.getState().setCheckpoint(true);
 
-    if (result.success) {
-      await deleteCheckpoint(cwd);
-      const summary = await aiNarrate(
-        `Summarize what was set up. Steps completed: ${stepNames}`,
-        `Stack: ${stackDesc}`
-      );
-      if (summary) {
-        store.getState().addMessage({ role: "assistant", content: summary, level: "live", cost: 0 });
-      }
-    } else {
-      const failedStep = steps.find((s) => s.status === "failed");
-      if (failedStep) {
-        const fix = await aiAnalyzeFailure(
-          failedStep.label,
-          failedStep.error || "unknown error",
-          `Stack: ${stackDesc}, PM: ${scan.packageManager || "none"}`
-        );
-        if (fix) {
-          store.getState().addLog({ content: `AI suggestion: ${fix}`, type: "warning" });
-          store.getState().addMessage({ role: "assistant", content: fix, level: "live", cost: 0 });
-        }
-      }
+    if (!execution.success) {
+      store.getState().addLog({ content: "Setup stopped because a step failed.", type: "error" });
+      store.getState().addMessage({
+        role: "assistant",
+        content: "Setup stopped because a step failed. Review the failed step above before continuing.",
+      });
+      return;
     }
 
-    finishSetup(store, cwd);
+    await deleteCheckpoint(cwd);
+    await finishSuccessfulSetup(cwd, store);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    store.getState().addLog({ content: `Fatal error: ${msg}`, type: "error" });
-    store.getState().addMessage({ role: "system", content: `Error: ${msg}` });
+    const psetupError = fromUnknownError(err, { command: "setup", cwd });
+    store.getState().addLog({ content: errorSummary(psetupError), type: "error" });
+    store.getState().addNotice({ type: "error", message: psetupError.title });
+    store.getState().addMessage({ role: "system", content: errorSummary(psetupError) });
     store.getState().setRunning(false);
   }
 }
 
-async function finishSetup(store: AppStore, cwd: string) {
+async function collectInteractiveInputs(
+  cwd: string,
+  scan: ScanResult,
+  store: AppStore,
+  force: boolean
+): Promise<Record<string, string> | null> {
+  const envVars = store.getState().envVars;
+  const pending = envVars.filter((v) => v.status === "pending");
+
+  if (force) {
+    store.getState().addNotice({
+      type: "info",
+      message: "Force mode is using safe defaults and will stop only for blockers.",
+    });
+    if (pending.length > 0) {
+      store.getState().addMessage({
+        role: "thinking",
+        content: `Force mode will not invent ${pending.length} missing environment value${pending.length === 1 ? "" : "s"}; .env can be created with blanks from the template.`,
+      });
+    }
+    return null;
+  }
+
+  let pendingEnvValues: Record<string, string> | null = null;
+
+  if (pending.length > 0) {
+    const response = await askPrompt(store, {
+      id: "env-batch",
+      type: "choice",
+      title: "Environment Values",
+      message: [
+        `I found ${pending.length} missing value${pending.length === 1 ? "" : "s"} from .env.example:`,
+        pending.map((v) => v.key).join(", "),
+        "Paste KEY=value lines in Other if you already have them, or continue with blanks/defaults.",
+      ].join("\n"),
+      options: [
+        { id: "continue-env", label: "Continue with blanks", description: "Create/update .env from the template" },
+        { id: "skip-env", label: "Skip env setup", description: "Leave .env untouched" },
+      ],
+      includeOther: true,
+      otherLabel: "Paste values...",
+      placeholder: "OPENAI_API_KEY=...\nDATABASE_URL=...",
+      createdAt: Date.now(),
+    });
+
+    if (response.optionId === "skip-env") {
+      skipEnvStep(store, "Skipped environment setup because you asked me to leave it untouched.");
+    } else if (!response.optionId && response.value.trim()) {
+      const parsed = interpretEnvBatch(response.value);
+      const values = envInterpretationToRecord(parsed);
+      if (Object.keys(values).length > 0) {
+        pendingEnvValues = values;
+        store.getState().setEnvVars(
+          store.getState().envVars.map((env) =>
+            values[env.key] !== undefined
+              ? { ...env, value: values[env.key], status: "filled" as const, source: "pending confirmation" }
+              : env
+          )
+        );
+        store.getState().addLog({
+          content: `Recorded ${Object.keys(values).length} pasted environment value${Object.keys(values).length === 1 ? "" : "s"} for confirmation.`,
+          type: "success",
+        });
+        store.getState().addMessage({
+          role: "thinking",
+          content: `Parsed environment paste: ${maskEnvVars(Object.entries(values).map(([key, value]) => ({ key, value }))).map((item) => `${item.key}=${item.value}`).join(", ")}.`,
+        });
+      }
+      if (parsed.ignored.some((line) => line.reason !== "blank" && line.reason !== "comment")) {
+        store.getState().addNotice({
+          type: "warning",
+          message: "Some pasted env lines were ignored because they were not KEY=value pairs.",
+        });
+      }
+      if (parsed.duplicates.length > 0) {
+        store.getState().addNotice({
+          type: "info",
+          message: `Duplicate env keys used the last pasted value: ${parsed.duplicates.join(", ")}.`,
+        });
+      }
+    }
+  }
+
+  await confirmPlan(scan, store);
+  if (store.getState().isComplete) return null;
+  return pendingEnvValues;
+}
+
+async function finishSuccessfulSetup(cwd: string, store: AppStore): Promise<void> {
+  await refreshEnvVars(cwd, store);
+  store.getState().setComplete(true);
+
   const currentServices = store.getState().services;
   if (currentServices.length > 0) {
     store.getState().setServices(
@@ -210,7 +324,113 @@ async function finishSetup(store: AppStore, cwd: string) {
   });
 }
 
-async function populateKeyDeps(cwd: string, store: AppStore, scan: ScanResult) {
+async function confirmPlan(scan: ScanResult, store: AppStore): Promise<void> {
+  const response = await askPrompt(store, createPlanPrompt(scan, store, "confirm-plan"));
+
+  if (response.optionId === "cancel-plan" || /\b(cancel|stop|abort)\b/i.test(response.value)) {
+    store.getState().addLog({ content: "Setup cancelled before execution.", type: "warning" });
+    store.getState().addMessage({ role: "assistant", content: "Cancelled before execution. No setup steps were run." });
+    store.getState().setSteps(store.getState().steps.map((step) => ({ ...step, status: "skipped" as const })));
+    store.getState().setComplete(true);
+    return;
+  }
+
+  if (!response.optionId && response.value.trim()) {
+    const adjusted = applyPlanTextAdjustment(store.getState().steps, response.value);
+    store.getState().setSteps(adjusted.steps);
+    for (const note of adjusted.notes) {
+      store.getState().addLog({ content: note, type: "info" });
+      store.getState().addMessage({ role: "thinking", content: note });
+    }
+
+    const finalResponse = await askPrompt(store, createPlanPrompt(scan, store, "confirm-adjusted-plan"));
+    if (finalResponse.optionId === "cancel-plan" || /\b(cancel|stop|abort)\b/i.test(finalResponse.value)) {
+      store.getState().addLog({ content: "Setup cancelled after plan adjustment.", type: "warning" });
+      store.getState().addMessage({ role: "assistant", content: "Cancelled after plan adjustment. No setup steps were run." });
+      store.getState().setSteps(store.getState().steps.map((step) => ({ ...step, status: "skipped" as const })));
+      store.getState().setComplete(true);
+      return;
+    }
+  }
+
+  store.getState().addMessage({ role: "assistant", content: "Confirmed. I will execute the plan now." });
+}
+
+function createPlanPrompt(scan: ScanResult, store: AppStore, id: string): AgentPrompt {
+  const env = store.getState().envVars
+    .filter((item) => item.value)
+    .map((item) => ({ key: item.key, value: item.value }));
+  const summary = createConfirmationSummary({ scan, steps: store.getState().steps, env });
+  return {
+    id,
+    type: "confirm",
+    title: id === "confirm-plan" ? "Confirm Setup Plan" : "Confirm Adjusted Plan",
+    message: formatConfirmationSummary(summary),
+    options: [
+      { id: "proceed-plan", label: "Proceed", description: "Run these setup steps" },
+      { id: "cancel-plan", label: "Cancel", description: "Exit without running setup" },
+    ],
+    includeOther: true,
+    otherLabel: "Adjust plan...",
+    placeholder: "Example: skip build, use pnpm, do not change env",
+    createdAt: Date.now(),
+  };
+}
+
+function askPrompt(store: AppStore, prompt: AgentPrompt): Promise<AgentPromptResponse> {
+  store.getState().clearPromptResponse();
+  store.getState().setPendingPrompt(prompt);
+  store.getState().setActivePanel(0);
+  store.getState().addMessage({
+    role: "assistant",
+    content: prompt.message ? `${prompt.title}\n${prompt.message}` : prompt.title,
+  });
+
+  return new Promise((resolve) => {
+    const unsubscribe = store.subscribe((state, previous) => {
+      const response = state.promptResponse;
+      if (!response || previous.promptResponse === response || response.promptId !== prompt.id) return;
+      unsubscribe();
+      recordPromptAnswer(store, prompt, response);
+      store.getState().clearPromptResponse();
+      resolve(response);
+    });
+  });
+}
+
+function recordPromptAnswer(store: AppStore, prompt: AgentPrompt, response: AgentPromptResponse): void {
+  const content = summarizePromptResponse(prompt, response);
+  const sensitive = prompt.sensitive || /KEY|SECRET|TOKEN|PASSWORD/i.test(prompt.title);
+  store.getState().addMessage({
+    role: "user",
+    content: sensitive ? "••••••••" : content,
+  });
+}
+
+function summarizePromptResponse(prompt: AgentPrompt, response: AgentPromptResponse): string {
+  if (prompt.id === "env-batch" && !response.optionId) {
+    const parsed = interpretEnvBatch(response.value);
+    const values = envInterpretationToRecord(parsed);
+    const masked = maskEnvVars(Object.entries(values).map(([key, value]) => ({ key, value })));
+    return masked.length > 0
+      ? masked.map((item) => `${item.key}=${item.value}`).join(", ")
+      : "Pasted environment values";
+  }
+
+  return response.value;
+}
+
+function skipEnvStep(store: AppStore, message: string): void {
+  store.getState().setEnvVars(store.getState().envVars.map((env) =>
+    env.status === "pending" ? { ...env, status: "skipped" as const } : env
+  ));
+  store.getState().setSteps(store.getState().steps.map((step) =>
+    step.type === "env" ? { ...step, status: "skipped" as const } : step
+  ));
+  store.getState().addLog({ content: message, type: "info" });
+}
+
+async function populateKeyDeps(cwd: string, store: AppStore) {
   try {
     const { readFile } = await import("fs/promises");
     const { join } = await import("path");
@@ -239,7 +459,7 @@ async function populateEnvVars(cwd: string, store: AppStore) {
       .map((l) => l.split("=")[0].trim())
       .filter(Boolean);
 
-    let currentVars: Record<string, string> = {};
+    const currentVars: Record<string, string> = {};
     try {
       const env = await readFile(join(cwd, ".env"), "utf-8");
       for (const line of env.split("\n")) {
@@ -259,6 +479,11 @@ async function populateEnvVars(cwd: string, store: AppStore) {
 
     store.getState().setEnvVars(envVars);
   } catch {}
+}
+
+async function refreshEnvVars(cwd: string, store: AppStore) {
+  store.getState().setEnvVars([]);
+  await populateEnvVars(cwd, store);
 }
 
 function populatePorts(store: AppStore, scan: ScanResult) {
@@ -294,39 +519,12 @@ function populateServices(store: AppStore, scan: ScanResult) {
 
 function hasAIKeyCheck(): boolean {
   return !!(
-    process.env.MINIMAX_API_KEY ||
-    process.env.MOONSHOT_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.GROQ_API_KEY ||
-    process.env.ANTHROPIC_API_KEY ||
-    process.env.GOOGLE_API_KEY
+    getProviderEnvValue("minimax") ||
+    getProviderEnvValue("moonshot") ||
+    getProviderEnvValue("openai") ||
+    getProviderEnvValue("groq") ||
+    getProviderEnvValue("anthropic") ||
+    getProviderEnvValue("google") ||
+    getProviderEnvValue("github")
   );
-}
-
-async function aiNarrate(prompt: string, context: string): Promise<string | null> {
-  if (!hasAIKeyCheck()) return null;
-  try {
-    const messages: ChatMessage[] = [
-      { role: "system", content: `You are P-Setup's AI guide. Be concise (1-2 sentences max). Context: ${context}` },
-      { role: "user", content: prompt },
-    ];
-    const result = await chat(messages, { maxTokens: 150 });
-    return result.content;
-  } catch {
-    return null;
-  }
-}
-
-async function aiAnalyzeFailure(step: string, error: string, context: string): Promise<string | null> {
-  if (!hasAIKeyCheck()) return null;
-  try {
-    const messages: ChatMessage[] = [
-      { role: "system", content: `You are P-Setup's AI troubleshooter. Diagnose the error and suggest a fix in 2-3 sentences. Context: ${context}` },
-      { role: "user", content: `Step "${step}" failed with: ${error}` },
-    ];
-    const result = await chat(messages, { maxTokens: 200 });
-    return result.content;
-  } catch {
-    return null;
-  }
 }
