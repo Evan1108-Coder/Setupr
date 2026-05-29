@@ -3,6 +3,8 @@ import { join } from "path";
 
 export const PROJECT_STATE_DIR = ".setupr";
 export const PROJECT_STATE_FILE = "state.json";
+export const PROJECT_NOTES_FILE = "notes.json";
+export const PROJECT_IMPORTED_CONTEXT_FILE = "imported-context.json";
 export const PROJECT_HISTORY_FILE = "history.jsonl";
 export const PROJECT_LOG_FILE = "log.jsonl";
 
@@ -24,7 +26,7 @@ export type ProjectEventInput = Omit<ProjectEvent, "timestamp"> & {
   timestamp?: number;
 };
 
-export type ProjectJsonFile = typeof PROJECT_STATE_FILE;
+export type ProjectJsonFile = typeof PROJECT_STATE_FILE | typeof PROJECT_NOTES_FILE | typeof PROJECT_IMPORTED_CONTEXT_FILE;
 export type ProjectJsonlFile = typeof PROJECT_HISTORY_FILE | typeof PROJECT_LOG_FILE;
 export type ProjectPersistenceFile = ProjectJsonFile | ProjectJsonlFile;
 

@@ -140,6 +140,21 @@ export async function runNonTUICommand(
       await cmdShare(sub, cwd, { ...flags, args: flags.args || [] });
       break;
     }
+    case "notes": {
+      const { cmdNotes } = await import("./memory.js");
+      await cmdNotes(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "history": {
+      const { cmdHistory } = await import("./memory.js");
+      await cmdHistory(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
+    case "context": {
+      const { cmdContext } = await import("./memory.js");
+      await cmdContext(sub, cwd, { ...flags, args: flags.args || [] });
+      break;
+    }
     case "plugin": {
       const { cmdPlugin } = await import("./plugin.js");
       await cmdPlugin(sub, cwd, { ...flags, args: flags.args || [] });

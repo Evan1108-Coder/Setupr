@@ -75,6 +75,9 @@ setup --plain
 | `workspace <list\|run\|exec\|add\|info\|check>` | Operate on monorepo workspaces |
 | `health [full\|deps\|security\|outdated\|size]` | Run project health checks |
 | `share <export\|import\|inspect>` | Export/import shareable setup bundles |
+| `notes <add\|list\|remove\|clear>` | Manage project-local notes in `.setupr` |
+| `history [list] [limit]` | Show recent project-local Setupr history |
+| `context <show\|export\|import>` | Export/import notes and history for team handoff |
 | `plugin <install\|remove\|list\|info\|enable\|disable>` | Manage Setupr plugins |
 | `lint <run\|setup\|fix>` | Run or set up linting |
 | `format <run\|check\|setup>` | Run or set up formatting |
@@ -216,6 +219,18 @@ setup env smart
 - Persists across terminals and reboots
 - Automatically cleaned up on success
 - Resume interrupted setups seamlessly
+
+### Project Memory
+
+```bash
+setup notes add "Use pnpm for installs"
+setup notes list
+setup history 10
+setup context export team-context.json
+setup context import team-context.json
+```
+
+Notes are saved in `.setupr/notes.json`. History uses `.setupr/history.jsonl`, and context export/import moves a deterministic bundle of notes plus history for team handoff.
 
 ## Flags
 
