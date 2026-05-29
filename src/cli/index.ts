@@ -138,8 +138,9 @@ export async function run() {
 
 async function runCommandPath(command: string, subCommand: string | undefined, cwd: string, isPlain: boolean, isBareAuth: boolean): Promise<void> {
   const tuiCommands = tuiCommandNames();
+  const isAuthSubcommand = command === "auth" && Boolean(subCommand);
 
-  if ((tuiCommands.has(command) || isBareAuth) && !isPlain) {
+  if ((tuiCommands.has(command) || isBareAuth) && !isPlain && !isAuthSubcommand) {
     const confirmed = await showPreWarning(command, cwd, cli.flags.force, subCommand);
     if (!confirmed) return;
 
@@ -147,8 +148,8 @@ async function runCommandPath(command: string, subCommand: string | undefined, c
       await showTransition(command);
       await launchTUI(command as any, cwd, { cleanMode: subCommand as any, force: cli.flags.force });
     }, { title: `Setupr ${command}` });
-  } else if ((tuiCommands.has(command) || isBareAuth) && isPlain) {
-    if (isBareAuth) {
+  } else if ((tuiCommands.has(command) || isBareAuth) && isPlain && !isAuthSubcommand) {
+    if (command === "auth") {
       const { runNonTUICommand } = await import("../commands/plain/router.js");
       await runNonTUICommand(command, subCommand, cwd, { ...cli.flags, args: cli.input.slice(2) });
       return;
