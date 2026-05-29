@@ -7,15 +7,21 @@ import { createAppStore } from "../state/store.js";
 import { hasProjectSignals } from "../tui/projectSignals.js";
 import { createSetuprError, printPlainError, classifyCommandFailure } from "../errors/index.js";
 import { deleteCheckpoint, formatCheckpointAge, loadCheckpoint, saveCheckpoint } from "../state/checkpoint.js";
+import { collectDashboardStatus } from "../status/collector.js";
 
 interface PlainOptions {
   force?: boolean;
+  json?: boolean;
 }
 
-export async function runPlainMode(command: string, cwd: string, sub?: string, _options: PlainOptions = {}): Promise<void> {
+export async function runPlainMode(command: string, cwd: string, sub?: string, options: PlainOptions = {}): Promise<void> {
   switch (command) {
     case "setup":
       await plainSetup(cwd);
+      break;
+    case "dashboard":
+    case "status":
+      await plainStatus(cwd, command === "dashboard", options);
       break;
     case "doctor":
       await plainDoctor(cwd);
@@ -38,6 +44,39 @@ export async function runPlainMode(command: string, cwd: string, sub?: string, _
       }));
       return;
   }
+}
+
+async function plainStatus(cwd: string, fromDashboard = false, options: PlainOptions = {}): Promise<void> {
+  const status = await collectDashboardStatus(cwd);
+  if (options.json) {
+    console.log(JSON.stringify(status, null, 2));
+    return;
+  }
+  console.log(chalk.blue.bold(`\n  ${fromDashboard ? "Setupr Dashboard" : "Setupr Status"}\n`));
+  console.log(`  Project:      ${chalk.white(status.projectName)}`);
+  console.log(`  Directory:    ${chalk.dim(status.cwd)}`);
+  console.log(`  Health:       ${healthColor(status.health.label)(`${status.health.score}/100 ${status.health.label}`)}`);
+  if (status.scanError) console.log(`  Scan:         ${chalk.red(status.scanError)}`);
+  console.log(`  Stack:        ${chalk.white(formatStack(status))}`);
+  console.log(`  Git:          ${formatGit(status)}`);
+  console.log(`  Env:          ${formatEnv(status)}`);
+  console.log(`  Dependencies: ${formatDeps(status)}`);
+  console.log(`  Processes:    ${formatProcesses(status)}`);
+  console.log(`  AI:           ${chalk.white(status.ai.activeModel)} ${chalk.dim(`(${status.ai.availableModels} available)`)}`);
+  console.log("");
+  console.log(chalk.yellow("  Checks"));
+  for (const check of status.health.checks) {
+    const marker = check.status === "ok" ? chalk.green("✓") : check.status === "warning" ? chalk.yellow("△") : chalk.red("✗");
+    console.log(`  ${marker} ${check.label.padEnd(13)} ${chalk.dim(check.detail)}`);
+  }
+  if (status.history.length > 0) {
+    console.log("");
+    console.log(chalk.yellow("  Recent History"));
+    for (const event of status.history.slice(-5)) {
+      console.log(`  ${chalk.dim(formatTime(event.timestamp))} ${event.message || event.type}`);
+    }
+  }
+  console.log("");
 }
 
 async function plainSetup(cwd: string): Promise<void> {
@@ -259,4 +298,53 @@ async function plainClean(cwd: string, mode?: string): Promise<void> {
     }
   }
   console.log(chalk.green.bold("\n✓ Clean complete!"));
+}
+
+function formatStack(status: Awaited<ReturnType<typeof collectDashboardStatus>>): string {
+  const scan = status.scan;
+  if (!scan || !status.hasProject) return "no project detected";
+  return [
+    scan.language || "unknown",
+    scan.framework,
+    scan.packageManager,
+    scan.runtime?.name,
+  ].filter(Boolean).join(" / ");
+}
+
+function formatGit(status: Awaited<ReturnType<typeof collectDashboardStatus>>): string {
+  const git = status.git;
+  if (!git.isRepo) return chalk.yellow("not a git repository");
+  const sync = [git.ahead ? `ahead ${git.ahead}` : "", git.behind ? `behind ${git.behind}` : ""].filter(Boolean).join(", ");
+  return `${chalk.white(git.branch || "unknown")} ${git.dirtyFiles > 0 ? chalk.yellow(`${git.dirtyFiles} changed`) : chalk.green("clean")}${sync ? chalk.dim(`, ${sync}`) : ""}`;
+}
+
+function formatEnv(status: Awaited<ReturnType<typeof collectDashboardStatus>>): string {
+  const env = status.env;
+  if (!env.hasExample) return chalk.yellow("no .env.example");
+  if (!env.hasEnv) return chalk.yellow(`${env.required} required, no .env`);
+  if (env.missing.length > 0) return chalk.red(`${env.missing.length} missing of ${env.required}`);
+  return chalk.green(`${env.defined}/${env.required} defined`);
+}
+
+function formatDeps(status: Awaited<ReturnType<typeof collectDashboardStatus>>): string {
+  const deps = status.dependencies;
+  if (deps.prod + deps.dev === 0) return chalk.yellow("none detected");
+  return `${chalk.white(`${deps.prod} prod, ${deps.dev} dev`)} ${deps.lockfilePresent ? chalk.dim(deps.lockfile) : chalk.yellow("no lockfile")}`;
+}
+
+function formatProcesses(status: Awaited<ReturnType<typeof collectDashboardStatus>>): string {
+  const processes = status.processes;
+  if (processes.managed === 0) return chalk.dim("none managed");
+  if (processes.crashed > 0) return chalk.red(`${processes.crashed} crashed, ${processes.running}/${processes.managed} running`);
+  return chalk.green(`${processes.running}/${processes.managed} running`);
+}
+
+function healthColor(label: "good" | "warning" | "error") {
+  if (label === "good") return chalk.green;
+  if (label === "warning") return chalk.yellow;
+  return chalk.red;
+}
+
+function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }

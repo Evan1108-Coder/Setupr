@@ -1,4 +1,5 @@
 import meow from "meow";
+import { resolve } from "path";
 import { showPreWarning } from "./preWarning.js";
 import { showTransition } from "./transition.js";
 import { launchTUI } from "./launcher.js";
@@ -6,6 +7,8 @@ import { runPlainMode } from "./plain.js";
 import { withInteractiveScreen } from "./terminalScreen.js";
 import { helpPathFromInput, isHelpRequest, showHelp } from "./help.js";
 import { createSetuprError, printPlainError } from "../errors/index.js";
+import { knownCommandNames, noSubcommandNames, tuiCommandNames } from "./commandRegistry.js";
+import { appendHistoryEvent } from "../state/project.js";
 
 const cli = meow(
   `
@@ -86,38 +89,61 @@ const cli = meow(
       noTui: { type: "boolean", default: false },
       plain: { type: "boolean", default: false },
       key: { type: "string" },
+      json: { type: "boolean", default: false },
+      tui: { type: "boolean", default: false },
+      smart: { type: "boolean", default: false },
+      dryRun: { type: "boolean", default: false },
+      yes: { type: "boolean", default: false },
+      verbose: { type: "boolean", default: false },
+      quiet: { type: "boolean", default: false },
+      watch: { type: "boolean", default: false },
+      scope: { type: "string" },
+      provider: { type: "string" },
+      model: { type: "string" },
+      timeout: { type: "number" },
+      cwd: { type: "string" },
+      template: { type: "string" },
+      message: { type: "string" },
     },
   }
 );
 
 export async function run() {
-  const command = cli.input[0] || "setup";
+  const explicitCommand = cli.input[0];
+  const command = explicitCommand || "dashboard";
   if (isHelpRequest(command, cli.input, Boolean(cli.flags.help))) {
     showHelp(helpPathFromInput(command, cli.input, Boolean(cli.flags.help)));
     return;
   }
 
   const subCommand = resolveSubCommand(command, cli.input[1], cli.flags);
-  const cwd = process.cwd();
+  const cwd = typeof cli.flags.cwd === "string" ? resolve(cli.flags.cwd) : process.cwd();
   if (!validateCliRequest(command, subCommand, cwd)) return;
-  const isPlain = cli.flags.noTui || cli.flags.plain || !process.stdout.isTTY;
+  const isPlain = (cli.flags.noTui || cli.flags.plain || !process.stdout.isTTY) && !cli.flags.tui;
   const isBareAuth = command === "auth" && !subCommand;
 
-  // TUI commands
-  const tuiCommands = ["setup", "start", "doctor", "update", "clean"];
+  await recordCommandStart(cwd, command, subCommand, cli.input);
+  try {
+    await runCommandPath(command, subCommand, cwd, isPlain, isBareAuth);
+    await recordCommandFinish(cwd, command, subCommand);
+  } catch (err) {
+    await recordCommandError(cwd, command, subCommand, err);
+    throw err;
+  }
+}
 
-  if ((tuiCommands.includes(command) || isBareAuth) && !isPlain) {
+async function runCommandPath(command: string, subCommand: string | undefined, cwd: string, isPlain: boolean, isBareAuth: boolean): Promise<void> {
+  const tuiCommands = tuiCommandNames();
+
+  if ((tuiCommands.has(command) || isBareAuth) && !isPlain) {
     const confirmed = await showPreWarning(command, cwd, cli.flags.force, subCommand);
     if (!confirmed) return;
 
     await withInteractiveScreen(async () => {
-      // Transition animation
       await showTransition(command);
-
-      // Launch TUI
       await launchTUI(command as any, cwd, { cleanMode: subCommand as any, force: cli.flags.force });
     }, { title: `Setupr ${command}` });
-  } else if ((tuiCommands.includes(command) || isBareAuth) && isPlain) {
+  } else if ((tuiCommands.has(command) || isBareAuth) && isPlain) {
     if (isBareAuth) {
       const { runNonTUICommand } = await import("../commands/plain/router.js");
       await runNonTUICommand(command, subCommand, cwd, { ...cli.flags, args: cli.input.slice(2) });
@@ -130,21 +156,15 @@ export async function run() {
       });
       if (!confirmed) return;
     }
-    await runPlainMode(command, cwd, subCommand, { force: cli.flags.force });
+    await runPlainMode(command, cwd, subCommand, { force: cli.flags.force, json: cli.flags.json });
   } else {
-    // Non-TUI commands
     const { runNonTUICommand } = await import("../commands/plain/router.js");
     await runNonTUICommand(command, subCommand, cwd, { ...cli.flags, args: cli.input.slice(2) });
   }
 }
 
 function validateCliRequest(command: string, subCommand: string | undefined, cwd: string): boolean {
-  const known = new Set([
-    "setup", "start", "doctor", "update", "clean", "env", "auth", "info", "list", "run", "switch",
-    "add", "remove", "port", "deps", "config", "lock", "diff", "logs", "test", "build", "deploy", "open",
-    "git", "init", "migrate", "ci", "docker", "secrets", "templates", "workspace", "health", "share", "plugin",
-    "lint", "format", "scaffold",
-  ]);
+  const known = knownCommandNames();
   if (!known.has(command)) {
     printPlainError(createSetuprError({ code: "UNKNOWN_COMMAND", command, cwd, details: [`Received: ${command}`] }));
     return false;
@@ -180,7 +200,7 @@ function validateCliRequest(command: string, subCommand: string | undefined, cwd
     return false;
   }
 
-  const noSubcommand = new Set(["setup", "start", "doctor", "update", "info", "list", "deps", "lock", "diff", "logs", "test", "build", "deploy"]);
+  const noSubcommand = noSubcommandNames();
   if (subCommand && noSubcommand.has(command)) {
     printPlainError(createSetuprError({
       code: "UNKNOWN_SUBCOMMAND",
@@ -209,4 +229,49 @@ function resolveSubCommand(command: string, positional: string | undefined, flag
   if (flags.share) return "share";
   if (flags.deps) return "deps";
   return positional;
+}
+
+async function recordCommandStart(cwd: string, command: string, subCommand: string | undefined, input: string[]): Promise<void> {
+  await appendHistoryEvent(cwd, {
+    type: "command.start",
+    message: `setupr ${[command === "dashboard" && input.length === 0 ? "" : command, subCommand].filter(Boolean).join(" ")}`.trim(),
+    data: {
+      command,
+      subCommand: subCommand || null,
+      args: input.map(maskArg),
+      mode: cli.flags.plain || cli.flags.noTui ? "plain" : cli.flags.tui ? "tui" : "auto",
+    },
+  }).catch(() => undefined);
+}
+
+async function recordCommandFinish(cwd: string, command: string, subCommand: string | undefined): Promise<void> {
+  await appendHistoryEvent(cwd, {
+    type: "command.finish",
+    message: `${command}${subCommand ? ` ${subCommand}` : ""} finished${process.exitCode ? ` with exit ${process.exitCode}` : ""}`,
+    data: {
+      command,
+      subCommand: subCommand || null,
+      exitCode: process.exitCode || 0,
+    },
+  }).catch(() => undefined);
+}
+
+async function recordCommandError(cwd: string, command: string, subCommand: string | undefined, err: unknown): Promise<void> {
+  await appendHistoryEvent(cwd, {
+    type: "command.error",
+    message: `${command}${subCommand ? ` ${subCommand}` : ""} failed`,
+    data: {
+      command,
+      subCommand: subCommand || null,
+      error: err instanceof Error ? err.message : String(err),
+    },
+  }).catch(() => undefined);
+}
+
+function maskArg(value: string): string {
+  if (/^(sk-|sk-ant-|ghp_|github_pat_|gsk_|AIza)/.test(value)) return "****";
+  if (/[A-Z0-9_]*(KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=/i.test(value)) {
+    return value.replace(/=.*/, "=****");
+  }
+  return value;
 }

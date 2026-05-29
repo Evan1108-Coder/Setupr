@@ -18,7 +18,7 @@ export async function launchTUI(
 
   const store = createAppStore(cwd);
 
-  if (command !== "setup") {
+  if (command !== "setup" && command !== "dashboard" && command !== "status") {
     const scan = await scanProject(cwd);
     store.getState().setScan(scan);
   }

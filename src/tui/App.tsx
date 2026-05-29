@@ -5,6 +5,7 @@ import { StartLayout } from "./layouts/StartLayout.js";
 import { UpdateLayout } from "./layouts/UpdateLayout.js";
 import { CleanLayout } from "./layouts/CleanLayout.js";
 import { AuthLayout } from "./layouts/AuthLayout.js";
+import { DashboardLayout } from "./layouts/DashboardLayout.js";
 import type { ScanResult } from "../scanner/index.js";
 import { scanProject } from "../scanner/index.js";
 import { collectContext } from "../context/collector.js";
@@ -26,7 +27,7 @@ import {
   mergeEnvValues,
 } from "../ai/setupFlow.js";
 
-export type TUICommand = "setup" | "start" | "doctor" | "update" | "clean" | "auth";
+export type TUICommand = "dashboard" | "setup" | "start" | "doctor" | "update" | "clean" | "auth" | "status";
 
 interface AppProps {
   command: TUICommand;
@@ -48,6 +49,9 @@ export function App({ command, cwd, store, cleanMode = "deps", force = false }: 
   switch (command) {
     case "setup":
       return <SetupLayout store={store} />;
+    case "dashboard":
+    case "status":
+      return <DashboardLayout cwd={cwd} />;
     case "doctor":
       return scan ? <DoctorLayout scan={scan} cwd={cwd} /> : <SetupLayout store={store} />;
     case "start":

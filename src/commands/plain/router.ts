@@ -19,6 +19,12 @@ export async function runNonTUICommand(
   flags: Flags
 ): Promise<void> {
   switch (command) {
+    case "dashboard":
+    case "status": {
+      const { runPlainMode } = await import("../../cli/plain.js");
+      await runPlainMode(command, cwd, sub, { force: flags.force, json: Boolean(flags.json) });
+      break;
+    }
     case "env":
       await cmdEnv(sub, cwd, flags);
       break;

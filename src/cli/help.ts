@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { createSetuprError, printPlainError } from "../errors/index.js";
+import { GLOBAL_OPTIONS, getCommand, visibleCommands, type CommandEntry } from "./commandRegistry.js";
 
 interface HelpNode {
   name: string;
@@ -11,56 +12,12 @@ interface HelpNode {
 }
 
 const GLOBAL_HELP: HelpNode = {
-  name: "setup",
-  summary: "Intelligent project setup and management CLI.",
-  usage: "setup <command> [options]",
-  commands: [
-    { name: "setup", summary: "Full project setup with agent-guided TUI or plain mode." },
-    { name: "start", summary: "Detect and run the project start/dev command." },
-    { name: "doctor", summary: "Diagnose runtimes, dependencies, services, env files, and terminal support." },
-    { name: "update", summary: "Check dependency updates and warn about risky changes." },
-    { name: "clean", summary: "Remove generated artifacts; supports deps, share, and all modes." },
-    { name: "env", summary: "Manage project .env files from .env.example." },
-    { name: "auth", summary: "Manage Setupr AI provider API keys and models." },
-    { name: "config", summary: "Manage global Setupr preferences." },
-    { name: "info", summary: "Show project summary." },
-    { name: "list", summary: "List available project scripts." },
-    { name: "run", summary: "Run a project script." },
-    { name: "switch", summary: "Switch runtime version." },
-    { name: "add", summary: "Install a dependency using the detected package manager." },
-    { name: "remove", summary: "Remove a dependency using the detected package manager." },
-    { name: "port", summary: "Check common ports or one specific port." },
-    { name: "deps", summary: "Show dependency tree and audit information." },
-    { name: "lock", summary: "Snapshot environment state." },
-    { name: "diff", summary: "Compare current state with a locked state." },
-    { name: "logs", summary: "Show recent project logs." },
-    { name: "test", summary: "Run the project test script." },
-    { name: "build", summary: "Run the project build script." },
-    { name: "deploy", summary: "Run the project deploy script." },
-    { name: "open", summary: "Open project browser, repository, or IDE target." },
-    { name: "git", summary: "Git workflows, release helpers, hooks, branches, PRs, and history tools." },
-    { name: "init", summary: "Scaffold a new project from built-in stacks or templates." },
-    { name: "migrate", summary: "Migrate the project package manager." },
-    { name: "ci", summary: "Generate CI/CD configuration." },
-    { name: "docker", summary: "Generate Dockerfile and compose files, or check Docker readiness." },
-    { name: "secrets", summary: "Manage encrypted project secrets." },
-    { name: "templates", summary: "Create, list, save, and remove project templates." },
-    { name: "workspace", summary: "Inspect and operate on monorepo workspaces." },
-    { name: "health", summary: "Run project health, dependency, security, size, and outdated checks." },
-    { name: "share", summary: "Export, import, or inspect shareable project setup bundles." },
-    { name: "plugin", summary: "Install, remove, inspect, enable, or disable Setupr plugins." },
-    { name: "lint", summary: "Run, fix, or set up linting." },
-    { name: "format", summary: "Run, check, or set up formatting." },
-    { name: "scaffold", summary: "Generate common files such as components, pages, APIs, tests, and services." },
-    { name: "help", summary: "Show global or command-specific help." },
-  ],
-  options: [
-    { name: "--force", summary: "Skip safe prompts; still stop for destructive/blocking cases." },
-    { name: "--no-tui, --plain", summary: "Disable rich TUI and use plain output." },
-    { name: "--help", summary: "Show help." },
-    { name: "--version", summary: "Show version." },
-  ],
-  examples: ["setup", "setup help auth", "setup auth login", "setup env init --force"],
+  name: "setupr",
+  summary: "Project control center for setup, operations, diagnostics, and AI-assisted workflows.",
+  usage: "setupr [command] [options]",
+  commands: visibleCommands().map((command) => ({ name: command.name, summary: command.summary, usage: command.usage })),
+  options: GLOBAL_OPTIONS,
+  examples: ["setupr", "setupr setup", "setupr help auth", "setupr auth login", "setupr env init --force"],
 };
 
 const HELP_NODES: Record<string, HelpNode> = {
@@ -355,13 +312,13 @@ const HELP_NODES: Record<string, HelpNode> = {
 export function showHelp(path: string[] = []): boolean {
   const normalized = normalizePath(path);
   const key = normalized.join(" ");
-  const node = key ? HELP_NODES[key] || HELP_NODES[normalized[0]] : GLOBAL_HELP;
+  const node = key ? HELP_NODES[key] || registryHelpNode(normalized) : GLOBAL_HELP;
   if (!node) {
     printPlainError(createSetuprError({
       code: "UNKNOWN_SUBCOMMAND",
       command: "help",
       subcommand: path.join(" "),
-      details: ["Run setup help to list all commands."],
+      details: ["Run setupr help to list all commands."],
     }));
     return false;
   }
@@ -416,4 +373,34 @@ function normalizePath(path: string[]): string[] {
     .filter(Boolean)
     .filter((item) => item !== "--help" && item !== "-h")
     .slice(0, 2);
+}
+
+function registryHelpNode(path: string[]): HelpNode | undefined {
+  const command = getCommand(path[0]);
+  if (!command) return undefined;
+  if (path[1] && command.subcommands && !command.subcommands.some((sub) => sub.name === path[1])) {
+    return undefined;
+  }
+  if (path[1]) {
+    const sub = command.subcommands?.find((candidate) => candidate.name === path[1]);
+    return {
+      name: `${command.name} ${path[1]}`,
+      summary: sub?.summary || command.summary,
+      usage: sub?.usage || `${command.usage}`,
+      options: command.options,
+      examples: command.examples,
+    };
+  }
+  return commandToHelpNode(command);
+}
+
+function commandToHelpNode(command: CommandEntry): HelpNode {
+  return {
+    name: command.name,
+    summary: command.summary,
+    usage: command.usage,
+    commands: command.subcommands,
+    options: command.options,
+    examples: command.examples,
+  };
 }

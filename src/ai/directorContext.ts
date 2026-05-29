@@ -1,5 +1,6 @@
 import type { ScanResult } from "../scanner/index.js";
 import type { AppMessage, AppStore, EnvVar, LogEntry } from "../state/store.js";
+import { visibleCommands } from "../cli/commandRegistry.js";
 import { describeDefaultModelSelection, getProviderEnvValue, PROVIDERS, type AIProvider } from "./models.js";
 import { maskSensitiveValue } from "./setupFlow.js";
 
@@ -13,30 +14,6 @@ export interface DirectorContextInput {
 
 const SECRET_KEY_PATTERN =
   /(TOKEN|SECRET|PASSWORD|PASS|API_?KEY|PRIVATE|CREDENTIAL|AUTH|BEARER|SESSION|COOKIE)/i;
-
-const COMMAND_CAPABILITIES = [
-  { command: "setup", mode: "tui/plain", summary: "scan, plan, install, configure, verify, and explain setup" },
-  { command: "start", mode: "tui/plain", summary: "detect and run the project start/dev command" },
-  { command: "doctor", mode: "tui/plain", summary: "diagnose runtimes, dependencies, services, env, git, and terminal support" },
-  { command: "update", mode: "tui/plain", summary: "check dependency updates and risky changes" },
-  { command: "clean", mode: "tui/plain", summary: "remove dependencies, caches, build output, or share-sensitive files" },
-  { command: "auth", mode: "tui/plain", summary: "manage AI provider keys and active model" },
-  { command: "env", mode: "plain", summary: "init, check, sync, and smart-analyze project env files" },
-  { command: "git", mode: "plain", summary: "git init, hooks, flow, commit, branch, pr, stash, rebase, tag, release, status, log, sync, clean, ignore, changelog, blame, cherry-pick, worktree, bisect, contributors, undo" },
-  { command: "init", mode: "plain", summary: "scaffold a project from built-in stacks or templates" },
-  { command: "migrate", mode: "plain", summary: "migrate package managers between npm, yarn, pnpm, and bun" },
-  { command: "ci", mode: "plain", summary: "generate github, gitlab, bitbucket, or circleci config" },
-  { command: "docker", mode: "plain", summary: "generate Dockerfile, compose files, and check Docker readiness" },
-  { command: "secrets", mode: "plain", summary: "manage encrypted project-local secrets" },
-  { command: "templates", mode: "plain", summary: "new, list, save, and remove project templates" },
-  { command: "workspace", mode: "plain", summary: "list, run, exec, add, info, and check monorepo workspaces" },
-  { command: "health", mode: "plain", summary: "run full, deps, security, outdated, and size health checks" },
-  { command: "share", mode: "plain", summary: "export, import, and inspect shareable setup bundles" },
-  { command: "plugin", mode: "plain", summary: "install, remove, list, inspect, enable, and disable plugins" },
-  { command: "lint", mode: "plain", summary: "run, fix, or set up linting" },
-  { command: "format", mode: "plain", summary: "run, check, or set up formatting" },
-  { command: "scaffold", mode: "plain", summary: "generate components, pages, APIs, hooks, models, tests, services, and middleware" },
-];
 
 export function buildDirectorContextPacket(input: DirectorContextInput): string {
   const state = input.store.getState();
@@ -70,8 +47,17 @@ export function buildDirectorContextPacket(input: DirectorContextInput): string 
       configuredProviders: configuredProviders(),
     },
     capabilities: {
-      help: ["setup help", "setup help <command>", "setup <command> --help"],
-      commands: COMMAND_CAPABILITIES,
+      help: ["setupr help", "setupr help <command>", "setupr <command> --help"],
+      commands: visibleCommands().map((command) => ({
+        command: command.name,
+        mode: command.mode,
+        summary: command.summary,
+        subcommands: command.subcommands?.map((sub) => sub.name),
+        options: command.options?.map((option) => option.name),
+        risk: command.risk,
+        writes: command.writes,
+        aiCapable: command.aiCapable,
+      })),
     },
     session: {
       activePanel: state.activePanel,

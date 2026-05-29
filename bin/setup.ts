@@ -1,7 +1,7 @@
 import { run } from "../src/cli/index.js";
 import { fromUnknownError, printPlainError } from "../src/errors/index.js";
 
-process.title = "P-Setup";
+process.title = "Setupr";
 
 run().catch((err) => {
   printPlainError(fromUnknownError(err, {
