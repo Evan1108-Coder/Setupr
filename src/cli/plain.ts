@@ -12,6 +12,7 @@ import { collectDashboardStatus } from "../status/collector.js";
 interface PlainOptions {
   force?: boolean;
   json?: boolean;
+  watch?: boolean;
 }
 
 export async function runPlainMode(command: string, cwd: string, sub?: string, options: PlainOptions = {}): Promise<void> {
@@ -27,7 +28,7 @@ export async function runPlainMode(command: string, cwd: string, sub?: string, o
       await plainDoctor(cwd);
       break;
     case "start":
-      await plainStart(cwd);
+      await plainStart(cwd, sub, options);
       break;
     case "update":
       await plainUpdate(cwd);
@@ -211,36 +212,25 @@ async function plainDoctor(cwd: string): Promise<void> {
   if (scan.services.length) console.log(chalk.dim(`  Services: ${scan.services.join(", ")}`));
 }
 
-async function plainStart(cwd: string): Promise<void> {
-  const scan = await scanProject(cwd);
-  const pm = scan.packageManager || "npm";
-  let cmd: string | null = null;
-
-  if (scan.scripts.dev) cmd = `${pm} run dev`;
-  else if (scan.scripts.start) cmd = `${pm} run start`;
-
-  if (!cmd) {
+async function plainStart(cwd: string, target: string | undefined, options: PlainOptions): Promise<void> {
+  const { startManagedProcess } = await import("../processes/manager.js");
+  try {
+    const proc = await startManagedProcess(cwd, target, { force: options.force, autoRestart: options.watch });
+    console.log(chalk.green(`✓ Started ${proc.id}`));
+    console.log(chalk.dim(`  Command: ${proc.command}`));
+    console.log(chalk.dim(`  PID: ${proc.pid || "unknown"}`));
+    console.log(chalk.dim(`  Logs: ${proc.logFile}`));
+    console.log(chalk.dim("  Use: setupr ps, setupr logs, setupr stop"));
+  } catch (err) {
+    if (typeof err === "object" && err && "code" in err) {
+      printPlainError(err as any);
+      return;
+    }
     printPlainError(createSetuprError({
-      code: "MISSING_SCRIPT",
+      code: "COMMAND_FAILED",
       command: "start",
       cwd,
-      details: ["No dev or start script was found in package.json."],
-      nextSteps: ["Add a dev or start script, or run a specific script with setup run <script>."],
-    }));
-    return;
-  }
-
-  console.log(chalk.blue(`Running: ${cmd}`));
-  const result = await runCommand(cmd, cwd, (line) => console.log(line));
-  if (result.exitCode !== 0) {
-    printPlainError(classifyCommandFailure({
-      command: cmd,
-      cwd,
-      exitCode: result.exitCode,
-      stdout: result.stdout,
-      stderr: result.stderr,
-      stepLabel: "Start project",
-      stepType: "script",
+      details: [err instanceof Error ? err.message : String(err)],
     }));
   }
 }

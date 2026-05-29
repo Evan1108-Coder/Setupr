@@ -52,6 +52,8 @@ export const ERROR_CATALOG: Record<SetuprErrorCode, Template> = {
   COMMAND_NOT_FOUND: executor("Command not found", "The shell could not find the command to run.", ["Install the missing tool or fix PATH."]),
   COMMAND_TIMEOUT: executor("Command timed out", "The command took too long and was stopped.", ["Retry, check network/service state, or run the command manually."]),
   COMMAND_ABORTED: executor("Command aborted", "The command was interrupted before it finished.", ["Rerun when ready."]),
+  PROCESS_ALREADY_RUNNING: executor("Process already running", "Setupr is already managing a live process with that name.", ["Run setupr ps, setupr logs, or setupr stop before starting another."]),
+  PROCESS_NOT_FOUND: executor("Process not found", "Setupr could not find a managed process with that name.", ["Run setupr ps to list managed processes."]),
   INSTALL_FAILED: executor("Dependency install failed", "The package manager failed while installing dependencies.", ["Check package manager output, network, lockfile, and dependency conflicts."]),
   BUILD_FAILED: executor("Build failed", "The project's build command failed.", ["Fix the build error, then rerun setup build or setup."]),
   TEST_FAILED: executor("Tests failed", "The project's test command failed.", ["Fix failing tests, then rerun setup test."]),

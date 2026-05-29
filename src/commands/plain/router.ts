@@ -67,7 +67,16 @@ export async function runNonTUICommand(
       await cmdDiff(cwd);
       break;
     case "logs":
-      await cmdLogs(cwd);
+      await cmdProcessLogs(cwd, sub);
+      break;
+    case "ps":
+      await cmdPs(cwd, flags);
+      break;
+    case "stop":
+      await cmdStop(cwd, sub, flags);
+      break;
+    case "restart":
+      await cmdRestart(cwd, sub, flags);
       break;
     case "test":
       await cmdTest(cwd);
@@ -720,6 +729,68 @@ async function cmdLogs(cwd: string) {
     cwd,
     details: [`Checked: ${logFiles.join(", ")}`],
   }));
+}
+
+async function cmdProcessLogs(cwd: string, target?: string) {
+  const { readProcessLog } = await import("../../processes/manager.js");
+  const result = await readProcessLog(cwd, target, 120);
+  if (result.process && result.content.trim()) {
+    console.log(chalk.blue.bold(`\n  Logs: ${result.process.name}\n`));
+    console.log(result.content);
+    return;
+  }
+  if (target) {
+    printPlainError(createSetuprError({
+      code: "LOG_FILE_MISSING",
+      command: "logs",
+      subcommand: target,
+      cwd,
+      details: [`No managed process log found for ${target}.`],
+    }));
+    return;
+  }
+  await cmdLogs(cwd);
+}
+
+async function cmdPs(cwd: string, flags: Flags) {
+  const { listManagedProcesses } = await import("../../processes/manager.js");
+  const processes = await listManagedProcesses(cwd);
+  if (flags.json) {
+    console.log(JSON.stringify(processes, null, 2));
+    return;
+  }
+  console.log(chalk.blue.bold("\n  Setupr Processes\n"));
+  if (processes.length === 0) {
+    console.log(chalk.dim("  No Setupr-managed processes."));
+    console.log(chalk.dim("  Start one with: setupr start --plain"));
+    console.log("");
+    return;
+  }
+  for (const proc of processes) {
+    const color = proc.status === "running" ? chalk.green : proc.status === "crashed" ? chalk.red : chalk.dim;
+    console.log(`  ${color(proc.status.padEnd(8))} ${chalk.white(proc.id.padEnd(14))} ${proc.pid ? chalk.dim(`pid ${proc.pid}`) : chalk.dim("no pid")}  ${chalk.dim(proc.command)}`);
+  }
+  console.log("");
+}
+
+async function cmdStop(cwd: string, target: string | undefined, flags: Flags) {
+  const { stopManagedProcess } = await import("../../processes/manager.js");
+  const stopped = await stopManagedProcess(cwd, target, { force: flags.force });
+  if (stopped.length === 0) {
+    console.log(chalk.dim(target ? `No managed process found for ${target}.` : "No running managed processes."));
+    return;
+  }
+  for (const proc of stopped) {
+    console.log(chalk.green(`✓ Stopped ${proc.id}${proc.pid ? ` (pid ${proc.pid})` : ""}`));
+  }
+}
+
+async function cmdRestart(cwd: string, target: string | undefined, flags: Flags) {
+  const { restartManagedProcess } = await import("../../processes/manager.js");
+  const proc = await restartManagedProcess(cwd, target, { force: flags.force, autoRestart: Boolean(flags.watch) });
+  console.log(chalk.green(`✓ Restarted ${proc.id}`));
+  console.log(chalk.dim(`  PID: ${proc.pid || "unknown"}`));
+  console.log(chalk.dim(`  Logs: ${proc.logFile}`));
 }
 
 async function cmdTest(cwd: string) {

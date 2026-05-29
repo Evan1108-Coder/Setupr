@@ -8,6 +8,7 @@ import { visibleCommands } from "../cli/commandRegistry.js";
 import { scanProject, type ScanResult } from "../scanner/index.js";
 import { hasProjectSignals } from "../tui/projectSignals.js";
 import { readRecentHistoryEvents, readRecentLogEvents, readProjectState, type ProjectEvent, type JsonObject } from "../state/project.js";
+import { listManagedProcesses } from "../processes/manager.js";
 
 export interface DashboardStatus {
   cwd: string;
@@ -203,10 +204,8 @@ function collectDependencyStatus(cwd: string, scan: ScanResult | null): Dashboar
 }
 
 async function collectProcessStatus(cwd: string): Promise<DashboardStatus["processes"]> {
-  const state = await readProjectState<JsonObject>(cwd, {});
-  const rawProcesses = Array.isArray(state.processes) ? state.processes : [];
+  const rawProcesses = await listManagedProcesses(cwd);
   const entries = rawProcesses
-    .filter((entry): entry is JsonObject => Boolean(entry && typeof entry === "object" && !Array.isArray(entry)))
     .slice(0, 8)
     .map((entry) => ({
       name: String(entry.name || entry.id || "process"),

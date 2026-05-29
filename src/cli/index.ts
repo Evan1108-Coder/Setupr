@@ -9,6 +9,7 @@ import { helpPathFromInput, isHelpRequest, showHelp } from "./help.js";
 import { createSetuprError, printPlainError } from "../errors/index.js";
 import { knownCommandNames, noSubcommandNames, tuiCommandNames } from "./commandRegistry.js";
 import { appendHistoryEvent } from "../state/project.js";
+import { runSupervisorFromCli } from "../processes/manager.js";
 
 const cli = meow(
   `
@@ -110,6 +111,9 @@ const cli = meow(
 
 export async function run() {
   const explicitCommand = cli.input[0];
+  if (explicitCommand === "_supervise" && await runSupervisorFromCli(cli.input)) {
+    return;
+  }
   const command = explicitCommand || "dashboard";
   if (isHelpRequest(command, cli.input, Boolean(cli.flags.help))) {
     showHelp(helpPathFromInput(command, cli.input, Boolean(cli.flags.help)));
@@ -156,7 +160,7 @@ async function runCommandPath(command: string, subCommand: string | undefined, c
       });
       if (!confirmed) return;
     }
-    await runPlainMode(command, cwd, subCommand, { force: cli.flags.force, json: cli.flags.json });
+    await runPlainMode(command, cwd, subCommand, { force: cli.flags.force, json: cli.flags.json, watch: cli.flags.watch });
   } else {
     const { runNonTUICommand } = await import("../commands/plain/router.js");
     await runNonTUICommand(command, subCommand, cwd, { ...cli.flags, args: cli.input.slice(2) });

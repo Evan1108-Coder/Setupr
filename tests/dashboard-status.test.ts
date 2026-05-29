@@ -4,7 +4,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { spawnSync } from "child_process";
 import { collectDashboardStatus } from "../src/status/collector.js";
-import { appendHistoryEvent, writeProjectState } from "../src/state/project.js";
+import { appendHistoryEvent } from "../src/state/project.js";
 
 describe("dashboard/status collector", () => {
   let tempDir: string;
@@ -20,12 +20,31 @@ describe("dashboard/status collector", () => {
     await writeFile(join(tempDir, ".env.example"), "API_KEY=\nPUBLIC_URL=http://localhost:3000\n");
     await writeFile(join(tempDir, ".env"), "PUBLIC_URL=http://localhost:3000\nEXTRA_FLAG=true\n");
     await appendHistoryEvent(tempDir, { type: "command", message: "ran setup status" });
-    await writeProjectState(tempDir, {
-      processes: [
-        { name: "web", pid: 1234, status: "running", command: "npm run dev" },
-        { name: "api", status: "crashed", command: "npm run api" },
-      ],
-    });
+    await mkdir(join(tempDir, ".setupr"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".setupr", "processes.json"),
+      JSON.stringify([
+        {
+          id: "web",
+          name: "web",
+          pid: process.pid,
+          status: "running",
+          command: "npm run dev",
+          cwd: tempDir,
+          startedAt: Date.now(),
+          logFile: join(tempDir, ".setupr", "logs", "processes", "web.log"),
+        },
+        {
+          id: "api",
+          name: "api",
+          status: "crashed",
+          command: "npm run api",
+          cwd: tempDir,
+          startedAt: Date.now(),
+          logFile: join(tempDir, ".setupr", "logs", "processes", "api.log"),
+        },
+      ])
+    );
   });
 
   afterEach(async () => {
@@ -65,4 +84,3 @@ describe("dashboard/status collector", () => {
     expect(status.git.recent[0]).toContain("feat: initial");
   });
 });
-
