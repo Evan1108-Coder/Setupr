@@ -107,6 +107,33 @@ Or fix npm permissions: https://docs.npmjs.com/resolving-eacces-permissions-erro
 
 In `--plain` mode, setup stops after the failed step and exits non-zero. Fix the failing command, then rerun `setup --plain`.
 
+### Test command cannot find a suite
+
+`setupr test run` uses detected package scripts first, then language defaults such as `python -m pytest`, `cargo test`, or `go test ./...`. If no reliable command exists:
+
+```bash
+setupr test doctor
+setupr test list
+```
+
+Add a native test script to the project or use `setupr test create <file> --yes` to create a starter test for one source file. Test run history is stored in `.setupr/test-runs.json`.
+
+### Security scan reports too many known findings
+
+Use a baseline for known existing findings and ignore individual false positives:
+
+```bash
+setupr security baseline
+setupr security ignore <finding-id>
+setupr security report
+```
+
+`setupr security headers` checks localhost URLs by default. For external URLs, pass `--force` so the network target is explicit:
+
+```bash
+setupr security headers --url https://example.com --force
+```
+
 ### Managed process shows crashed after stop
 
 `setupr stop` marks the supervisor entry as stopped. If a process still appears crashed, it usually means the child process ignored the stop signal or the registry was written by an older Setupr version.

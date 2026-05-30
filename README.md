@@ -69,7 +69,8 @@ setupr setup --plain
 | `lock` | Snapshot environment state |
 | `diff` | Compare current vs locked state |
 | `logs [target]` | Show managed process logs, falling back to package-manager logs |
-| `test` | Detect and run test suite |
+| `test [run\|quick\|full\|ci\|smoke\|unit\|integration\|e2e\|watch\|coverage\|changed\|file\|failed\|doctor\|list\|report\|clean\|create\|generate\|fix\|security]` | Run verification suites, smoke checks, reports, and test scaffolding |
+| `security [scan\|quick\|deep\|deps\|secrets\|env\|docker\|ci\|code\|routes\|auth\|headers\|doctor\|report\|baseline\|ignore\|fix\|watch\|test]` | Run defensive security scans, baselines, ignores, and safe fixes |
 | `build` | Detect and run build command |
 | `deploy` | Run deploy scripts |
 | `open [repo\|ide]` | Open in browser/IDE/repo |
@@ -222,6 +223,38 @@ Examples:
 - `setup auth list` stops on a corrupt `~/.setupr/secrets.json` instead of pretending keys are missing, so existing secrets are not accidentally overwritten.
 - command failures are classified as install, build, test, network, permission, timeout, or missing-tool errors when possible.
 - `--force` skips ordinary prompts, but it does not ignore failed commands, invalid auth storage, missing secrets, or destructive blockers.
+
+### Verification And Security
+
+Setupr includes grouped verification and security workflows for local development and CI:
+
+```bash
+# Fast local confidence check
+setupr test quick
+
+# Broader local check: test, build, typecheck, lint, security when detected
+setupr test full --report .setupr/test-report.md
+
+# Explain current test coverage and missing scripts
+setupr test doctor
+
+# Preview or create a starter test for one source file
+setupr test create src/lib/math.ts
+setupr test create src/lib/math.ts --yes
+
+# Defensive local security scan
+setupr security scan
+
+# Deeper static scan and report
+setupr security deep --report .setupr/security-report.json
+
+# Inspect local HTTP security headers
+setupr security headers --url http://localhost:3000
+```
+
+`test clean`, `test create`, and `security fix` are guarded writes: they preview by default and require `--yes` or `--force` before changing files. Security scans are defensive static checks only. External URL header checks require `--force`; localhost URLs are allowed directly. Findings can be accepted with `setupr security baseline` or ignored individually with `setupr security ignore <finding-id>`.
+
+Verification reports live in `.setupr/test-runs.json`; security reports live in `.setupr/security-runs.json`. The dashboard and `setupr status --plain` summarize the latest test and security state.
 
 ### Safety Policy
 

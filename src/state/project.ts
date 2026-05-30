@@ -26,7 +26,7 @@ export type ProjectEventInput = Omit<ProjectEvent, "timestamp"> & {
   timestamp?: number;
 };
 
-export type ProjectJsonFile = typeof PROJECT_STATE_FILE | typeof PROJECT_NOTES_FILE | typeof PROJECT_IMPORTED_CONTEXT_FILE;
+export type ProjectJsonFile = typeof PROJECT_STATE_FILE | typeof PROJECT_NOTES_FILE | typeof PROJECT_IMPORTED_CONTEXT_FILE | string;
 export type ProjectJsonlFile = typeof PROJECT_HISTORY_FILE | typeof PROJECT_LOG_FILE;
 export type ProjectPersistenceFile = ProjectJsonFile | ProjectJsonlFile;
 

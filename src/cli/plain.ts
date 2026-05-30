@@ -68,9 +68,11 @@ async function plainStatus(cwd: string, fromDashboard = false, options: PlainOpt
   console.log(`  Stack:        ${chalk.white(formatStack(status))}`);
   console.log(`  Git:          ${formatGit(status)}`);
   console.log(`  Env:          ${formatEnv(status)}`);
-  console.log(`  Dependencies: ${formatDeps(status)}`);
-  console.log(`  Processes:    ${formatProcesses(status)}`);
-  console.log(`  AI:           ${chalk.white(status.ai.activeModel)} ${chalk.dim(`(${status.ai.availableModels} available)`)}`);
+	  console.log(`  Dependencies: ${formatDeps(status)}`);
+	  console.log(`  Processes:    ${formatProcesses(status)}`);
+	  console.log(`  Tests:        ${chalk.white(status.verification.status)}`);
+	  console.log(`  Security:     ${securityText(status.security.score, status.security.findings)}`);
+	  console.log(`  AI:           ${chalk.white(status.ai.activeModel)} ${chalk.dim(`(${status.ai.availableModels} available)`)}`);
   console.log("");
   console.log(chalk.yellow("  Checks"));
   for (const check of status.health.checks) {
@@ -408,6 +410,13 @@ function formatProcesses(status: Awaited<ReturnType<typeof collectDashboardStatu
   if (processes.managed === 0) return chalk.dim("none managed");
   if (processes.crashed > 0) return chalk.red(`${processes.crashed} crashed, ${processes.running}/${processes.managed} running`);
   return chalk.green(`${processes.running}/${processes.managed} running`);
+}
+
+function securityText(score: number, findings: number): string {
+  const text = findings > 0 ? `${findings} finding(s), score ${score}` : `score ${score}`;
+  if (score < 70) return chalk.red(text);
+  if (findings > 0 || score < 90) return chalk.yellow(text);
+  return chalk.green(text);
 }
 
 function healthColor(label: "good" | "warning" | "error") {

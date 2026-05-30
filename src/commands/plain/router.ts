@@ -79,9 +79,16 @@ export async function runNonTUICommand(
     case "restart":
       await cmdRestart(cwd, sub, flags);
       break;
-    case "test":
-      await cmdTest(cwd);
+    case "test": {
+      const { runVerificationCommand } = await import("../../verification/index.js");
+      await runVerificationCommand(cwd, sub || "run", { ...flags, args: flags.args || [] });
       break;
+    }
+    case "security": {
+      const { runSecurityCommand } = await import("../../security/index.js");
+      await runSecurityCommand(cwd, sub || "scan", { ...flags, args: flags.args || [] });
+      break;
+    }
     case "build":
       await cmdBuild(cwd);
       break;
@@ -1163,21 +1170,6 @@ async function cmdRestart(cwd: string, target: string | undefined, flags: Flags)
   console.log(chalk.green(`✓ Restarted ${proc.id}`));
   console.log(chalk.dim(`  PID: ${proc.pid || "unknown"}`));
   console.log(chalk.dim(`  Logs: ${proc.logFile}`));
-}
-
-async function cmdTest(cwd: string) {
-  const scan = await scanProject(cwd);
-  const pm = scan.packageManager || "npm";
-  if (scan.scripts.test) {
-    await runPlainCommand(`${pm} run test`, cwd, { stepType: "script", stepLabel: "test" });
-  } else {
-    printPlainError(createSetuprError({
-      code: "MISSING_SCRIPT",
-      command: "test",
-      cwd,
-      details: ["No test script found in package.json."],
-    }));
-  }
 }
 
 async function cmdBuild(cwd: string) {

@@ -19,9 +19,13 @@ describe("help routing", () => {
 
     expect(showHelp(["auth"])).toBe(true);
     expect(showHelp(["auth", "set-key"])).toBe(true);
-    expect(showHelp(["git"])).toBe(true);
-    expect(showHelp(["docker"])).toBe(true);
-    expect(showHelp(["workspace"])).toBe(true);
+	    expect(showHelp(["git"])).toBe(true);
+	    expect(showHelp(["docker"])).toBe(true);
+	    expect(showHelp(["workspace"])).toBe(true);
+	    expect(showHelp(["test"])).toBe(true);
+	    expect(showHelp(["test", "full"])).toBe(true);
+	    expect(showHelp(["security"])).toBe(true);
+	    expect(showHelp(["security", "headers"])).toBe(true);
     expect(showHelp(["not-real"])).toBe(false);
     expect(process.exitCode).toBe(1);
     expect(log).toHaveBeenCalled();
@@ -44,8 +48,10 @@ describe("help routing", () => {
       "secrets",
       "templates",
       "workspace",
-      "health",
-      "share",
+	      "health",
+	      "test",
+	      "security",
+	      "share",
       "plugin",
       "lint",
       "format",

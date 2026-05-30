@@ -9,6 +9,8 @@ import { scanProject, type ScanResult } from "../scanner/index.js";
 import { hasProjectSignals } from "../tui/projectSignals.js";
 import { readRecentHistoryEvents, readRecentLogEvents, readProjectState, type ProjectEvent, type JsonObject } from "../state/project.js";
 import { listManagedProcesses } from "../processes/manager.js";
+import { collectVerificationSummary } from "../verification/index.js";
+import { collectSecuritySummary, type SecurityFinding } from "../security/index.js";
 
 export interface DashboardStatus {
   cwd: string;
@@ -54,6 +56,15 @@ export interface DashboardStatus {
     crashed: number;
     entries: Array<{ name: string; pid?: number; status: string; command?: string }>;
   };
+  verification: {
+    status: string;
+    lastCommand?: string;
+  };
+  security: {
+    score: number;
+    findings: number;
+    topFindings: SecurityFinding[];
+  };
   ai: {
     activeModel: string;
     availableModels: number;
@@ -74,18 +85,29 @@ export async function collectDashboardStatus(cwd: string): Promise<DashboardStat
     scanError = humanError(err);
   }
 
-  const [git, env, processes, history, logs, projectState] = await Promise.all([
+  const [git, env, processes, history, logs, projectState, verificationSummary, securitySummary] = await Promise.all([
     collectGitStatus(cwd),
     collectEnvStatus(cwd),
     collectProcessStatus(cwd),
     readRecentHistoryEvents(cwd, 8),
     readRecentLogEvents(cwd, 8),
     readProjectState<JsonObject>(cwd, {}),
+    collectVerificationSummary(cwd).catch(() => ({ status: "unavailable", lastRun: undefined })),
+    collectSecuritySummary(cwd).catch(() => ({ score: 100, topFindings: [], lastRun: undefined })),
   ]);
 
   const dependencies = collectDependencyStatus(cwd, scan);
   const hasProject = hasProjectSignals(scan);
-  const health = computeHealth({ scan, scanError, hasProject, git, env, dependencies, processes });
+  const verification: DashboardStatus["verification"] = {
+    status: verificationSummary.status,
+    lastCommand: verificationSummary.lastRun?.command,
+  };
+  const security: DashboardStatus["security"] = {
+    score: securitySummary.score,
+    findings: securitySummary.lastRun?.findings.length ?? securitySummary.topFindings.length,
+    topFindings: securitySummary.topFindings,
+  };
+  const health = computeHealth({ scan, scanError, hasProject, git, env, dependencies, processes, verification, security });
 
   return {
     cwd,
@@ -99,6 +121,8 @@ export async function collectDashboardStatus(cwd: string): Promise<DashboardStat
     env,
     dependencies,
     processes,
+    verification,
+    security,
     ai: {
       activeModel: getDefaultModel().id,
       availableModels: getAvailableModels().length,
@@ -135,6 +159,8 @@ export function createDashboardFallbackStatus(cwd: string, reason: string): Dash
     env: { hasExample: false, hasEnv: false, required: 0, defined: 0, missing: [], extra: [] },
     dependencies: { packageManager: null, prod: 0, dev: 0, lockfilePresent: false },
     processes: { managed: 0, running: 0, crashed: 0, entries: [] },
+    verification: { status: "not collected" },
+    security: { score: 100, findings: 0, topFindings: [] },
     ai: { activeModel: getDefaultModel().id, availableModels: getAvailableModels().length },
     history: [],
     logs: [],
@@ -272,6 +298,8 @@ function computeHealth(input: {
   env: DashboardStatus["env"];
   dependencies: DashboardStatus["dependencies"];
   processes: DashboardStatus["processes"];
+  verification: DashboardStatus["verification"];
+  security: DashboardStatus["security"];
 }): DashboardStatus["health"] {
   const checks: DashboardStatus["health"]["checks"] = [];
   checks.push(input.hasProject
@@ -289,6 +317,14 @@ function computeHealth(input: {
   checks.push(input.processes.crashed > 0
     ? { label: "Processes", status: "error", detail: `${input.processes.crashed} crashed` }
     : { label: "Processes", status: "ok", detail: `${input.processes.running}/${input.processes.managed} running` });
+  checks.push(input.verification.status.startsWith("fail")
+    ? { label: "Tests", status: "error", detail: input.verification.status }
+    : input.verification.status === "no test runs" || input.verification.status === "not collected"
+      ? { label: "Tests", status: "warning", detail: input.verification.status }
+      : { label: "Tests", status: input.verification.status.startsWith("warn") ? "warning" : "ok", detail: input.verification.status });
+  checks.push(input.security.findings > 0
+    ? { label: "Security", status: input.security.score < 70 ? "error" : "warning", detail: `${input.security.findings} finding(s), score ${input.security.score}` }
+    : { label: "Security", status: "ok", detail: `score ${input.security.score}` });
 
   const score = Math.max(0, Math.round(100 - checks.reduce((total, check) => total + (check.status === "error" ? 30 : check.status === "warning" ? 12 : 0), 0)));
   const label = checks.some((check) => check.status === "error") ? "error" : checks.some((check) => check.status === "warning") ? "warning" : "good";

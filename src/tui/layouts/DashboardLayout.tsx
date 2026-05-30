@@ -198,7 +198,7 @@ function ProcessPanel({ status }: { status: DashboardStatus }) {
 }
 
 function ActionsPanel({ status }: { status: DashboardStatus }) {
-  const preferred = ["setup", "status", "doctor", "start", "env", "git", "test", "build"];
+  const preferred = ["setup", "status", "doctor", "start", "test", "security", "env", "git", "build"];
   const commands = preferred
     .map((name) => status.commands.find((command) => command.name === name))
     .filter((command): command is { name: string; summary: string } => Boolean(command));

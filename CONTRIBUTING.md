@@ -22,6 +22,8 @@ src/
 ├── executor/     # Step execution, checkpoint saving, undo/redo
 ├── processes/    # Managed process supervisor, registry, and logs
 ├── status/       # Dashboard/status collection
+├── verification/ # Test, smoke, CI, report, and scaffold verification workflows
+├── security/     # Defensive local security scans, reports, baselines, and ignores
 ├── context/      # Environment context collection
 ├── plugins/      # Public plugin API contracts
 ├── state/        # Zustand store, checkpoint, config

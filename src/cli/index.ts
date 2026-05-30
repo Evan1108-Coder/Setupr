@@ -103,6 +103,8 @@ const cli = meow(
       provider: { type: "string" },
       model: { type: "string" },
       timeout: { type: "number" },
+      report: { type: "string" },
+      url: { type: "string" },
       cwd: { type: "string" },
       template: { type: "string" },
       message: { type: "string" },

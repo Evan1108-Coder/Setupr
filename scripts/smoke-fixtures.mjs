@@ -128,7 +128,13 @@ function plainSmoke() {
     env: { HOME: join(temp, "corrupt-home") },
   });
   expectRun("missing build script", "js-failing", ["build", "--plain"], ["MISSING_SCRIPT"]);
-  expectRun("failing test script", "js-failing", ["test", "--plain"], ["TEST_FAILED"]);
+  expectRun("failing test script", "js-failing", ["test", "--plain"], ["Setupr Test run", "fail"]);
+  expectRun("test quick", "js-new", ["test", "quick", "--plain"], ["Setupr Test quick", "pass"]);
+  expectRun("test doctor", "js-new", ["test", "doctor", "--plain"], ["Setupr Test doctor", "Test script"]);
+  expectRun("test report", "js-new", ["test", "report", "--plain"], ["Setupr Test doctor"]);
+  expectRun("security quick", "js-new", ["security", "quick", "--plain"], ["Setupr Security scan", "Score:"]);
+  expectRun("security deep report", "docker-heavy", ["security", "deep", "--plain", "--report", ".setupr/security-smoke.md"], ["Setupr Security deep", "Container may run as root"]);
+  expectRun("security headers guarded", "js-new", ["security", "headers", "--plain", "--url", "https://example.com"], ["External URL requires explicit authorization", "Rerun with --force"]);
   expectRun("no project setup", "no-project", ["setup", "--plain", "--force"], ["NO_PROJECT_DETECTED"]);
   expectRun("monorepo info", "monorepo", ["info", "--plain"], ["Monorepo:", "npm-workspaces"]);
   expectRun("missing lock/log/repo", "env-missing", ["diff", "--plain"], ["LOCK_STATE_MISSING"]);

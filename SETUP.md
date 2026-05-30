@@ -41,7 +41,7 @@ setup help docker
 setup workspace --help
 ```
 
-The rich help output lists the full command surface, including setup, auth, env, git, CI, Docker, secrets, templates, workspace, health, share, plugin, lint, format, and scaffold commands.
+The rich help output lists the full command surface, including setup, auth, env, git, CI, Docker, secrets, templates, workspace, health, test, security, share, plugin, lint, format, and scaffold commands.
 
 ### Development Setup
 
@@ -103,6 +103,22 @@ For AI calls, Setupr uses compact internal facts for docs and user intent to red
 If a setup step fails, Setupr records structured output, classifies the failure, tries deterministic recovery for known cases, and can ask the AI director to diagnose or re-plan when a provider is configured. Interrupted AI-directed workflows resume from `.setupr/agent-workflow.json`.
 
 `setupr doctor` adds severity/explanation/fix suggestions, and `setupr start` uses the same context to choose the most likely dev script and warn about blockers before starting a managed process.
+
+## Verification And Security
+
+Use Setupr's grouped commands when you want local confidence checks before committing or publishing:
+
+```bash
+setupr test quick
+setupr test full --report .setupr/test-report.md
+setupr test doctor
+setupr security scan
+setupr security deep --report .setupr/security-report.md
+```
+
+`setupr test` chooses project-native commands from package scripts, Python, Rust, Go, and common build/lint/typecheck names. `setupr test create <file>` previews a starter test file and writes it only with `--yes` or `--force`.
+
+`setupr security` runs defensive checks for likely committed secrets, risky env naming, dependency lockfile/version problems, Docker/CI risks, dangerous code primitives, route/auth smells, and optional local HTTP headers. Reports are saved under `.setupr/`; dashboard/status reads the latest report summary.
 
 ## CI/CD Usage
 
