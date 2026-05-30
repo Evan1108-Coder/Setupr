@@ -172,8 +172,7 @@ async function runCommandPath(command: string, subCommand: string | undefined, c
 function validateCliRequest(command: string, subCommand: string | undefined, cwd: string): boolean {
   const known = knownCommandNames();
   if (!known.has(command)) {
-    printPlainError(createSetuprError({ code: "UNKNOWN_COMMAND", command, cwd, details: [`Received: ${command}`] }));
-    return false;
+    return true;
   }
 
   const cleanFlags = [cli.flags.all, cli.flags.deps, cli.flags.share].filter(Boolean).length;
