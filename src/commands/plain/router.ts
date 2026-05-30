@@ -6,6 +6,7 @@ import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { initEnvFile, normalizeEnvKey, parseEnvKeys, parseEnvPairs } from "../../env/index.js";
 import { createSetuprError, printPlainError, classifyCommandFailure } from "../../errors/index.js";
+import { runProjectCommandOperation } from "../../core/operations.js";
 
 interface Flags {
   force?: boolean;
@@ -1232,19 +1233,17 @@ async function cmdOpen(target: string | undefined, cwd: string) {
   }
 }
 
-async function runPlainCommand(command: string, cwd: string, context: { stepType?: string; stepLabel?: string } = {}) {
-  console.log(chalk.blue(`Running: ${command}`));
-  const result = await runCommand(command, cwd, (line) => console.log(line));
-  if (result.exitCode !== 0) {
-    printPlainError(classifyCommandFailure({
-      command,
-      cwd,
-      exitCode: result.exitCode,
-      stdout: result.stdout,
-      stderr: result.stderr,
-      ...context,
-    }));
-  }
+async function runPlainCommand(command: string, cwd: string, context: { stepType?: string; stepLabel?: string; ownerCommand?: string; ownerSubcommand?: string; force?: boolean; dryRun?: boolean } = {}) {
+  await runProjectCommandOperation({
+    cwd,
+    ownerCommand: context.ownerCommand || context.stepLabel || "run",
+    ownerSubcommand: context.ownerSubcommand,
+    shellCommand: command,
+    stepType: context.stepType,
+    stepLabel: context.stepLabel,
+    force: context.force,
+    dryRun: context.dryRun,
+  });
 }
 
 function envReadErrorCode(error: unknown): "ENV_TEMPLATE_MISSING" | "ENV_CHECK_FAILED" {

@@ -8,8 +8,8 @@ import { withInteractiveScreen } from "./terminalScreen.js";
 import { helpPathFromInput, isHelpRequest, showHelp } from "./help.js";
 import { createSetuprError, printPlainError } from "../errors/index.js";
 import { knownCommandNames, noSubcommandNames, tuiCommandNames } from "./commandRegistry.js";
-import { appendHistoryEvent } from "../state/project.js";
 import { runSupervisorFromCli } from "../processes/manager.js";
+import { createProjectEngine, type ProjectEngine } from "../core/engine.js";
 
 const cli = meow(
   `
@@ -125,16 +125,25 @@ export async function run() {
 
   const subCommand = resolveSubCommand(command, cli.input[1], cli.flags);
   const cwd = typeof cli.flags.cwd === "string" ? resolve(cli.flags.cwd) : process.cwd();
+  const mode = cli.flags.plain || cli.flags.noTui ? "plain" : cli.flags.tui ? "tui" : "auto";
+  const engine = createProjectEngine({
+    cwd,
+    command,
+    subcommand: subCommand,
+    args: cli.input.slice(2),
+    mode,
+    flags: cli.flags,
+  });
   if (!validateCliRequest(command, subCommand, cwd)) return;
   const isPlain = (cli.flags.noTui || cli.flags.plain || !process.stdout.isTTY) && !cli.flags.tui;
   const isBareAuth = command === "auth" && !subCommand;
 
-  await recordCommandStart(cwd, command, subCommand, cli.input);
+  await recordCommandStart(engine, cli.input);
   try {
     await runCommandPath(command, subCommand, cwd, isPlain, isBareAuth);
-    await recordCommandFinish(cwd, command, subCommand);
+    await recordCommandFinish(engine);
   } catch (err) {
-    await recordCommandError(cwd, command, subCommand, err);
+    await recordCommandError(engine, err);
     throw err;
   }
 }
@@ -238,41 +247,33 @@ function resolveSubCommand(command: string, positional: string | undefined, flag
   return positional;
 }
 
-async function recordCommandStart(cwd: string, command: string, subCommand: string | undefined, input: string[]): Promise<void> {
-  await appendHistoryEvent(cwd, {
+async function recordCommandStart(engine: ProjectEngine, input: string[]): Promise<void> {
+  await engine.recordCommand({
     type: "command.start",
-    message: `setupr ${[command === "dashboard" && input.length === 0 ? "" : command, subCommand].filter(Boolean).join(" ")}`.trim(),
-    data: {
-      command,
-      subCommand: subCommand || null,
+    extra: {
       args: input.map(maskArg),
       mode: cli.flags.plain || cli.flags.noTui ? "plain" : cli.flags.tui ? "tui" : "auto",
     },
-  }).catch(() => undefined);
+  });
 }
 
-async function recordCommandFinish(cwd: string, command: string, subCommand: string | undefined): Promise<void> {
-  await appendHistoryEvent(cwd, {
+async function recordCommandFinish(engine: ProjectEngine): Promise<void> {
+  await engine.recordCommand({
     type: "command.finish",
-    message: `${command}${subCommand ? ` ${subCommand}` : ""} finished${process.exitCode ? ` with exit ${process.exitCode}` : ""}`,
-    data: {
-      command,
-      subCommand: subCommand || null,
-      exitCode: process.exitCode || 0,
-    },
-  }).catch(() => undefined);
+    exitCode: numericExitCode(0),
+  });
 }
 
-async function recordCommandError(cwd: string, command: string, subCommand: string | undefined, err: unknown): Promise<void> {
-  await appendHistoryEvent(cwd, {
+async function recordCommandError(engine: ProjectEngine, err: unknown): Promise<void> {
+  await engine.recordCommand({
     type: "command.error",
-    message: `${command}${subCommand ? ` ${subCommand}` : ""} failed`,
-    data: {
-      command,
-      subCommand: subCommand || null,
-      error: err instanceof Error ? err.message : String(err),
-    },
-  }).catch(() => undefined);
+    error: err,
+    exitCode: numericExitCode(1),
+  });
+}
+
+function numericExitCode(fallback: number): number {
+  return typeof process.exitCode === "number" ? process.exitCode : fallback;
 }
 
 function maskArg(value: string): string {
