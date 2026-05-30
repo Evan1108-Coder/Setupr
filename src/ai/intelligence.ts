@@ -3,6 +3,8 @@ import { getCached, setCache, buildCacheKey } from "./cache.js";
 import type { ScanResult } from "../scanner/index.js";
 import { classifyAIProviderError, errorSummary } from "../errors/index.js";
 import type { ParsedUserIntent } from "./userIntent.js";
+import { getActiveModel } from "./client.js";
+import { fallbackModelsFor } from "../agent/providerDiagnostics.js";
 
 export type IntelligenceLevel = "pattern" | "cached" | "live";
 
@@ -141,6 +143,15 @@ export async function intelligentResponse(
       cost: result.tokens * costPerToken,
     };
   } catch (err) {
+    const fallback = await tryFallbackModels(allMessages, err);
+    if (fallback) {
+      await setCache(cacheKey, fallback.content, fallback.tokens);
+      return {
+        response: `${fallback.content}\n\n(Fell back from ${fallback.originalModel} to ${fallback.model} after the first provider failed.)`,
+        level: "live",
+        cost: fallback.tokens * 0.000001,
+      };
+    }
     const psetupError = classifyAIProviderError(err, { command: "ai-director" });
     return {
       response: `AI unavailable: ${errorSummary(psetupError)} ${psetupError.nextSteps?.join(" ") || ""}`,
@@ -148,4 +159,27 @@ export async function intelligentResponse(
       cost: 0,
     };
   }
+}
+
+async function tryFallbackModels(
+  messages: ChatMessage[],
+  originalError: unknown
+): Promise<{ content: string; tokens: number; model: string; originalModel: string } | null> {
+  const active = getActiveModel();
+  const original = classifyAIProviderError(originalError, { command: "ai-director", details: [`Model: ${active.id}`] });
+  if (!["AI_PROVIDER_TIMEOUT", "AI_PROVIDER_RATE_LIMITED", "AI_PROVIDER_QUOTA_EXHAUSTED", "AI_PROVIDER_UNAVAILABLE", "AI_PROVIDER_REQUEST_FAILED"].includes(original.code)) {
+    return null;
+  }
+  const fallbacks = fallbackModelsFor(active)
+    .sort((a, b) => Number(a.provider === active.provider) - Number(b.provider === active.provider))
+    .slice(0, 4);
+  for (const model of fallbacks) {
+    try {
+      const result = await chat(messages, { model: model.id, timeoutMs: 18000, maxTokens: 900, temperature: 0.2 });
+      return { ...result, originalModel: active.id };
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }

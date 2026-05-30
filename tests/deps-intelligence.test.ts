@@ -63,6 +63,28 @@ describe("deps intelligence commands", () => {
     expect(output.lines.join("\n")).toContain("express@4.18.2");
   });
 
+  it("falls back to package.json declarations when installed dependency tree is unavailable", async () => {
+    await writeProject({
+      name: "deps-list-missing-install",
+      version: "1.0.0",
+      dependencies: { express: "^4.18.0" },
+      devDependencies: { vitest: "^1.0.0" },
+    });
+    runCommandMock.mockResolvedValue({ stdout: "", stderr: "npm ERR! missing: express", exitCode: 1 });
+
+    const output = captureConsole();
+    try {
+      await runNonTUICommand("deps", "list", TEST_DIR, { args: [] });
+    } finally {
+      output.restore();
+    }
+
+    const text = output.lines.join("\n");
+    expect(text).toContain("package.json declarations");
+    expect(text).toContain("express@^4.18.0");
+    expect(text).toContain("vitest@^1.0.0");
+  });
+
   it("summarizes npm audit json without throwing on nonzero audit exit", async () => {
     await writeProject({ name: "deps-audit", version: "1.0.0" }, { name: "deps-audit", lockfileVersion: 3, packages: {} });
     runCommandMock.mockResolvedValue({

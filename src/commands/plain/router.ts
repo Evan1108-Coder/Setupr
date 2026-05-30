@@ -692,7 +692,16 @@ async function cmdDepsList(cwd: string) {
   console.log(chalk.blue(`Dependencies (${pm}):`));
   const result = await runCommand(`${pm} list --depth=0`, cwd);
   if (result.exitCode !== 0) {
-    printPlainError(classifyCommandFailure({ command: `${pm} list --depth=0`, cwd, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }));
+    console.log(chalk.yellow("  Package manager dependency tree is unavailable; showing package.json declarations instead."));
+    const snapshot = await loadDependencySnapshot(cwd);
+    const declared = declaredDependencyRows(snapshot.packageJson);
+    if (declared.length === 0) {
+      printPlainError(classifyCommandFailure({ command: `${pm} list --depth=0`, cwd, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }));
+      return;
+    }
+    for (const row of declared) {
+      console.log(`  ${row.kind.padEnd(22)} ${row.name}@${row.range}`);
+    }
   } else {
     console.log(result.stdout || result.stderr);
   }
@@ -913,6 +922,21 @@ function directDependencyKinds(packageJson: PackageJsonInfo | undefined, package
     const range = (deps as Record<string, string>)[packageName];
     return range ? [{ kind: label, range }] : [];
   });
+}
+
+function declaredDependencyRows(packageJson: PackageJsonInfo | undefined): Array<{ kind: string; name: string; range: string }> {
+  if (!packageJson) return [];
+  const groups: Array<[keyof PackageJsonInfo, string]> = [
+    ["dependencies", "dependencies"],
+    ["devDependencies", "devDependencies"],
+    ["optionalDependencies", "optionalDependencies"],
+    ["peerDependencies", "peerDependencies"],
+  ];
+  return groups.flatMap(([key, label]) => {
+    const deps = packageJson[key];
+    if (!deps || typeof deps !== "object" || Array.isArray(deps)) return [];
+    return Object.entries(deps as Record<string, string>).map(([name, range]) => ({ kind: label, name, range }));
+  }).sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
 }
 
 function parseFirstJson(text: string): any | undefined {

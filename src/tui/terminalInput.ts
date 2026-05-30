@@ -84,11 +84,15 @@ function findPartialTerminalControl(input: string): { index: number; sequence: s
   if (escIndex === -1) return null;
   const tail = input.slice(escIndex);
   if (tail === ESC) return { index: escIndex, sequence: tail };
-  if (/^\x1B\[[0-?]*[ -/]*$/.test(tail)) return { index: escIndex, sequence: tail };
-  if (/^\x1B\][^\x07]*(?:\x1B)?$/.test(tail) && !/\x07|\x1B\\/.test(tail)) {
+  if (tail.startsWith(`${ESC}[`)) {
+    const csiBody = tail.slice(2);
+    if (/^[0-?]*[ -/]*$/.test(csiBody) || csiBody === "200" || csiBody === "201") {
+      return { index: escIndex, sequence: tail };
+    }
+  }
+  if (tail.startsWith(`${ESC}]`) && !tail.includes(BEL) && !tail.includes(`${ESC}\\`)) {
     return { index: escIndex, sequence: tail };
   }
-  if (/^\x1B\[200$|^\x1B\[201$/.test(tail)) return { index: escIndex, sequence: tail };
   return null;
 }
 
