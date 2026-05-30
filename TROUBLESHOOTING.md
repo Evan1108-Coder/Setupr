@@ -180,6 +180,8 @@ setupr plugin validate ./your-plugin
 
 The manifest should include `setupr.apiVersion: "1"` and at least one extension array: `commands`, `scanners`, `planners`, `doctorChecks`, `fixers`, or `panels`.
 
+Runtime loading also requires the plugin to be enabled in Setupr config and to expose a built JavaScript entrypoint through `main`, `exports`, `dist/index.js`, or `index.js`. Run `setupr plugin doctor` to see enabled plugins and load diagnostics.
+
 ### Wrong language/framework detected
 
 Override detection with a `.setupr.json` file:

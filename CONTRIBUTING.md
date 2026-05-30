@@ -71,6 +71,7 @@ Plugin packages should include:
 - a built entrypoint exposed through `main` or `exports`
 - deterministic failure behavior: invalid manifests should surface `PLUGIN_INVALID`, install/load failures should surface `PLUGIN_LOAD_FAILED`
 - extension points should return structured values and route shell work through the executor/safety layer
+- runtime plugins should be enabled through Setupr config; setup planners, doctor checks, panels, and commands receive a `SetuprPluginContext` with scan and project context
 
 ## Testing
 

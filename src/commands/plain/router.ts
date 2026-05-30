@@ -23,7 +23,7 @@ export async function runNonTUICommand(
     case "dashboard":
     case "status": {
       const { runPlainMode } = await import("../../cli/plain.js");
-      await runPlainMode(command, cwd, sub, { force: flags.force, json: Boolean(flags.json) });
+      await runPlainMode(command, cwd, sub, { force: flags.force, json: Boolean(flags.json), fix: Boolean(flags.fix), yes: Boolean(flags.yes), watch: Boolean(flags.watch) });
       break;
     }
     case "env":
@@ -196,13 +196,22 @@ export async function runNonTUICommand(
       await cmdTodo(cwd);
       break;
     }
-    default:
+    default: {
+      const { tryRunPluginCommand } = await import("../../plugins/runtime.js");
+      const handledByPlugin = await tryRunPluginCommand({
+        cwd,
+        command,
+        args: [sub, ...(flags.args || [])].filter((item): item is string => Boolean(item)),
+        log: (message) => console.log(chalk.dim(`Plugin: ${message}`)),
+      });
+      if (handledByPlugin) break;
       printPlainError(createSetuprError({
         code: "UNKNOWN_COMMAND",
         command,
         cwd,
         details: [`Received: ${command}`],
       }));
+    }
   }
 }
 

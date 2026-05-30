@@ -1,10 +1,11 @@
 import chalk from "chalk";
 import { existsSync } from "fs";
 import { readFile, writeFile, mkdir, rm } from "fs/promises";
-import { basename, join, resolve } from "path";
+import { basename, join, relative, resolve } from "path";
 import { createSetuprError, printPlainError } from "../../errors/index.js";
 import { loadConfig, saveConfig } from "../../state/config.js";
 import { runCommandArgs } from "../../executor/index.js";
+import { loadEnabledPlugins } from "../../plugins/runtime.js";
 
 interface PluginManifest {
   name: string;
@@ -99,13 +100,16 @@ async function pluginInstall(cwd: string, flags: { args?: string[]; force?: bool
     || name.endsWith(".git");
 
   try {
+    let pluginDir: string;
+    let registeredName = name;
     if (isGitSource) {
-      const pluginDir = join(pluginsDir, name.split("/").pop()?.replace(/\.git$/, "") || "plugin");
+      pluginDir = join(pluginsDir, name.split("/").pop()?.replace(/\.git$/, "") || "plugin");
       await runCommandArgs("git", ["clone", "--depth", "1", name, pluginDir], cwd);
+      registeredName = await readPluginPackageName(pluginDir).catch(() => basename(pluginDir));
       console.log(chalk.green(`✓ Installed plugin from ${name}`));
     } else {
       // npm-style install from registry
-      const pluginDir = join(pluginsDir, name.replace(/[\\/]/g, "__"));
+      pluginDir = join(pluginsDir, name.replace(/[\\/]/g, "__"));
       await mkdir(pluginDir, { recursive: true });
       const result = await runCommandArgs("npm", ["pack", name, "--pack-destination", pluginDir], cwd);
       if (result.exitCode !== 0) {
@@ -120,15 +124,21 @@ async function pluginInstall(cwd: string, flags: { args?: string[]; force?: bool
         );
         return;
       }
+      registeredName = name;
       console.log(chalk.green(`✓ Installed plugin: ${name}`));
     }
 
     // Register in config
     const config = await loadConfig();
     const plugins = config.plugins || [];
-    const existing = plugins.find((p) => p.name === name);
+    const existing = plugins.find((p) => p.name === registeredName);
     if (!existing) {
-      plugins.push({ name, version: "latest", enabled: true, source: isGitSource ? "git" : "npm" });
+      plugins.push({
+        name: registeredName,
+        version: "latest",
+        enabled: true,
+        source: relative(cwd, pluginDir),
+      });
       config.plugins = plugins;
       await saveConfig(config);
     }
@@ -143,6 +153,11 @@ async function pluginInstall(cwd: string, flags: { args?: string[]; force?: bool
       })
     );
   }
+}
+
+async function readPluginPackageName(pluginDir: string): Promise<string> {
+  const manifest = JSON.parse(await readFile(join(pluginDir, "package.json"), "utf-8")) as { name?: string };
+  return manifest.name || basename(pluginDir);
 }
 
 async function pluginRemove(cwd: string, flags: { args?: string[] }): Promise<void> {
@@ -402,6 +417,7 @@ async function pluginValidate(cwd: string, flags: { args?: string[] }): Promise<
 async function pluginDoctor(cwd: string): Promise<void> {
   const config = await loadConfig();
   const projectPluginDir = join(cwd, ".setupr", "plugins");
+  const runtime = await loadEnabledPlugins(cwd);
   console.log(chalk.blue.bold("\n  Plugin Developer Environment\n"));
   console.log(`  Project plugin dir: ${chalk.white(projectPluginDir)}`);
   console.log(`  Installed plugins:  ${chalk.white(String(config.plugins.length))}`);
@@ -409,6 +425,13 @@ async function pluginDoctor(cwd: string): Promise<void> {
   console.log(`  Scaffold command:   ${chalk.dim("setupr plugin create <name>")}`);
   console.log(`  Validate command:   ${chalk.dim("setupr plugin validate <path>")}`);
   console.log(`  Extension points:   ${chalk.dim("commands, scanners, planners, doctorChecks, fixers, panels")}`);
+  if (runtime.diagnostics.length) {
+    console.log(chalk.yellow("\n  Runtime Loading"));
+    for (const diagnostic of runtime.diagnostics) {
+      const marker = diagnostic.status === "loaded" ? chalk.green("✓") : diagnostic.status === "skipped" ? chalk.yellow("△") : chalk.red("✗");
+      console.log(`  ${marker} ${chalk.white(diagnostic.name)} ${chalk.dim(diagnostic.message)}`);
+    }
+  }
   console.log("");
 }
 

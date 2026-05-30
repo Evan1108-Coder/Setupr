@@ -95,6 +95,7 @@ const cli = meow(
       smart: { type: "boolean", default: false },
       dryRun: { type: "boolean", default: false },
       yes: { type: "boolean", default: false },
+      fix: { type: "boolean", default: false },
       verbose: { type: "boolean", default: false },
       quiet: { type: "boolean", default: false },
       watch: { type: "boolean", default: false },
@@ -161,7 +162,7 @@ async function runCommandPath(command: string, subCommand: string | undefined, c
       });
       if (!confirmed) return;
     }
-    await runPlainMode(command, cwd, subCommand, { force: cli.flags.force, json: cli.flags.json, watch: cli.flags.watch });
+    await runPlainMode(command, cwd, subCommand, { force: cli.flags.force, json: cli.flags.json, watch: cli.flags.watch, fix: cli.flags.fix, yes: cli.flags.yes });
   } else {
     const { runNonTUICommand } = await import("../commands/plain/router.js");
     await runNonTUICommand(command, subCommand, cwd, { ...cli.flags, args: cli.input.slice(2) });

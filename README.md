@@ -187,7 +187,7 @@ Setupr's AI layer is now a director runtime, not only a one-shot planner:
 - turns failures into structured diagnosis and safe re-planning decisions
 - shows plan diffs when chat steering changes the active plan
 - explains env vars, suggests safe local defaults where appropriate, and refuses to invent secrets
-- adds AI-style diagnosis and safe fix suggestions to doctor
+- adds AI-style diagnosis, plugin doctor checks, and safe fix suggestions to doctor
 - ranks start scripts using project context and warns about blockers before launching managed processes
 - writes agent workflow checkpoints to `.setupr/agent-workflow.json` so interrupted flows can resume with the same plan, prompt, answers, and safe output excerpts
 
@@ -311,9 +311,11 @@ setupr plugin validate .
 setupr plugin doctor
 ```
 
-Plugins are installed into the project-local `.setupr/plugins` area and registered in global Setupr config. `plugin create` scaffolds a package with a `setupr` manifest block and starter entrypoint; `plugin validate` checks package metadata and entrypoint shape before install/runtime loading.
+Plugins are installed into the project-local `.setupr/plugins` area and registered in global Setupr config. `plugin create` scaffolds a package with a `setupr` manifest block and starter entrypoint; `plugin validate` checks package metadata and entrypoint shape before install/runtime loading. Runtime loading only runs enabled plugins, and `setupr plugin doctor` reports load failures before they affect setup.
 
-Plugin extension points use structured objects and can add commands, scanners, planners, doctor checks, fixers, and TUI/dashboard panels. Plugin-proposed work still routes through Setupr's context, executor, and safety systems.
+Plugin extension points use structured objects and can add commands, scanners, planners, doctor checks, fixers, and TUI/dashboard panels. Planner extensions run during setup planning, doctor checks appear in `setupr doctor`, and plugin commands can be invoked from the plain CLI. Plugin-proposed work still routes through Setupr's context, executor, and safety systems.
+
+Doctor fixes are explicit. `setupr doctor --plain --fix` previews available safe fixes, and `setupr doctor --plain --fix --yes` applies only fixes that pass the central safety policy.
 
 ## Flags
 

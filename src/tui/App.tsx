@@ -18,6 +18,7 @@ import { fromUnknownError, errorSummary } from "../errors/index.js";
 import { deleteCheckpoint, formatCheckpointAge, loadCheckpoint } from "../state/checkpoint.js";
 import { loadAgentWorkflowCheckpoint, saveAgentWorkflowCheckpoint } from "../agent/workflowCheckpoint.js";
 import { analyzeEnvTemplate, createPostSetupSummary, formatEnvInsights } from "../agent/runtime.js";
+import { applyPluginPlanners } from "../plugins/runtime.js";
 import type { AgentPrompt, AgentPromptResponse, AppStore } from "../state/store.js";
 import {
   applyPlanTextAdjustment,
@@ -175,7 +176,27 @@ async function runSetupFlow(cwd: string, store: AppStore, options: { force: bool
 
     store.getState().addLog({ content: "Planning setup steps...", type: "info" });
     store.getState().addMessage({ role: "thinking", content: "Planning setup steps..." });
-    const steps = agentCheckpoint?.steps?.length ? agentCheckpoint.steps : await planSteps(scan, context);
+    let steps = agentCheckpoint?.steps?.length ? agentCheckpoint.steps : await planSteps(scan, context);
+    if (!agentCheckpoint?.steps?.length) {
+      const pluginPlanners = await applyPluginPlanners({
+        cwd,
+        scan,
+        projectContext: context,
+        steps,
+        log: (message) => store.getState().addLog({ content: `Plugin: ${message}`, type: "info" }),
+      });
+      steps = pluginPlanners.steps;
+      for (const diagnostic of pluginPlanners.diagnostics.filter((item) => item.status === "failed")) {
+        store.getState().addNotice({ type: "warning", message: `Plugin ${diagnostic.name}: ${diagnostic.message}` });
+      }
+      const applied = pluginPlanners.diagnostics.filter((item) => item.message === "Planner applied.");
+      if (applied.length) {
+        store.getState().addMessage({
+          role: "thinking",
+          content: `Applied plugin planners: ${applied.map((item) => item.name).join(", ")}.`,
+        });
+      }
+    }
     const planLevel = shouldUseAIPlanner(scan) && hasAIKeyCheck() ? "live" : "pattern";
     store.getState().setSteps(steps);
     await saveAgentWorkflowCheckpoint(cwd, {

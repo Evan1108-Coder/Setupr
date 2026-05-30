@@ -11,10 +11,14 @@ import { collectDashboardStatus } from "../status/collector.js";
 import { collectContext } from "../context/collector.js";
 import { analyzeEnvTemplate, createPostSetupSummary, doctorInsights, formatEnvInsights } from "../agent/runtime.js";
 import { deleteAgentWorkflowCheckpoint } from "../agent/workflowCheckpoint.js";
+import { applyPluginPlanners, runPluginDoctorChecks } from "../plugins/runtime.js";
+import { evaluateCommandSafety } from "../agent/safety.js";
 
 interface PlainOptions {
   force?: boolean;
+  fix?: boolean;
   json?: boolean;
+  yes?: boolean;
   watch?: boolean;
 }
 
@@ -28,7 +32,7 @@ export async function runPlainMode(command: string, cwd: string, sub?: string, o
       await plainStatus(cwd, command === "dashboard", options);
       break;
     case "doctor":
-      await plainDoctor(cwd);
+      await plainDoctor(cwd, options);
       break;
     case "start":
       await plainStart(cwd, sub, options);
@@ -124,7 +128,19 @@ async function plainSetup(cwd: string, options: PlainOptions = {}): Promise<void
     const context = await collectContext(cwd, scan);
     const planSpinner = ora("Planning setup steps...").start();
     steps = await planSteps(scan, context);
+    const pluginPlanners = await applyPluginPlanners({
+      cwd,
+      scan,
+      projectContext: context,
+      steps,
+      log: (message) => console.log(chalk.dim(`  Plugin: ${message}`)),
+    });
+    steps = pluginPlanners.steps;
     planSpinner.succeed(`${steps.length} steps planned`);
+    const appliedPlugins = pluginPlanners.diagnostics.filter((item) => item.message === "Planner applied.");
+    if (appliedPlugins.length) {
+      console.log(chalk.dim(`  Plugin planners: ${appliedPlugins.map((item) => item.name).join(", ")}`));
+    }
     const envInsights = analyzeEnvTemplate(context);
     if (envInsights.length) {
       console.log(chalk.dim("\n  Env intelligence"));
@@ -171,7 +187,7 @@ async function plainSetup(cwd: string, options: PlainOptions = {}): Promise<void
   }
 }
 
-async function plainDoctor(cwd: string): Promise<void> {
+async function plainDoctor(cwd: string, options: PlainOptions = {}): Promise<void> {
   const spinner = ora("Running diagnostics...").start();
   const scan = await scanProject(cwd);
   spinner.stop();
@@ -217,6 +233,12 @@ async function plainDoctor(cwd: string): Promise<void> {
   if (scan.services.length) console.log(chalk.dim(`  Services: ${scan.services.join(", ")}`));
   const context = await collectContext(cwd, scan);
   const insights = doctorInsights(context);
+  const pluginChecks = await runPluginDoctorChecks({
+    cwd,
+    scan,
+    projectContext: context,
+    log: (message) => console.log(chalk.dim(`  Plugin: ${message}`)),
+  });
   if (insights.length) {
     console.log(chalk.yellow.bold("\n  AI Director Diagnosis\n"));
     for (const insight of insights) {
@@ -226,6 +248,48 @@ async function plainDoctor(cwd: string): Promise<void> {
         console.log(chalk.dim(`    Fix: ${insight.fix.label}${insight.fix.command ? ` (${insight.fix.command})` : ""}${insight.fix.safe ? " [safe]" : ""}`));
       }
     }
+  }
+  if (pluginChecks.length) {
+    console.log(chalk.yellow.bold("\n  Plugin Checks\n"));
+    for (const check of pluginChecks) {
+      const marker = check.status === "pass" ? chalk.green("✓") : check.status === "warn" ? chalk.yellow("△") : chalk.red("✗");
+      console.log(`  ${marker} ${chalk.white(`${check.plugin}:${check.check}`)} — ${chalk.dim(check.message)}`);
+      if (check.fix) console.log(chalk.dim(`    Fix: ${check.fix.label}${check.fix.command ? ` (${check.fix.command})` : ""}`));
+    }
+  }
+
+  const fixCommands = [
+    ...insights
+      .filter((insight) => insight.fix?.safe && insight.fix.command)
+      .map((insight) => ({ label: insight.fix!.label, command: insight.fix!.command!, source: insight.issue })),
+    ...pluginChecks
+      .filter((check) => check.fix?.command)
+      .map((check) => ({ label: check.fix!.label, command: check.fix!.command!, source: `${check.plugin}:${check.check}` })),
+  ];
+  if (options.fix && fixCommands.length === 0) {
+    console.log(chalk.green("\n  No safe doctor fixes are available.\n"));
+  } else if (options.fix && !options.yes && !options.force) {
+    console.log(chalk.yellow("\n  Safe fixes are available, but were not run."));
+    console.log(chalk.dim("  Re-run with: setupr doctor --plain --fix --yes"));
+    for (const fix of fixCommands) console.log(chalk.dim(`  • ${fix.label}: ${fix.command}`));
+    console.log("");
+  } else if (options.fix) {
+    console.log(chalk.yellow.bold("\n  Applying Safe Fixes\n"));
+    for (const fix of fixCommands) {
+      const safety = evaluateCommandSafety(fix.command);
+      if (safety.decision === "block") {
+        console.log(chalk.red(`  ✗ Blocked ${fix.label}: ${safety.reasons.join("; ") || "blocked by safety policy"}`));
+        continue;
+      }
+      const result = await runCommand(fix.command, cwd);
+      if (result.exitCode === 0) {
+        console.log(chalk.green(`  ✓ ${fix.label}`));
+      } else {
+        console.log(chalk.red(`  ✗ ${fix.label}`));
+        if (result.stderr.trim()) console.log(chalk.dim(`    ${result.stderr.trim().slice(0, 300)}`));
+      }
+    }
+    console.log("");
   }
 }
 
