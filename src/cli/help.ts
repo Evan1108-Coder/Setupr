@@ -99,18 +99,20 @@ const HELP_NODES: Record<string, HelpNode> = {
   },
   env: {
     name: "env",
-    summary: "Manage the project .env file from .env.example.",
-    usage: "setup env <init|check|sync|smart> [--force]",
+    summary: "Open the .env editor TUI or manage the project .env file from .env.example.",
+    usage: "setup env [init|check|sync|smart] [--force|--plain]",
     commands: [
+      { name: "(no subcommand)", summary: "Open the interactive .env editor TUI. Creates .env from .env.example after confirmation when needed." },
       { name: "init", summary: "Create .env from .env.example. Without .env.example, requires --force to create empty .env." },
       { name: "check", summary: "Report missing values required by .env.example." },
       { name: "sync", summary: "Reorder/update .env structure from .env.example while preserving values." },
       { name: "smart", summary: "Analyze missing, empty, invalid, extra, and changed env values." },
     ],
     options: [
+      { name: "--plain, --no-tui", summary: "Show a non-interactive env summary/error instead of the editor." },
       { name: "--force", summary: "With init, overwrite existing .env or create empty .env when no .env.example exists." },
     ],
-    examples: ["setup env init", "setup env init --force", "setup env check", "setup env smart"],
+    examples: ["setup env", "setup env --force", "setup env init", "setup env init --force", "setup env check", "setup env smart"],
   },
   clean: {
     name: "clean",

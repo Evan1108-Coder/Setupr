@@ -73,6 +73,9 @@ Setupr detects required environment variables by:
 ### Commands
 
 ```bash
+# Open the interactive .env editor TUI
+setup env
+
 # Create .env from .env.example
 setup env init
 
@@ -89,6 +92,15 @@ setup env sync
 # Smart analysis: detect issues + interactive fix
 setup env smart
 ```
+
+### `env` Editor Behavior
+
+- `setup env` opens a TUI editor for the local `.env`
+- if `.env` is missing but `.env.example` exists, Setupr asks before creating `.env` from the template
+- if both `.env` and `.env.example` are missing, Setupr returns `ENV_TEMPLATE_MISSING`
+- `setup env --force` creates an empty `.env` when no template exists and explains that no variables were inferred
+- the editor accepts normal value edits and pasted `KEY=value` lines
+- sensitive keys such as API keys, tokens, secrets, and passwords are masked in the editor input
 
 ### `env smart` Behavior
 

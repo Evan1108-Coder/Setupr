@@ -179,6 +179,8 @@ Setupr creates `.env` from `.env.example` when a template is present. If `.env` 
 setup env init --force
 ```
 
+Bare `setup env` opens the editor TUI. If `.env` is missing and `.env.example` exists, Setupr asks before creating `.env` from the template. If no template exists, it returns `ENV_TEMPLATE_MISSING`; use `setup env --force` only when you intentionally want an empty `.env`.
+
 ### Port conflicts
 
 Use the port command to check:

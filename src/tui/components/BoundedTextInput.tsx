@@ -83,11 +83,12 @@ export function BoundedTextInput({
     }
 
     const cleanInput = stripTerminalControlInput(input).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    if (!cleanInput && !key.return && !key.backspace && !key.delete && !key.leftArrow && !key.rightArrow) {
+    const returnOnly = key.return || input === "\r" || input === "\n" || cleanInput === "\n";
+    if (!cleanInput && !returnOnly && !key.backspace && !key.delete && !key.leftArrow && !key.rightArrow) {
       return;
     }
 
-    if (key.return) {
+    if (returnOnly) {
       onSubmit(value, { steer: Boolean(key.ctrl) });
       return;
     }

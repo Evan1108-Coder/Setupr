@@ -19,6 +19,7 @@ export const ERROR_CATALOG: Record<SetuprErrorCode, Template> = {
   MISSING_RUNTIME: runtime("Runtime missing", "The project runtime is not installed or not available on PATH.", ["Install the runtime and rerun doctor/setup."]),
 
   ENV_TEMPLATE_MISSING: env("No .env.example found", "Setupr cannot infer the app's environment variables without a template.", ["Create .env.example, or rerun with --force to create an empty .env."]),
+  ENV_FILE_MISSING: env("No .env file found", "Setupr found an environment template, but there is no editable .env file yet.", ["Run setup env init, or run setup env and confirm creation from .env.example."]),
   ENV_ALREADY_EXISTS: envWarn("Existing .env left unchanged", ".env already exists, so Setupr did not overwrite it.", ["Use --force if you intentionally want to overwrite it."]),
   ENV_SYNC_FAILED: env("Env sync failed", "Setupr could not sync .env with .env.example.", ["Check file permissions and .env.example syntax."]),
   ENV_CHECK_FAILED: env("Env check failed", "Setupr found missing or empty environment values.", ["Fill the missing values in .env."]),

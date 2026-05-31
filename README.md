@@ -314,6 +314,9 @@ All command-like actions from setup, doctor, start, plugins, and AI steering pas
 ### Environment Management
 
 ```bash
+# Open the interactive .env editor TUI
+setup env
+
 # Create .env from .env.example
 setup env init
 
@@ -330,6 +333,8 @@ setup env sync
 # Smart reorganize + auto-fill
 setup env smart
 ```
+
+Bare `setup env` opens the env editor. If `.env` exists, it opens directly. If only `.env.example` exists, Setupr asks before creating `.env` from the template. If neither file exists, it stops with `ENV_TEMPLATE_MISSING`; `setup env --force` creates an empty `.env` and explains that no variables were inferred.
 
 ### Checkpoint & Resume
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { findDirectionalFocusItem, type FocusItem } from "../src/tui/hooks/useFocusNavigation.js";
 import { parseSgrMouse, stripTerminalControlInput } from "../src/tui/terminalInput.js";
 import { buildChatFocusItems, buildChatLayout } from "../src/tui/layouts/ChatLayout.js";
+import { buildEnvFocusItems, buildEnvLayout } from "../src/tui/layouts/EnvLayout.js";
 
 const wideSetupItems: FocusItem[] = [
   { id: "steps", row: 0, column: 0, bounds: { x: 1, y: 2, width: 20, height: 6 } },
@@ -47,6 +48,30 @@ describe("TUI focus navigation", () => {
   it("uses a stacked chat layout on narrow terminals without overflowing height", () => {
     const layout = buildChatLayout(70, 20);
     const items = buildChatFocusItems(layout);
+    const maxBottom = Math.max(...items.map((item) => (item.bounds?.y || 0) + (item.bounds?.height || 0)));
+
+    expect(layout.stacked).toBe(true);
+    expect(layout.inputMaxLines).toBeGreaterThanOrEqual(1);
+    expect(maxBottom).toBeLessThanOrEqual(layout.height + 2);
+  });
+
+  it("keeps env editor input bottom-anchored and navigable", () => {
+    const layout = buildEnvLayout(120, 32);
+    const items = buildEnvFocusItems(layout);
+    const vars = items.find((item) => item.id === "vars");
+    const editor = items.find((item) => item.id === "editor");
+    const input = items.find((item) => item.id === "input");
+
+    expect(layout.stacked).toBe(false);
+    expect(input?.parentIds).toContain("editor");
+    expect(input?.bounds?.y).toBeGreaterThan(20);
+    expect(findDirectionalFocusItem(items, vars!, "right", ["vars"])?.id).toBe("details");
+    expect(findDirectionalFocusItem(items, editor!, "left", ["editor", "input"])?.id).toBe("vars");
+  });
+
+  it("uses a stacked env editor layout on narrow terminals without overflowing height", () => {
+    const layout = buildEnvLayout(72, 22);
+    const items = buildEnvFocusItems(layout);
     const maxBottom = Math.max(...items.map((item) => (item.bounds?.y || 0) + (item.bounds?.height || 0)));
 
     expect(layout.stacked).toBe(true);

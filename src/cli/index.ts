@@ -1,5 +1,5 @@
 import meow from "meow";
-import { resolve } from "path";
+import { join, resolve } from "path";
 import { showPreWarning } from "./preWarning.js";
 import { showTransition } from "./transition.js";
 import { launchTUI } from "./launcher.js";
@@ -10,6 +10,7 @@ import { createSetuprError, printPlainError } from "../errors/index.js";
 import { knownCommandNames, noSubcommandNames, tuiCommandNames } from "./commandRegistry.js";
 import { runSupervisorFromCli } from "../processes/manager.js";
 import { createProjectEngine, type ProjectEngine } from "../core/engine.js";
+import { fileExists, initEnvFile } from "../env/index.js";
 
 const cli = meow(
   `
@@ -24,7 +25,7 @@ const cli = meow(
     update      Check for dependency updates
     clean       Remove artifacts (--deps, --share, --all)
 
-    env         Manage .env files (init, check, sync, smart)
+    env         Open .env editor or manage files (init, check, sync, smart)
     auth        Manage AI provider API keys and models
     info        Show project summary
     list        List available scripts/commands
@@ -77,6 +78,7 @@ const cli = meow(
     $ setup
     $ setup doctor
     $ setup auth login
+    $ setup env
     $ setup env smart
     $ setup chat how do I start this app?
     $ setup release publish-check
@@ -162,8 +164,17 @@ export async function run() {
 async function runCommandPath(command: string, subCommand: string | undefined, cwd: string, isPlain: boolean, isBareAuth: boolean): Promise<void> {
   const tuiCommands = tuiCommandNames();
   const isAuthSubcommand = command === "auth" && Boolean(subCommand);
+  const isBareEnv = command === "env" && !subCommand;
+  const isEnvSubcommand = command === "env" && Boolean(subCommand);
 
-  if ((tuiCommands.has(command) || isBareAuth) && !isPlain && !isAuthSubcommand) {
+  if (isBareEnv && !isPlain) {
+    const ready = await prepareEnvEditor(cwd, Boolean(cli.flags.force));
+    if (!ready) return;
+    await withInteractiveScreen(async () => {
+      await showTransition(command);
+      await launchTUI("env", cwd, { force: cli.flags.force });
+    }, { title: "Setupr env" });
+  } else if ((tuiCommands.has(command) || isBareAuth) && !isPlain && !isAuthSubcommand && !isEnvSubcommand) {
     const confirmed = await showPreWarning(command, cwd, cli.flags.force, subCommand);
     if (!confirmed) return;
 
@@ -177,13 +188,18 @@ async function runCommandPath(command: string, subCommand: string | undefined, c
         chatResume: Boolean(cli.flags.resume || (command === "chat" && subCommand === "resume")),
       });
     }, { title: `Setupr ${command}` });
-  } else if ((tuiCommands.has(command) || isBareAuth) && isPlain && !isAuthSubcommand) {
+  } else if ((tuiCommands.has(command) || isBareAuth) && isPlain && !isAuthSubcommand && !isEnvSubcommand) {
     if (command === "auth") {
       const { runNonTUICommand } = await import("../commands/plain/router.js");
       await runNonTUICommand(command, subCommand, cwd, { ...cli.flags, args: cli.input.slice(2) });
       return;
     }
     if (command === "chat") {
+      const { runNonTUICommand } = await import("../commands/plain/router.js");
+      await runNonTUICommand(command, subCommand, cwd, { ...cli.flags, args: cli.input.slice(2) });
+      return;
+    }
+    if (command === "env") {
       const { runNonTUICommand } = await import("../commands/plain/router.js");
       await runNonTUICommand(command, subCommand, cwd, { ...cli.flags, args: cli.input.slice(2) });
       return;
@@ -200,6 +216,98 @@ async function runCommandPath(command: string, subCommand: string | undefined, c
     const { runNonTUICommand } = await import("../commands/plain/router.js");
     await runNonTUICommand(command, subCommand, cwd, { ...cli.flags, args: cli.input.slice(2) });
   }
+}
+
+async function prepareEnvEditor(cwd: string, force: boolean): Promise<boolean> {
+  const envPath = join(cwd, ".env");
+  const examplePath = join(cwd, ".env.example");
+  const hasEnv = await fileExists(envPath);
+  const hasExample = await fileExists(examplePath);
+
+  if (hasEnv) return true;
+
+  if (hasExample) {
+    if (!force) {
+      console.log("");
+      console.log("  Setupr env");
+      console.log("  .env is missing. Setupr can create it from .env.example before opening the editor.");
+      console.log("");
+      console.log("  Press Enter to create .env and continue, Ctrl+C to cancel...");
+      const confirmed = await waitForEnterBeforeEnv();
+      if (!confirmed) return false;
+    }
+    try {
+      await initEnvFile(cwd);
+      console.log("  Created .env from .env.example.");
+      return true;
+    } catch (err) {
+      printPlainError(createSetuprError({
+        code: "ENV_WRITE_FAILED",
+        command: "env",
+        cwd,
+        details: [err instanceof Error ? err.message : String(err)],
+      }));
+      return false;
+    }
+  }
+
+  if (force) {
+    try {
+      await initEnvFile(cwd, { overwrite: true });
+      console.log("");
+      console.log("  Created empty .env because --force was used and no .env.example was found.");
+      console.log("  No required variables could be inferred. Paste KEY=value lines in the editor.");
+      return true;
+    } catch (err) {
+      printPlainError(createSetuprError({
+        code: "ENV_WRITE_FAILED",
+        command: "env",
+        cwd,
+        details: [err instanceof Error ? err.message : String(err)],
+      }));
+      return false;
+    }
+  }
+
+  printPlainError(createSetuprError({
+    code: "ENV_TEMPLATE_MISSING",
+    command: "env",
+    cwd,
+    forceBehavior: "With --force, Setupr creates an empty .env and opens the editor, but no variables are inferred.",
+  }));
+  return false;
+}
+
+function waitForEnterBeforeEnv(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!process.stdin.isTTY || typeof process.stdin.setRawMode !== "function") {
+      printPlainError(createSetuprError({
+        code: "NON_INTERACTIVE_CONFIRMATION_REQUIRED",
+        command: "env",
+        forceBehavior: "Pass --force to create .env without an interactive confirmation.",
+      }));
+      resolve(false);
+      return;
+    }
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.once("data", (data) => {
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+      const key = data.toString();
+      if (key === "\x03") {
+        printPlainError(createSetuprError({
+          code: "COMMAND_ABORTED",
+          command: "env",
+          details: ["Cancelled before opening the env editor."],
+          exitCode: 130,
+        }));
+        resolve(false);
+        return;
+      }
+      resolve(true);
+    });
+  });
 }
 
 function chatInitialMessage(subCommand: string | undefined): string | undefined {

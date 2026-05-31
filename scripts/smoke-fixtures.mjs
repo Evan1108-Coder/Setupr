@@ -24,6 +24,7 @@ function createFixtures() {
   dir("malformed-pkg");
   dir("malformed-config");
   dir("env-missing");
+  dir("env-tui-force");
   dir("env-bad");
   dir("no-project");
   dir("js-failing");
@@ -122,7 +123,9 @@ function plainSmoke() {
   expectRun("malformed package", "malformed-pkg", ["info", "--plain"], ["MALFORMED_PROJECT_FILE", "package.json"]);
   expectRun("malformed setupr config", "malformed-config", ["info", "--plain"], ["PROJECT_CONFIG_INVALID", ".setupr.json"]);
   expectRun("missing env template", "env-missing", ["env", "init", "--plain"], ["ENV_TEMPLATE_MISSING"]);
+  expectRun("bare env missing template", "env-missing", ["env", "--plain"], ["ENV_TEMPLATE_MISSING"]);
   expectRun("forced empty env", "env-missing", ["env", "init", "--plain", "--force"], ["Created empty .env"]);
+  expectRun("bare env missing file", "js-new", ["env", "--plain"], ["ENV_FILE_MISSING"]);
   expectRun("bad env smart", "env-bad", ["env", "smart", "--plain"], ["ENV_SMART_FAILED", "4 issues"]);
   expectRun("corrupt auth storage", "no-project", ["auth", "status", "--plain"], ["AUTH_STORAGE_INVALID"], {
     env: { HOME: join(temp, "corrupt-home") },
@@ -197,6 +200,36 @@ function tuiSmoke() {
       skipped: "pseudo-terminal capture unavailable here; run manual iTerm2/Ghostty visual QA",
     });
   }
+
+  const envExpectFile = join(temp, "tui-env.expect");
+  writeFileSync(envExpectFile, [
+    "set timeout 10",
+    "set node [lindex $argv 0]",
+    "set cli [lindex $argv 1]",
+    "set cwd [lindex $argv 2]",
+    "cd $cwd",
+    "set env(COLUMNS) 100",
+    "set env(LINES) 28",
+    "spawn $node $cli env --force",
+    "after 500",
+    "send \"API_KEY=smoke-value\\r\"",
+    "after 1200",
+    "send \"\\003\"",
+    "expect eof",
+    "",
+  ].join("\n"));
+  const envResult = spawnSync("expect", [envExpectFile, process.execPath, cli, join(temp, "env-tui-force")], {
+    encoding: "utf8",
+    timeout: 12_000,
+  });
+  const envOutput = `${envResult.stdout || ""}\n${envResult.stderr || ""}`;
+  const envFile = join(temp, "env-tui-force", ".env");
+  const envOk = fileExists(envFile) && envOutput.includes("Setupr Env");
+  results.push({
+    name: "tui env editor capture",
+    ok: envOk,
+    details: envOk ? "opened editor and created .env" : `env editor did not complete\n${trim(envOutput)}`,
+  });
 }
 
 function expectRun(name, fixture, args, expected, options = {}) {

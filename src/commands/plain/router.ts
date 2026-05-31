@@ -4,7 +4,7 @@ import { runCommand } from "../../executor/index.js";
 import { existsSync } from "fs";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
-import { initEnvFile, normalizeEnvKey, parseEnvKeys, parseEnvPairs } from "../../env/index.js";
+import { fileExists, initEnvFile, normalizeEnvKey, parseEnvKeys, parseEnvPairs } from "../../env/index.js";
 import { createSetuprError, printPlainError, classifyCommandFailure } from "../../errors/index.js";
 import { runProjectCommandOperation } from "../../core/operations.js";
 
@@ -259,6 +259,45 @@ async function cmdEnv(sub: string | undefined, cwd: string, flags: Flags) {
   const examplePath = join(cwd, ".env.example");
 
   switch (sub) {
+    case undefined: {
+      const hasEnv = await fileExists(envPath);
+      const hasExample = await fileExists(examplePath);
+      if (!hasEnv && !hasExample) {
+        printPlainError(createSetuprError({
+          code: "ENV_TEMPLATE_MISSING",
+          command: "env",
+          cwd,
+          forceBehavior: "Interactive env editor mode can create an empty .env with --force, but no variables are inferred.",
+        }));
+        return;
+      }
+      if (!hasEnv && hasExample) {
+        printPlainError(createSetuprError({
+          code: "ENV_FILE_MISSING",
+          command: "env",
+          cwd,
+          details: [".env.example exists, but .env has not been created yet."],
+          recovery: [{ kind: "run-command", label: "Create .env from template", command: "setup env init" }],
+          canContinue: false,
+        }));
+        return;
+      }
+      const env = await readFile(envPath, "utf-8").catch(() => "");
+      const example = await readFile(examplePath, "utf-8").catch(() => "");
+      const currentKeys = parseEnvKeys(env);
+      const requiredKeys = parseEnvKeys(example);
+      const currentPairs = parseEnvPairs(env);
+      const missing = requiredKeys.filter((key) => !currentKeys.includes(key) || !currentPairs[key]?.trim());
+      console.log(chalk.blue.bold("\n  Setupr Env\n"));
+      console.log(`  .env:          ${chalk.green("present")}`);
+      console.log(`  .env.example:  ${hasExample ? chalk.green("present") : chalk.yellow("missing")}`);
+      console.log(`  Values:        ${chalk.white(currentKeys.length)}`);
+      if (requiredKeys.length) console.log(`  Required:      ${chalk.white(requiredKeys.length)}`);
+      if (missing.length) console.log(`  Missing:       ${chalk.yellow(missing.join(", "))}`);
+      console.log("");
+      console.log(chalk.dim("  Run setup env in an interactive terminal to open the editor TUI."));
+      break;
+    }
     case "init": {
       let result;
       try {
