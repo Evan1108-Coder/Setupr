@@ -132,6 +132,22 @@ describe("AI director", () => {
     expect(env.P_SETUP_AI_MODEL).toBe("gpt-4o-mini");
   });
 
+  it("asks for clarification when a model change is ambiguous", async () => {
+    const store = createAppStore(tempDir);
+
+    const result = await handleDirectorInput({
+      text: "change model",
+      cwd: tempDir,
+      scan,
+      contextDSL: "js/react/npm",
+      store,
+    });
+
+    expect(result.action).toBe("model.clarify");
+    expect(store.getState().pendingPrompt?.id).toBe("director-ambiguous-model");
+    expect(store.getState().messages.at(-1)?.content).toContain("Which model should change");
+  });
+
   it("can adjust the setup plan instead of only answering text", async () => {
     const store = createAppStore(tempDir);
     store.getState().setSteps([

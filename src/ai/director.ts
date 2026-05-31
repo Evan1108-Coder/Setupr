@@ -96,7 +96,10 @@ async function maybeHandleModelIntent(input: DirectorInput, text: string): Promi
   if (!hasModelIntentSignal(text)) return null;
 
   const requested = extractRequestedModel(text);
-  if (!requested) return null;
+  if (!requested) {
+    if (isAmbiguousModelChange(text)) return askWhichModelToChange(input);
+    return null;
+  }
 
   const model = findModelForRequest(requested);
   if (!model) {
@@ -279,6 +282,31 @@ function hasModelIntentSignal(text: string): boolean {
     lower.includes(model.id.toLowerCase()) ||
     lower.includes(model.name.toLowerCase())
   );
+}
+
+function isAmbiguousModelChange(text: string): boolean {
+  return /\b(?:change|switch|set|use)\b.{0,24}\bmodel\b|\bmodel\b.{0,24}\b(?:change|switch|set|use)\b/i.test(text);
+}
+
+function askWhichModelToChange(input: DirectorInput): DirectorResult {
+  input.store.getState().setPendingPrompt({
+    id: "director-ambiguous-model",
+    type: "choice",
+    title: "Which model should change?",
+    message: "“Model” can mean Setupr's AI model, an app config/env value, or a code/schema model.",
+    options: [
+      { id: "setupr-ai-model", label: "Setupr AI model" },
+      { id: "project-model", label: "Project code/config model" },
+    ],
+    includeOther: true,
+    otherLabel: "Other...",
+    createdAt: Date.now(),
+  });
+  input.store.getState().addMessage({
+    role: "assistant",
+    content: "Which model should change: Setupr's AI model, a project config/env model, or a code/schema model?",
+  });
+  return { handled: true, action: "model.clarify" };
 }
 
 function cleanModelToken(token: string): string {
