@@ -19,6 +19,8 @@ describe("help routing", () => {
 
     expect(showHelp(["auth"])).toBe(true);
     expect(showHelp(["chat"])).toBe(true);
+    expect(showHelp(["scaffold"])).toBe(true);
+    expect(showHelp(["explain"])).toBe(true);
     expect(showHelp(["auth", "set-key"])).toBe(true);
 	    expect(showHelp(["git"])).toBe(true);
 	    expect(showHelp(["docker"])).toBe(true);
@@ -57,9 +59,12 @@ describe("help routing", () => {
       "plugin",
       "lint",
       "format",
-      "scaffold",
     ]) {
       expect(output).toContain(command);
     }
+    expect(output).not.toContain("scaffold");
+    expect(output).not.toContain("explain <file>");
+    expect(output).not.toContain("refactor <file>");
+    expect(output).not.toContain("todo");
   });
 });

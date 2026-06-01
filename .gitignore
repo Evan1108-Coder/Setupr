@@ -1,11 +1,20 @@
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
+!.env.template
 .env.local
 *.tgz
+.npmrc
+*.pem
+*.key
+*.p12
+*.crt
 .DS_Store
 coverage/
 .setupr/
+.p-setup/
 
 # Local visual smoke-test artifacts
 tui-screenshots/

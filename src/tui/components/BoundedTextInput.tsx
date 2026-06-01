@@ -187,11 +187,14 @@ function shortcutFromInput(input: string, key: { ctrl?: boolean; meta?: boolean;
     if (input === "w" || input === "\x17") return "delete-word-before";
     if (input === "d" || input === "\x04") return "delete-forward";
   }
+  if (input === "\x1b[H" || input === "\x1bOH") return "start";
+  if (input === "\x1b[F" || input === "\x1bOF") return "end";
   if (input === "\x17") return "delete-word-before";
-  if (input === "\x1bb" || input === "\x1b[1;3D" || input === "\x1b[1;9D") return "word-left";
-  if (input === "\x1bf" || input === "\x1b[1;3C" || input === "\x1b[1;9C") return "word-right";
-  if (input === "\x1b\x7f" || input === "\x1b\b" || input === "\x1b[3;3~") return "delete-word-before";
-  if (input === "\x1b[3~" && key.delete) return "delete-forward";
+  if (input === "\x1bb" || input === "\x1b[1;3D" || input === "\x1b[1;5D" || input === "\x1b[1;9D" || input === "\x1b[5D") return "word-left";
+  if (input === "\x1bf" || input === "\x1b[1;3C" || input === "\x1b[1;5C" || input === "\x1b[1;9C" || input === "\x1b[5C") return "word-right";
+  if (input === "\x1b\x7f" || input === "\x1b\b" || input === "\x1b[3;3~" || input === "\x1b[3;5~") return "delete-word-before";
+  if (input === "\x1bd" || input === "\x1b[3;2~" || input === "\x1b[3;6~") return "delete-word-after";
+  if (input === "\x1b[3~" || (input === "\x04" && key.ctrl) || key.delete) return "delete-forward";
   return null;
 }
 

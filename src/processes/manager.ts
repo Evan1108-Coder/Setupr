@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
 import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
@@ -166,11 +166,9 @@ function runChild(command: string, cwd: string, logFile: string): Promise<number
   return new Promise((resolve) => {
     const env = { ...process.env };
     if (!env.NO_COLOR) env.FORCE_COLOR = "1";
-    const child = spawn(command, { cwd, shell: true, env });
+    const child = spawn(command, { cwd, shell: true, env, detached: process.platform !== "win32" });
     const stopChild = () => {
-      try {
-        child.kill("SIGTERM");
-      } catch {}
+      terminateProcessTree(child);
     };
     process.once("SIGTERM", stopChild);
     process.once("SIGINT", stopChild);
@@ -187,6 +185,29 @@ function runChild(command: string, cwd: string, logFile: string): Promise<number
       resolve(1);
     });
   });
+}
+
+function terminateProcessTree(proc: ChildProcess): void {
+  if (!proc.pid) return;
+  if (process.platform === "win32") {
+    try {
+      spawn("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+    } catch {
+      try { proc.kill("SIGTERM"); } catch {}
+    }
+    return;
+  }
+
+  try {
+    process.kill(-proc.pid, "SIGTERM");
+  } catch {
+    try { proc.kill("SIGTERM"); } catch {}
+  }
+
+  const forceKill = setTimeout(() => {
+    try { process.kill(-proc.pid!, "SIGKILL"); } catch {}
+  }, 1500);
+  forceKill.unref?.();
 }
 
 async function resolveStartCommand(cwd: string, target?: string): Promise<string> {

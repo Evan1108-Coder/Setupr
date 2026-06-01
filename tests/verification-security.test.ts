@@ -63,6 +63,22 @@ describe("verification and security command groups", () => {
     expect(process.exitCode).toBe(1);
   });
 
+  it("bounds watch-mode verification so it does not hang forever", async () => {
+    await writeFile(join(tempDir, "package.json"), JSON.stringify({
+      scripts: {
+        "test:watch": "node -e \"setInterval(() => console.log('watch alive'), 100)\"",
+      },
+    }));
+
+    const started = Date.now();
+    const report = await runVerificationCommand(tempDir, "watch", { timeout: 1 });
+
+    expect(Date.now() - started).toBeLessThan(3000);
+    expect(report?.status).toBe("warn");
+    expect(report?.checks[0]?.detail).toContain("watch command stayed alive");
+    expect(process.exitCode).toBeUndefined();
+  });
+
   it("detects defensive security findings, supports ignore, and updates dashboard health", async () => {
     await writeFile(join(tempDir, "package.json"), JSON.stringify({ dependencies: { request: "*" } }, null, 2));
     await writeFile(join(tempDir, ".env.example"), "NEXT_PUBLIC_SECRET_TOKEN=\nDATABASE_URL=\n");

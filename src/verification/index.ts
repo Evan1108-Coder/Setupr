@@ -31,7 +31,14 @@ export interface VerificationOptions {
   yes?: boolean;
   force?: boolean;
   report?: string;
+  timeout?: number;
   args?: string[];
+}
+
+interface ReportRunOptions {
+  timeoutMs?: number;
+  timeoutStatus?: VerificationStatus;
+  timeoutDetail?: string;
 }
 
 const TEST_RUNS_FILE = "test-runs.json" as const;
@@ -61,8 +68,14 @@ export async function runVerificationCommand(
     case "integration":
     case "e2e":
       return runNamedTest(cwd, scan, target, options);
-    case "watch":
-      return runReport(cwd, scan, "watch", [watchCommand(scan)].filter(Boolean) as string[], options);
+    case "watch": {
+      const timeoutSeconds = options.timeout && options.timeout > 0 ? options.timeout : 12;
+      return runReport(cwd, scan, "watch", [watchCommand(scan)].filter(Boolean) as string[], options, undefined, {
+        timeoutMs: timeoutSeconds * 1000,
+        timeoutStatus: "warn",
+        timeoutDetail: `watch command stayed alive for ${timeoutSeconds}s, so Setupr stopped it and treated that as a successful watch readiness check.`,
+      });
+    }
     case "coverage":
       return runReport(cwd, scan, "coverage", [coverageCommand(scan)].filter(Boolean) as string[], options);
     case "changed":
@@ -294,7 +307,7 @@ async function runSecurityDelegation(cwd: string, options: VerificationOptions):
   return emptyReport(cwd, "security", "Delegated to setupr security scan.", options);
 }
 
-async function runReport(cwd: string, scan: ScanResult, commandName: string, commands: string[], options: VerificationOptions, fallbackDetail?: string): Promise<VerificationReport> {
+async function runReport(cwd: string, scan: ScanResult, commandName: string, commands: string[], options: VerificationOptions, fallbackDetail?: string, runOptions: ReportRunOptions = {}): Promise<VerificationReport> {
   const checks: VerificationCheck[] = [];
   if (!commands.length) {
     checks.push({ id: "missing", label: "Verification command", status: "warn", detail: fallbackDetail || "No verification command detected." });
@@ -303,15 +316,21 @@ async function runReport(cwd: string, scan: ScanResult, commandName: string, com
     const started = Date.now();
     const result = await runCommand(command, cwd, (line) => {
       if (!options.json) console.log(line);
-    });
+    }, undefined, { timeoutMs: runOptions.timeoutMs });
+    const timedOut = Boolean(result.timedOut);
+    const status: VerificationStatus = result.exitCode === 0
+      ? "pass"
+      : timedOut && runOptions.timeoutStatus
+        ? runOptions.timeoutStatus
+        : "fail";
     checks.push({
       id: command,
       label: command,
       command,
-      status: result.exitCode === 0 ? "pass" : "fail",
+      status,
       durationMs: Date.now() - started,
       output: `${result.stdout}\n${result.stderr}`.trim().slice(-4000),
-      detail: result.exitCode === 0 ? "passed" : `exit ${result.exitCode}`,
+      detail: timedOut && runOptions.timeoutDetail ? runOptions.timeoutDetail : result.exitCode === 0 ? "passed" : `exit ${result.exitCode}`,
     });
   }
   return finalizeReport(cwd, { type: "verification", command: commandName, cwd, createdAt: Date.now(), status: statusFromChecks(checks), checks }, options);

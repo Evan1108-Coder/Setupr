@@ -198,36 +198,43 @@ async function authTest(provider?: string): Promise<void> {
   const providers = provider ? [provider] : AUTH_PROVIDERS;
   console.log(chalk.blue.bold("\n  Setupr Auth Test\n"));
   console.log(chalk.dim("  Sends tiny requests to configured providers; raw keys are never printed.\n"));
-  let failures = 0;
-  for (const name of providers) {
+  const results = await Promise.all(providers.map(async (name) => {
     const resolved = requireProvider(name, false);
     if (!resolved) {
-      console.log(chalk.red(`  ✗ Unknown provider: ${name}`));
-      failures++;
-      continue;
+      return { failure: true, lines: [chalk.red(`  ✗ Unknown provider: ${name}`)] };
     }
     const model = preferredTestModel(resolved);
     if (!getProviderEnvValue(resolved)) {
-      console.log(`  ${chalk.dim("○")} ${PROVIDER_LABELS[resolved].padEnd(15)} ${chalk.dim("missing API key")}`);
-      continue;
+      return { failure: false, lines: [`  ${chalk.dim("○")} ${PROVIDER_LABELS[resolved].padEnd(15)} ${chalk.dim("missing API key")}`] };
     }
     try {
-      const previous = process.env.P_SETUP_AI_MODEL;
-      process.env.P_SETUP_AI_MODEL = model.id;
       const started = Date.now();
-      const result = await chatWithModelRestore(previous, model.id);
-      console.log(`  ${chalk.green("✓")} ${PROVIDER_LABELS[resolved].padEnd(15)} ${model.id} ${chalk.dim(`${Date.now() - started}ms, ${result.tokens} tokens`)}`);
+      const timeoutMs = authTestTimeoutMs(resolved);
+      const result = await chatWithModel(model.id, timeoutMs);
+      return {
+        failure: false,
+        lines: [`  ${chalk.green("✓")} ${PROVIDER_LABELS[resolved].padEnd(15)} ${model.id} ${chalk.dim(`${Date.now() - started}ms, ${result.tokens} tokens`)}`],
+      };
     } catch (err) {
-      failures++;
       const psetupError = classifyAIProviderError(err, {
         command: "auth",
         subcommand: "test",
         details: [`Provider: ${resolved}`, `Model: ${model.id}`],
       });
-      console.log(`  ${chalk.red("✗")} ${PROVIDER_LABELS[resolved].padEnd(15)} ${model.id} ${chalk.red(psetupError.title)}`);
-      console.log(chalk.dim(`    ${psetupError.explanation}`));
-      for (const step of psetupError.nextSteps || []) console.log(chalk.dim(`    • ${step}`));
+      return {
+        failure: true,
+        lines: [
+          `  ${chalk.red("✗")} ${PROVIDER_LABELS[resolved].padEnd(15)} ${model.id} ${chalk.red(psetupError.title)}`,
+          chalk.dim(`    ${psetupError.explanation}`),
+          ...(psetupError.nextSteps || []).map((step) => chalk.dim(`    • ${step}`)),
+        ],
+      };
     }
+  }));
+  let failures = 0;
+  for (const result of results) {
+    if (result.failure) failures++;
+    for (const line of result.lines) console.log(line);
   }
   console.log("");
   if (failures > 0) process.exitCode = 1;
@@ -437,20 +444,16 @@ function preferredTestModel(provider: AIProvider) {
   return MODELS.find((model) => model.provider === provider)!;
 }
 
-async function chatWithModelRestore(previous: string | undefined, modelId: string) {
-  try {
-    return await chat([
-      { role: "system", content: "Reply with OK only." },
-      { role: "user", content: "Ping." },
-    ], { model: modelId, maxTokens: 12, temperature: 0, timeoutMs: 12000 });
-  } finally {
-    restoreModelEnv(previous);
-  }
+function authTestTimeoutMs(provider: AIProvider): number {
+  const diagnostic = providerDiagnostics().find((item) => item.provider === provider);
+  return Math.min(diagnostic?.profile.timeoutMs || 8000, 8000);
 }
 
-function restoreModelEnv(previous: string | undefined): void {
-  if (previous === undefined) delete process.env.P_SETUP_AI_MODEL;
-  else process.env.P_SETUP_AI_MODEL = previous;
+async function chatWithModel(modelId: string, timeoutMs: number) {
+  return chat([
+    { role: "system", content: "Reply with OK only." },
+    { role: "user", content: "Ping." },
+  ], { model: modelId, maxTokens: 12, temperature: 0, timeoutMs, maxRetries: 0 });
 }
 
 function askHidden(question: string): Promise<string> {

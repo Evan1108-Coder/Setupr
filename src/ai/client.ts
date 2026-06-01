@@ -54,6 +54,7 @@ export interface ChatOptions {
   model?: string;
   stream?: boolean;
   timeoutMs?: number;
+  maxRetries?: number;
 }
 
 interface AnthropicResponse {
@@ -100,12 +101,12 @@ export async function chat(
         return chatGoogle(model, messages, opts, signal);
       }
 
-      return chatOpenAICompatible(client, model, messages, opts);
+      return chatOpenAICompatible(client, model, messages, opts, signal);
     },
     {
-      maxRetries: config.ai.maxRetries,
+      maxRetries: options?.maxRetries ?? config.ai.maxRetries,
       baseDelayMs: config.ai.retryDelayMs,
-      timeoutMs: config.ai.timeoutMs,
+      timeoutMs: options?.timeoutMs ?? config.ai.timeoutMs,
     }
   );
 }
@@ -114,7 +115,8 @@ async function chatOpenAICompatible(
   client: OpenAI,
   model: AIModel,
   messages: ChatMessage[],
-  options?: ChatOptions
+  options?: ChatOptions,
+  signal?: AbortSignal
 ): Promise<{ content: string; tokens: number; model: string }> {
   const response = await client.chat.completions.create({
     model: model.id,
@@ -124,6 +126,7 @@ async function chatOpenAICompatible(
   }, {
     timeout: options?.timeoutMs,
     maxRetries: 0,
+    signal,
   });
 
   const choice = response.choices[0];

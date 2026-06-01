@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSetuprError, printPlainError } from "../errors/index.js";
-import { GLOBAL_OPTIONS, getCommand, visibleCommands, type CommandEntry } from "./commandRegistry.js";
+import { GLOBAL_OPTIONS, getCommand, publicCommands, type CommandEntry } from "./commandRegistry.js";
 
 interface HelpNode {
   name: string;
@@ -15,7 +15,7 @@ const GLOBAL_HELP: HelpNode = {
   name: "setupr",
   summary: "Project control center for setup, operations, diagnostics, and AI-assisted workflows.",
   usage: "setupr [command] [options]",
-  commands: visibleCommands().map((command) => ({ name: command.name, summary: command.summary, usage: command.usage })),
+  commands: publicCommands().map((command) => ({ name: command.name, summary: command.summary, usage: command.usage })),
   options: GLOBAL_OPTIONS,
   examples: ["setupr", "setupr setup", "setupr help auth", "setupr auth login", "setupr env init --force"],
 };
@@ -271,8 +271,8 @@ const HELP_NODES: Record<string, HelpNode> = {
 	  },
 	  test: {
 	    name: "test",
-	    summary: "Verification command group for project tests, smoke checks, reports, and test scaffolding.",
-	    usage: "setupr test [run|quick|full|ci|smoke|unit|integration|e2e|watch|coverage|changed|file|failed|doctor|list|report|clean|create|generate|fix|security] [options]",
+	    summary: "Verification command group for project tests, smoke checks, and reports.",
+	    usage: "setupr test [run|quick|full|ci|smoke|unit|integration|e2e|watch|coverage|changed|file|failed|doctor|list|report|clean|fix|security] [options]",
 	    commands: [
 	      { name: "run", summary: "Run the best detected default verification command." },
 	      { name: "quick", summary: "Run the fastest safe checks for the current project." },
@@ -291,8 +291,6 @@ const HELP_NODES: Record<string, HelpNode> = {
 	      { name: "list", summary: "List detected test files." },
 	      { name: "report", summary: "Show the latest Setupr test report." },
 	      { name: "clean", summary: "Clean test caches; requires --yes or --force." },
-	      { name: "create", summary: "Preview or create a test file for a source file.", usage: "setupr test create <file> [--yes]" },
-	      { name: "generate", summary: "Alias for create." },
 	      { name: "fix", summary: "Run the safest available test/lint fix path." },
 	      { name: "security", summary: "Run the Setupr security scan from the test group." },
 	    ],
@@ -302,7 +300,7 @@ const HELP_NODES: Record<string, HelpNode> = {
 	      { name: "--yes, --force", summary: "Allow safe writes for clean/create." },
 	      { name: "--watch", summary: "Prefer watch scripts where available." },
 	    ],
-	    examples: ["setupr test quick", "setupr test full --report .setupr/test.md", "setupr test create src/lib/math.ts --yes", "setupr test security"],
+	    examples: ["setupr test quick", "setupr test full --report .setupr/test.md", "setupr test security"],
 	  },
 	  security: {
 	    name: "security",
@@ -390,7 +388,7 @@ const HELP_NODES: Record<string, HelpNode> = {
   },
   scaffold: {
     name: "scaffold",
-    summary: "Generate common project files.",
+    summary: "Advanced compatibility command for local project-file generation.",
     usage: "setup scaffold <component|page|api|hook|model|test|service|middleware> <name>",
     commands: [
       { name: "component", summary: "Generate a UI component." },

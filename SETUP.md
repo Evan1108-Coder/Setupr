@@ -42,7 +42,7 @@ setup help docker
 setup workspace --help
 ```
 
-The rich help output lists the full command surface, including setup, chat, auth, env, git, CI, Docker, secrets, templates, workspace, health, test, security, fix, release, perf, GitHub, registry, share, plugin, lint, format, and scaffold commands.
+The rich help output lists the primary project-control surface, including setup, chat, auth, env, git, CI, Docker, secrets, templates, workspace, health, test, security, fix, release, perf, GitHub, registry, share, plugin, lint, and format commands. Advanced inspection/file-generation commands remain directly runnable for compatibility, but they are not advertised in the primary command index.
 
 ### Development Setup
 

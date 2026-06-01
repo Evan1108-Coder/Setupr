@@ -20,6 +20,7 @@ export interface CommandEntry {
   writes?: boolean;
   aiCapable?: boolean;
   hidden?: boolean;
+  showInGlobalHelp?: boolean;
 }
 
 export const GLOBAL_OPTIONS: CommandOption[] = [
@@ -99,7 +100,7 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
   { id: "lock", name: "lock", summary: "Snapshot environment state.", usage: "setupr lock", mode: "plain", allowsSubcommand: false, writes: true },
   { id: "diff", name: "diff", summary: "Compare current state with a locked state.", usage: "setupr diff", mode: "plain", allowsSubcommand: false },
   { id: "logs", name: "logs", summary: "Show recent Setupr-managed process logs, falling back to package-manager logs.", usage: "setupr logs [target]", mode: "plain" },
-  { id: "test", name: "test", summary: "Run verification suites, smoke checks, reports, and test scaffolding.", usage: "setupr test [run|quick|full|ci|smoke|unit|integration|e2e|watch|coverage|changed|file|failed|doctor|list|report|clean|create|generate|fix|security] [options]", mode: "plain", subcommands: ["run", "quick", "full", "ci", "smoke", "unit", "integration", "e2e", "watch", "coverage", "changed", "file", "failed", "doctor", "list", "report", "clean", "create", "generate", "fix", "security"].map((name) => ({ name, summary: `test ${name} workflow.` })), options: flagOptions("--json", "--report <file>", "--yes", "--force", "--watch") },
+  { id: "test", name: "test", summary: "Run verification suites, smoke checks, and reports.", usage: "setupr test [run|quick|full|ci|smoke|unit|integration|e2e|watch|coverage|changed|file|failed|doctor|list|report|clean|fix|security] [options]", mode: "plain", subcommands: ["run", "quick", "full", "ci", "smoke", "unit", "integration", "e2e", "watch", "coverage", "changed", "file", "failed", "doctor", "list", "report", "clean", "fix", "security"].map((name) => ({ name, summary: `test ${name} workflow.` })), options: flagOptions("--json", "--report <file>", "--yes", "--force", "--watch") },
   { id: "security", name: "security", summary: "Run defensive security scans, baselines, ignores, and safe fixes.", usage: "setupr security [scan|quick|deep|deps|secrets|env|docker|ci|code|routes|auth|headers|doctor|report|baseline|ignore|fix|watch|test] [options]", mode: "plain", subcommands: ["scan", "quick", "deep", "deps", "secrets", "env", "docker", "ci", "code", "routes", "auth", "headers", "doctor", "report", "baseline", "ignore", "fix", "watch", "test"].map((name) => ({ name, summary: `security ${name} check.` })), options: flagOptions("--json", "--report <file>", "--url <url>", "--force", "--yes"), aiCapable: true },
   { id: "fix", name: "fix", summary: "Preview or run grouped safe fixes across doctor, env, lint, format, and security.", usage: "setupr fix [doctor|env|lint|format|security|all] [--yes|--force]", mode: "plain", subcommands: ["doctor", "env", "lint", "format", "security", "all"].map((name) => ({ name, summary: `fix ${name} workflow.` })), options: flagOptions("--yes", "--force"), writes: true, risk: "medium" },
   { id: "release", name: "release", summary: "Run release readiness checks, package dry-runs, notes, and version summaries.", usage: "setupr release [check|publish-check|notes|version] [--json]", mode: "plain", subcommands: ["check", "publish-check", "notes", "version"].map((name) => ({ name, summary: `release ${name}.` })), options: flagOptions("--json"), writes: false },
@@ -110,7 +111,7 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
   { id: "build", name: "build", summary: "Run the project build script.", usage: "setupr build", mode: "plain", allowsSubcommand: false },
   { id: "deploy", name: "deploy", summary: "Run deploy scripts.", usage: "setupr deploy", mode: "plain", allowsSubcommand: false },
   { id: "open", name: "open", summary: "Open project browser, repository, or IDE target.", usage: "setupr open [repo|ide]", mode: "plain" },
-  { id: "git", name: "git", summary: "Git workflows, AI-ready summaries, hooks, branches, PRs, and history tools.", usage: "setupr git <command> [options]", mode: "plain", subcommands: ["init", "hooks", "flow", "commit-message", "commit", "pr-description", "branch-check", "conflicts", "branch", "pr", "stash", "rebase", "tag", "release", "status", "log", "sync", "clean", "ignore", "changelog", "blame", "cherry-pick", "worktree", "bisect", "contributors", "undo"].map((name) => ({ name, summary: `git ${name} workflow.` })), options: flagOptions("--force", "--smart", "--dry-run"), writes: true, aiCapable: true },
+  { id: "git", name: "git", summary: "Git workflows, hooks, branches, PRs, and history tools.", usage: "setupr git <command> [options]", mode: "plain", subcommands: ["init", "hooks", "flow", "commit-message", "commit", "pr-description", "branch-check", "conflicts", "branch", "pr", "stash", "rebase", "tag", "release", "status", "log", "sync", "clean", "ignore", "changelog", "blame", "cherry-pick", "worktree", "bisect", "contributors", "undo"].map((name) => ({ name, summary: `git ${name} workflow.` })), options: flagOptions("--force", "--smart", "--dry-run"), writes: true, aiCapable: true },
   { id: "init", name: "init", summary: "Scaffold a new project from built-in stacks or templates.", usage: "setupr init [stack|name] [--force]", mode: "plain", options: flagOptions("--template <name>", "--force"), writes: true },
   { id: "migrate", name: "migrate", summary: "Migrate package manager metadata and lockfiles.", usage: "setupr migrate <npm|yarn|pnpm|bun> [--force]", mode: "plain", options: flagOptions("--force", "--dry-run"), risk: "high", writes: true },
   { id: "ci", name: "ci", summary: "Generate CI/CD configuration.", usage: "setupr ci <github|gitlab|bitbucket|circleci>", mode: "plain", writes: true },
@@ -126,16 +127,20 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
   { id: "plugin", name: "plugin", summary: "Create, validate, install, inspect, enable, or disable Setupr plugins.", usage: "setupr plugin <create|validate|doctor|install|remove|list|info|enable|disable> [name-or-url]", mode: "plain", subcommands: ["create", "validate", "doctor", "install", "remove", "list", "info", "enable", "disable"].map((name) => ({ name, summary: `plugin ${name}.` })), writes: true },
   { id: "lint", name: "lint", summary: "Run, fix, or set up linting.", usage: "setupr lint <run|setup|fix> [--force]", mode: "plain", subcommands: ["run", "setup", "fix"].map((name) => ({ name, summary: `lint ${name}.` })), options: flagOptions("--force"), writes: true },
   { id: "format", name: "format", summary: "Run, check, or set up formatting.", usage: "setupr format <run|check|setup> [--force]", mode: "plain", subcommands: ["run", "check", "setup"].map((name) => ({ name, summary: `format ${name}.` })), options: flagOptions("--force"), writes: true },
-  { id: "scaffold", name: "scaffold", summary: "Generate common files such as components, pages, APIs, tests, and services.", usage: "setupr scaffold <component|page|api|hook|model|test|service|middleware> <name>", mode: "plain", subcommands: ["component", "page", "api", "hook", "model", "test", "service", "middleware"].map((name) => ({ name, summary: `scaffold ${name}.` })), writes: true },
-  { id: "analyze", name: "analyze", summary: "Show a deterministic project architecture overview.", usage: "setupr analyze", mode: "plain", allowsSubcommand: false },
-  { id: "explain", name: "explain", summary: "Summarize a file using deterministic code signals.", usage: "setupr explain <file>", mode: "plain" },
-  { id: "refactor", name: "refactor", summary: "Suggest deterministic refactors for a file.", usage: "setupr refactor <file>", mode: "plain" },
-  { id: "todo", name: "todo", summary: "Scan TODO, FIXME, and HACK markers and prioritize them.", usage: "setupr todo", mode: "plain", allowsSubcommand: false },
+  { id: "scaffold", name: "scaffold", summary: "Advanced project-file generation for existing local workflows.", usage: "setupr scaffold <component|page|api|hook|model|test|service|middleware> <name>", mode: "plain", subcommands: ["component", "page", "api", "hook", "model", "test", "service", "middleware"].map((name) => ({ name, summary: `scaffold ${name}.` })), writes: true, showInGlobalHelp: false },
+  { id: "analyze", name: "analyze", summary: "Advanced project architecture inspection.", usage: "setupr analyze", mode: "plain", allowsSubcommand: false, showInGlobalHelp: false },
+  { id: "explain", name: "explain", summary: "Advanced file explanation from deterministic code signals.", usage: "setupr explain <file>", mode: "plain", showInGlobalHelp: false },
+  { id: "refactor", name: "refactor", summary: "Advanced refactor suggestions for a file.", usage: "setupr refactor <file>", mode: "plain", showInGlobalHelp: false },
+  { id: "todo", name: "todo", summary: "Advanced TODO/FIXME/HACK inspection.", usage: "setupr todo", mode: "plain", allowsSubcommand: false, showInGlobalHelp: false },
   { id: "help", name: "help", summary: "Show global or command-specific help.", usage: "setupr help [command] [subcommand]", mode: "plain", allowsSubcommand: true },
 ];
 
 export function visibleCommands(): CommandEntry[] {
   return COMMAND_REGISTRY.filter((command) => !command.hidden);
+}
+
+export function publicCommands(): CommandEntry[] {
+  return visibleCommands().filter((command) => command.showInGlobalHelp !== false);
 }
 
 export function getCommand(idOrName: string): CommandEntry | undefined {

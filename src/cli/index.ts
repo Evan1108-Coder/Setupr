@@ -62,7 +62,6 @@ const cli = meow(
     plugin      Plugin management (install, remove, list, info, enable, disable)
     lint        Run or setup linting (run, setup, fix)
     format      Run or setup code formatting (run, check, setup)
-    scaffold    Generate project files (component, page, api, hook, model, test, service, middleware)
 
   Options
     --force     Skip all prompts

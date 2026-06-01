@@ -70,7 +70,7 @@ setupr setup --plain
 | `lock` | Snapshot environment state |
 | `diff` | Compare current vs locked state |
 | `logs [target]` | Show managed process logs, falling back to package-manager logs |
-| `test [run\|quick\|full\|ci\|smoke\|unit\|integration\|e2e\|watch\|coverage\|changed\|file\|failed\|doctor\|list\|report\|clean\|create\|generate\|fix\|security]` | Run verification suites, smoke checks, reports, and test scaffolding |
+| `test [run\|quick\|full\|ci\|smoke\|unit\|integration\|e2e\|watch\|coverage\|changed\|file\|failed\|doctor\|list\|report\|clean\|fix\|security]` | Run verification suites, smoke checks, and reports |
 | `security [scan\|quick\|deep\|deps\|secrets\|env\|docker\|ci\|code\|routes\|auth\|headers\|doctor\|report\|baseline\|ignore\|fix\|watch\|test]` | Run defensive security scans, baselines, ignores, and safe fixes |
 | `fix [doctor\|env\|lint\|format\|security\|all]` | Preview or run grouped safe fixes |
 | `release [check\|publish-check\|notes\|version]` | Release readiness checks, package dry-runs, notes, and version summaries |
@@ -81,10 +81,6 @@ setupr setup --plain
 | `deploy` | Run deploy scripts |
 | `open [repo\|ide]` | Open in browser/IDE/repo |
 | `git` | Git workflows plus commit-message, PR-description, branch-check, and conflict helper |
-| `analyze` | Deterministic project architecture overview |
-| `explain <file>` | Explain a file from imports, exports, functions, classes, and role signals |
-| `refactor <file>` | Suggest deterministic refactors for a file |
-| `todo` | Scan TODO/FIXME/HACK markers and prioritize them |
 | `init` | Scaffold new projects from stacks or templates |
 | `migrate <npm\|yarn\|pnpm\|bun>` | Migrate package manager metadata and lockfiles |
 | `ci <github\|gitlab\|bitbucket\|circleci>` | Generate CI/CD config |
@@ -100,7 +96,6 @@ setupr setup --plain
 | `plugin <create\|validate\|doctor\|install\|remove\|list\|info\|enable\|disable>` | Manage Setupr plugins and plugin development |
 | `lint <run\|setup\|fix>` | Run or set up linting |
 | `format <run\|check\|setup>` | Run or set up formatting |
-| `scaffold <type> <name>` | Generate components, pages, APIs, hooks, models, tests, services, or middleware |
 
 ## Features
 
@@ -167,6 +162,8 @@ setup auth use openai/gpt-4.1-mini
 
 Setupr stores provider API keys globally in `~/.setupr/secrets.json` with file permissions `0600`. Raw keys are never printed; `setup auth list` and `setup auth status` show only masked keys.
 
+`setup auth test` runs configured providers concurrently with short per-provider timeouts. A slow or unavailable provider reports a classified timeout/error without blocking checks for the other configured providers.
+
 Setupr resolves provider keys in this order:
 
 1. Shell environment variables, useful for CI or temporary overrides
@@ -228,7 +225,7 @@ The `setup` TUI is an agent workspace, not just a log viewer:
 - When the director asks a question, the TUI shows a prompt card with options plus `Other...`, or a focused text/secret input when a typed value is needed. Normal chat input is locked while the AI is thinking/running; Esc pauses and Ctrl+R resumes.
 - The AI director stays centered on the current setup task, while still allowing brief adjacent questions, clarifications, and steering without being overly strict.
 - For live AI decisions, the director receives a sanitized context packet with project scan data, OS/terminal details, config parameters, current plan, TUI state, notices, dependency/service/port state, terminal diary, and chat history. Secret values are masked before model calls.
-- The same packet includes Setupr's current command capabilities, so the director can recommend or explain git, Docker, CI, workspace, secrets, template, health, plugin, lint, format, and scaffold workflows when they are relevant.
+- The same packet includes Setupr's current command capabilities, so the director can recommend or explain git, Docker, CI, workspace, secrets, template, health, plugin, lint, and format workflows when they are relevant.
 - User replies appear on the right side of the timeline; AI reasoning and decisions appear inline before execution.
 - `--force` skips safe prompts and uses defaults where possible, but it does not invent secrets and still stops for serious blockers or destructive choices.
 
@@ -371,23 +368,23 @@ setupr restart dev --watch
 
 `setupr` with no arguments opens the dashboard, not setup execution. The dashboard summarizes real project signals: scanner results, git state, env status, managed processes, recent history, and available commands. `setupr start` runs the detected `dev`, `start`, `serve`, `develop`, or `watch` script under a Setupr supervisor, writes logs under `.setupr/logs/processes`, and exposes it through `ps`, `logs`, `stop`, and `restart`.
 
-### Git, Code, And Dependency Intelligence
+### Git, Project Inspection, And Dependency Intelligence
 
 ```bash
 setupr git commit-message
 setupr git pr-description
 setupr git branch-check
 setupr git conflicts
-setupr analyze
-setupr explain src/index.ts
-setupr refactor src/index.ts
-setupr todo
 setupr deps audit
 setupr deps why react
 setupr deps licenses
 ```
 
 These commands work offline first. They use deterministic project, file, git, and lockfile signals, then AI-capable flows can layer on `--smart` where supported.
+
+Advanced inspection/file-generation commands from earlier Setupr versions still run directly for existing local workflows, but they are intentionally kept out of the main help surface so Setupr presents as a project-control terminal rather than a coding assistant.
+
+`setupr test watch` is bounded by a readiness window instead of running forever. If the watch script stays alive, Setupr stops it after the timeout and reports that the watch process was able to start.
 
 ### Plugin Development
 
@@ -486,7 +483,7 @@ npm run smoke:fixtures
 
 This builds the CLI, creates temporary broken/chaotic fixture projects, and checks malformed project files, env failures, corrupt auth storage, missing scripts, failing scripts, no-project setup, monorepo detection, missing logs/locks/remotes, plugin scaffolds, and real-world-style fixtures for Next.js, Vite, Django, FastAPI, Rust, Go, Docker-heavy projects, and broken lockfiles.
 
-The fixture smoke also exercises the expanded command surface through the built CLI, including CI, Docker, secrets, share, workspace, scaffold, and a git shell-injection regression check.
+The fixture smoke also exercises the expanded command surface through the built CLI, including CI, Docker, secrets, share, workspace, advanced compatibility commands, and a git shell-injection regression check.
 
 For a best-effort terminal capture smoke on macOS:
 

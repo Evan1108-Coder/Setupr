@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
 import type { SetupStep } from "../ai/planner.js";
 import type { AppStore } from "../state/store.js";
 import { createSnapshot } from "./undo.js";
@@ -181,13 +181,20 @@ interface CommandResult {
   stdout: string;
   stderr: string;
   exitCode: number;
+  timedOut?: boolean;
+  aborted?: boolean;
+}
+
+interface RunCommandOptions {
+  timeoutMs?: number;
 }
 
 export function runCommand(
   command: string,
   cwd: string,
   onLine?: (line: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options: RunCommandOptions = {}
 ): Promise<CommandResult> {
   return new Promise((resolve) => {
     const env = { ...process.env };
@@ -196,11 +203,33 @@ export function runCommand(
       cwd,
       shell: true,
       env,
+      detached: process.platform !== "win32",
     });
+
+    let settled = false;
+    let timedOut = false;
+    let aborted = false;
+    let timeout: NodeJS.Timeout | undefined;
+
+    const finish = (result: CommandResult) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      resolve({ ...result, timedOut, aborted });
+    };
+
+    if (options.timeoutMs && options.timeoutMs > 0) {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        terminateProcessTree(proc);
+      }, options.timeoutMs);
+      timeout.unref?.();
+    }
 
     if (signal) {
       signal.addEventListener("abort", () => {
-        proc.kill("SIGTERM");
+        aborted = true;
+        terminateProcessTree(proc);
       }, { once: true });
     }
 
@@ -224,11 +253,11 @@ export function runCommand(
     });
 
     proc.on("close", (code) => {
-      resolve({ stdout, stderr, exitCode: code ?? 1 });
+      finish({ stdout, stderr, exitCode: timedOut ? 124 : aborted ? 130 : code ?? 1 });
     });
 
     proc.on("error", (err) => {
-      resolve({ stdout, stderr: err.message, exitCode: 1 });
+      finish({ stdout, stderr: err.message, exitCode: 1 });
     });
   });
 }
@@ -238,7 +267,8 @@ export function runCommandArgs(
   args: string[],
   cwd: string,
   onLine?: (line: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options: RunCommandOptions = {}
 ): Promise<CommandResult> {
   return new Promise((resolve) => {
     const env = { ...process.env };
@@ -247,11 +277,33 @@ export function runCommandArgs(
       cwd,
       shell: false,
       env,
+      detached: process.platform !== "win32",
     });
+
+    let settled = false;
+    let timedOut = false;
+    let aborted = false;
+    let timeout: NodeJS.Timeout | undefined;
+
+    const finish = (result: CommandResult) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      resolve({ ...result, timedOut, aborted });
+    };
+
+    if (options.timeoutMs && options.timeoutMs > 0) {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        terminateProcessTree(proc);
+      }, options.timeoutMs);
+      timeout.unref?.();
+    }
 
     if (signal) {
       signal.addEventListener("abort", () => {
-        proc.kill("SIGTERM");
+        aborted = true;
+        terminateProcessTree(proc);
       }, { once: true });
     }
 
@@ -275,13 +327,36 @@ export function runCommandArgs(
     });
 
     proc.on("close", (code) => {
-      resolve({ stdout, stderr, exitCode: code ?? 1 });
+      finish({ stdout, stderr, exitCode: timedOut ? 124 : aborted ? 130 : code ?? 1 });
     });
 
     proc.on("error", (err) => {
-      resolve({ stdout, stderr: err.message, exitCode: 1 });
+      finish({ stdout, stderr: err.message, exitCode: 1 });
     });
   });
+}
+
+function terminateProcessTree(proc: ChildProcess): void {
+  if (!proc.pid) return;
+  if (process.platform === "win32") {
+    try {
+      spawn("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+    } catch {
+      try { proc.kill("SIGTERM"); } catch {}
+    }
+    return;
+  }
+
+  try {
+    process.kill(-proc.pid, "SIGTERM");
+  } catch {
+    try { proc.kill("SIGTERM"); } catch {}
+  }
+
+  const forceKill = setTimeout(() => {
+    try { process.kill(-proc.pid!, "SIGKILL"); } catch {}
+  }, 1500);
+  forceKill.unref?.();
 }
 
 export async function executeAllSteps(
