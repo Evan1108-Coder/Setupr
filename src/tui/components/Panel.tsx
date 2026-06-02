@@ -5,6 +5,7 @@ import type { FocusState } from "../hooks/useFocusNavigation.js";
 
 interface PanelProps {
   title: string;
+  subtitle?: string;
   active?: boolean;
   focusState?: FocusState;
   width?: number | string;
@@ -17,6 +18,7 @@ interface PanelProps {
 
 export function Panel({
   title,
+  subtitle,
   active = false,
   focusState,
   width,
@@ -29,7 +31,8 @@ export function Panel({
   const state: FocusState = focusState || (active ? "focused" : undefined);
   const focused = state === "focused";
   const ancestor = state === "ancestor";
-  const borderColor = focused ? colors.borderActive : ancestor ? colors.accent : colors.border;
+  const borderColor = focused ? colors.borderActive : ancestor ? colors.primary : colors.border;
+  const titleColor = focused ? colors.accent : colors.heading;
 
   return (
     <Box
@@ -43,11 +46,12 @@ export function Panel({
       flexShrink={flexShrink}
       paddingX={1}
     >
-      <Box width="100%" flexShrink={0}>
-        <Text color={focused ? colors.textBright : ancestor ? colors.accent : colors.textDim} bold={focused || ancestor}>
+      <Box width="100%" flexShrink={0} justifyContent="space-between">
+        <Text color={titleColor} bold>
           {focused ? "▸ " : ancestor ? "◆ " : "  "}
-          {title}
+          {title.toUpperCase()}
         </Text>
+        {subtitle && <Text color={colors.textDim} wrap="truncate">{subtitle}</Text>}
       </Box>
       <Box flexDirection="column" width="100%" minWidth={0} flexGrow={1} flexShrink={1} overflow="hidden">
         {children}

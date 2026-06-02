@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { findDirectionalFocusItem, type FocusItem } from "../src/tui/hooks/useFocusNavigation.js";
 import { parseSgrMouse, stripTerminalControlInput } from "../src/tui/terminalInput.js";
 import { buildChatFocusItems, buildChatLayout } from "../src/tui/layouts/ChatLayout.js";
+import { buildDashboardFocusItems, buildDashboardLayout } from "../src/tui/layouts/DashboardLayout.js";
 import { buildEnvFocusItems, buildEnvLayout } from "../src/tui/layouts/EnvLayout.js";
 
 const wideSetupItems: FocusItem[] = [
@@ -67,6 +68,46 @@ describe("TUI focus navigation", () => {
     expect(input?.bounds?.y).toBeGreaterThan(20);
     expect(findDirectionalFocusItem(items, vars!, "right", ["vars"])?.id).toBe("details");
     expect(findDirectionalFocusItem(items, editor!, "left", ["editor", "input"])?.id).toBe("vars");
+  });
+
+  it("organizes dashboard as metric row plus actions/notices on wide terminals", () => {
+    const layout = buildDashboardLayout(160, 38, "dashboard");
+    const items = buildDashboardFocusItems(layout);
+    const project = items.find((item) => item.id === "project");
+    const actions = items.find((item) => item.id === "actions");
+    const notices = items.find((item) => item.id === "notices");
+
+    expect(layout.stacked).toBe(false);
+    expect(items.slice(0, 5).map((item) => item.id)).toEqual(["project", "git", "env", "deps", "processes"]);
+    expect(actions?.bounds?.y).toBeGreaterThan(project?.bounds?.y || 0);
+    expect(notices?.bounds?.x).toBeGreaterThan(actions?.bounds?.x || 0);
+    expect(findDirectionalFocusItem(items, project!, "right", ["project"])?.id).toBe("git");
+    expect(findDirectionalFocusItem(items, notices!, "left", ["notices"])?.id).toBe("actions");
+  });
+
+  it("organizes status as health row, state/process row, and env/action row", () => {
+    const layout = buildDashboardLayout(160, 38, "status");
+    const items = buildDashboardFocusItems(layout);
+    const health = items.find((item) => item.id === "health");
+    const state = items.find((item) => item.id === "state");
+    const envvars = items.find((item) => item.id === "envvars");
+
+    expect(layout.stacked).toBe(false);
+    expect(items.slice(0, 5).map((item) => item.id)).toEqual(["health", "git", "env", "tests", "security"]);
+    expect(state?.bounds?.y).toBeGreaterThan(health?.bounds?.y || 0);
+    expect(envvars?.bounds?.y).toBeGreaterThan(state?.bounds?.y || 0);
+    expect(findDirectionalFocusItem(items, health!, "down", ["health"])?.id).toBe("state");
+  });
+
+  it("stacks dashboard/status layouts on constrained terminals without overflowing far past the screen", () => {
+    for (const variant of ["dashboard", "status"] as const) {
+      const layout = buildDashboardLayout(72, 22, variant);
+      const items = buildDashboardFocusItems(layout);
+      const maxBottom = Math.max(...items.map((item) => (item.bounds?.y || 0) + (item.bounds?.height || 0)));
+
+      expect(layout.stacked).toBe(true);
+      expect(maxBottom).toBeLessThanOrEqual(layout.height + 2);
+    }
   });
 
   it("uses a stacked env editor layout on narrow terminals without overflowing height", () => {

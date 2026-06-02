@@ -1,22 +1,23 @@
 export const colors = {
-  // Primary palette (dark blue terminal aesthetic)
-  primary: "#5B9BD5",
+  // Terminal-native cyber palette. These are foreground/border colors only;
+  // the TUI intentionally does not paint a background so terminal profiles win.
+  primary: "#4AA3FF",
   secondary: "#8EC6C5",
-  accent: "#FFC857",
+  accent: "#FFD166",
 
   // Status
-  success: "#4EC9B0",
-  warning: "#DCDCAA",
-  error: "#F44747",
+  success: "#6BE675",
+  warning: "#FFD166",
+  error: "#FF5C5C",
   info: "#569CD6",
 
   // UI
-  bg: "#1B2838",
-  panel: "#1E2D40",
-  border: "#2A4A6B",
-  borderActive: "#5B9BD5",
-  text: "#C8D6E5",
-  textDim: "#5C7A99",
+  bg: "#000000",
+  panel: "#000000",
+  border: "#24557A",
+  borderActive: "#FFD166",
+  text: "#D7E4F2",
+  textDim: "#5D7896",
   textBright: "#FFFFFF",
 
   // Syntax-like
@@ -26,13 +27,13 @@ export const colors = {
   function: "#DCDCAA",
 
   // Special
-  heading: "#5B9BD5",
+  heading: "#4AA3FF",
   label: "#7FAACC",
-  value: "#C8D6E5",
-  dimValue: "#5C7A99",
-  green: "#4EC9B0",
-  yellow: "#DCDCAA",
-  red: "#F44747",
+  value: "#D7E4F2",
+  dimValue: "#5D7896",
+  green: "#6BE675",
+  yellow: "#FFD166",
+  red: "#FF5C5C",
   orange: "#E8A838",
   cyan: "#56B6C2",
 };

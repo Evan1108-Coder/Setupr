@@ -61,7 +61,7 @@ export function App({ command, cwd, store, cleanMode = "deps", force = false, da
       return <SetupLayout store={store} />;
     case "dashboard":
     case "status":
-      return <DashboardLayout cwd={cwd} initialStatus={dashboardStatus} />;
+      return <DashboardLayout cwd={cwd} initialStatus={dashboardStatus} variant={command === "status" ? "status" : "dashboard"} />;
     case "doctor":
       return scan ? <DoctorLayout scan={scan} cwd={cwd} /> : <SetupLayout store={store} />;
     case "start":
