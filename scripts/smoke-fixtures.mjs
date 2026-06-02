@@ -211,9 +211,11 @@ function tuiSmoke() {
     "set env(COLUMNS) 100",
     "set env(LINES) 28",
     "spawn $node $cli env --force",
-    "after 500",
+    "after 2500",
     "send \"API_KEY=smoke-value\\r\"",
-    "after 1200",
+    "after 1500",
+    "send \"\\003\"",
+    "after 500",
     "send \"\\003\"",
     "expect eof",
     "",
@@ -224,7 +226,7 @@ function tuiSmoke() {
   });
   const envOutput = `${envResult.stdout || ""}\n${envResult.stderr || ""}`;
   const envFile = join(temp, "env-tui-force", ".env");
-  const envOk = fileExists(envFile) && envOutput.includes("Setupr Env");
+  const envOk = fileExists(envFile) && /setupr env|Setupr Env|VARIABLES|ENV FILE/i.test(envOutput) && envResult.status === 0;
   results.push({
     name: "tui env editor capture",
     ok: envOk,

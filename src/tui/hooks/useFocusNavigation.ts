@@ -51,6 +51,11 @@ export function useFocusNavigation({ items, initialId, onQuit }: UseFocusNavigat
   };
 
   useInput((input, key) => {
+    if (input === "\x03" || (key.ctrl && input === "c")) {
+      onQuit?.();
+      return;
+    }
+
     const mouse = parseSgrMouse(input);
     if (mouse?.action === "press") {
       const hit = findMouseHit(items, mouse.x, mouse.y);
