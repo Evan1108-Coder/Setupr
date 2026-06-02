@@ -183,3 +183,5 @@ setup clean --all
 ```
 
 The positional forms also work: `setup clean deps`, `setup clean share`, and `setup clean all`.
+
+In TUI mode, `setup clean` opens a safety review before deleting anything. Review the target list, protected-file notes, and risk summary, then type `CLEAN` to confirm. `--force` skips the review prompt and starts cleaning after the target scan, while still reporting exactly what was removed or failed.

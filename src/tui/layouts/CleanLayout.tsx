@@ -1,19 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useApp } from "ink";
-import { Panel } from "../components/Panel.js";
-import { StatusBar } from "../components/StatusBar.js";
-import { Spinner } from "../components/Spinner.js";
-import { useFocusNavigation, type FocusItem } from "../hooks/useFocusNavigation.js";
-import { useTerminalSize } from "../hooks/useTerminalSize.js";
-import { colors, icons } from "../theme.js";
-import type { ScanResult } from "../../scanner/index.js";
-import { stat, rm } from "fs/promises";
+import { rm, stat } from "fs/promises";
 import { join } from "path";
 import { createSetuprError, type SetuprError } from "../../errors/index.js";
+import type { ScanResult } from "../../scanner/index.js";
+import { ChatInput } from "../components/ChatInput.js";
+import { Panel } from "../components/Panel.js";
+import { Spinner } from "../components/Spinner.js";
+import { KVRow, MetricText, TuiFooter, TuiHeader, statusColor } from "../components/TuiFrame.js";
+import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
+import { useTerminalSize } from "../hooks/useTerminalSize.js";
+import { colors, icons } from "../theme.js";
 
 interface CleanTarget {
   path: string;
   size: string;
+  bytes: number;
   type: "deps" | "build" | "cache" | "sensitive";
   status: "pending" | "removing" | "done" | "failed";
   error?: SetuprError;
@@ -23,109 +25,279 @@ interface CleanLayoutProps {
   scan: ScanResult;
   cwd: string;
   mode: "deps" | "share" | "all";
+  force?: boolean;
 }
 
-export function CleanLayout({ cwd, mode }: CleanLayoutProps) {
+interface CleanLayoutGeometry {
+  width: number;
+  height: number;
+  stacked: boolean;
+  bodyHeight: number;
+  targetsWidth: number;
+  reviewWidth: number;
+  riskWidth: number;
+  inputMaxLines: number;
+  inputHeight: number;
+  inputBounds: FocusBounds;
+}
+
+type CleanPhase = "scanning" | "review" | "cleaning" | "done" | "blocked";
+
+export function CleanLayout({ cwd, mode, force = false }: CleanLayoutProps) {
   const { exit } = useApp();
   const terminal = useTerminalSize();
-  const stacked = terminal.width < 90;
-  const mainWidth = stacked ? terminal.width : Math.max(44, Math.floor(terminal.width * 0.64));
-  const sideWidth = stacked ? terminal.width : terminal.width - mainWidth;
-  const focusItems = useMemo(
-    () => buildFocusItems(terminal.width, terminal.height, mainWidth, sideWidth, stacked),
-    [terminal.width, terminal.height, mainWidth, sideWidth, stacked]
-  );
-  const focus = useFocusNavigation({ items: focusItems, onQuit: () => exit() });
+  const layout = useMemo(() => buildCleanLayout(terminal.width, terminal.height), [terminal.width, terminal.height]);
+  const focus = useFocusNavigation({ items: useMemo(() => buildCleanFocusItems(layout), [layout]), onQuit: () => exit() });
   const [targets, setTargets] = useState<CleanTarget[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [cleaning, setCleaning] = useState(false);
-  const [done, setDone] = useState(false);
+  const [phase, setPhase] = useState<CleanPhase>("scanning");
+  const [message, setMessage] = useState(force ? "Force mode: cleaning after scan." : "Review targets before deleting anything.");
 
   useEffect(() => {
-    findCleanTargets(cwd, mode).then((t) => {
-      setTargets(t);
-      setLoading(false);
+    let alive = true;
+    findCleanTargets(cwd, mode).then((found) => {
+      if (!alive) return;
+      setTargets(found);
+      if (found.length === 0) {
+        setPhase("done");
+        setMessage("Nothing to clean.");
+        return;
+      }
+      if (force) {
+        setPhase("cleaning");
+        cleanTargets(cwd, found).then((results) => {
+          if (!alive) return;
+          setTargets(results);
+          setPhase("done");
+          setMessage("Force mode cleaned the listed targets.");
+        });
+      } else {
+        setPhase("review");
+      }
     });
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  useEffect(() => {
-    if (!loading && targets.length > 0 && !cleaning && !done) {
-      setCleaning(true);
-      cleanTargets(cwd, targets).then((results) => {
-        setTargets(results);
-        setDone(true);
-        setCleaning(false);
-      });
+  const handleConfirm = async (text: string) => {
+    const normalized = text.trim().toLowerCase();
+    if (phase !== "review") return;
+    if (normalized !== "clean" && normalized !== "yes" && normalized !== "y") {
+      setPhase("blocked");
+      setMessage('Not cleaned. Type "CLEAN" to confirm deletion, or press q to quit.');
+      return;
     }
-  }, [loading, targets.length, cleaning, done]);
+    setPhase("cleaning");
+    setMessage("Cleaning selected targets...");
+    const results = await cleanTargets(cwd, targets);
+    setTargets(results);
+    setPhase("done");
+    setMessage(results.some((target) => target.status === "failed") ? "Clean finished with failures." : "Clean complete.");
+  };
+
+  const totalBytes = targets.reduce((sum, target) => sum + target.bytes, 0);
+  const failed = targets.filter((target) => target.status === "failed").length;
+  const risk = mode === "all" ? "High" : mode === "share" ? "High" : "Medium";
 
   return (
     <Box flexDirection="column" width={terminal.width} height={terminal.height}>
-      <Box height={1} justifyContent="space-between">
-        <Text color={colors.primary} bold> Setupr Clean</Text>
-        <Text color={colors.textDim}>mode: {mode}</Text>
-      </Box>
+      <TuiHeader
+        command={`setupr clean ${mode}`}
+        cwd={cwd}
+        status={phase}
+        statusColor={phase === "done" ? colors.success : phase === "blocked" ? colors.warning : statusColor(risk)}
+        right={`Risk ${risk}`}
+        width={terminal.width}
+      />
 
-      <Box flexDirection={stacked ? "column" : "row"} width="100%" flexGrow={1} minHeight={8}>
-        <Panel title="Targets" focusState={focus.focusState("targets")} width={stacked ? "100%" : mainWidth} height={stacked ? undefined : "100%"} flexGrow={stacked ? 1 : undefined}>
-          <Box flexDirection="column">
-            {loading && <Spinner label="Scanning for removable files..." />}
-            {targets.map((t) => (
-              <Box key={t.path} minWidth={0}>
-                <Text color={getTargetColor(t)} wrap="truncate">
-                  {t.status === "done" ? icons.check : t.status === "failed" ? icons.cross : t.status === "removing" ? icons.spinner[0] : icons.circle}
-                  {" "}{t.path}
-                </Text>
-                <Text color={colors.textDim}> ({t.size})</Text>
-                {t.error && <Text color={colors.error} wrap="truncate"> {t.error.code}</Text>}
-              </Box>
-            ))}
-            {!loading && targets.length === 0 && (
-              <Text color={colors.success}>{icons.check} Nothing to clean!</Text>
-            )}
-          </Box>
-        </Panel>
+      {layout.stacked ? (
+        <StackedClean
+          layout={layout}
+          targets={targets}
+          phase={phase}
+          mode={mode}
+          message={message}
+          totalBytes={totalBytes}
+          failed={failed}
+          risk={risk}
+          focus={focus.focusState}
+          inputActive={focus.isActive("input")}
+          inputBounds={focus.activeItem?.id === "input" ? focus.activeItem.bounds : undefined}
+          onConfirm={handleConfirm}
+        />
+      ) : (
+        <WideClean
+          layout={layout}
+          targets={targets}
+          phase={phase}
+          mode={mode}
+          message={message}
+          totalBytes={totalBytes}
+          failed={failed}
+          risk={risk}
+          focus={focus.focusState}
+          inputActive={focus.isActive("input")}
+          inputBounds={focus.activeItem?.id === "input" ? focus.activeItem.bounds : undefined}
+          onConfirm={handleConfirm}
+        />
+      )}
 
-        <Panel title="Info" focusState={focus.focusState("info")} width={stacked ? "100%" : sideWidth} height={stacked ? 9 : "100%"}>
-          <Box flexDirection="column">
-            <Text color={colors.textBright} bold>Mode: {mode}</Text>
-            {mode === "deps" && <Text color={colors.text}>Removes installed dependencies and dependency caches.</Text>}
-            {mode === "share" && <Text color={colors.text}>Removes sensitive and system-local files.</Text>}
-            {mode === "all" && <Text color={colors.text}>Removes dependencies, build output, caches, and local env files.</Text>}
-            <Text> </Text>
-            <Text color={colors.heading} bold>STATE</Text>
-            <Text color={colors.text}>Targets: {targets.length}</Text>
-            <Text color={targets.some((target) => target.status === "failed") ? colors.error : colors.textDim}>
-              Failed: {targets.filter((target) => target.status === "failed").length}
-            </Text>
-            <Text color={cleaning ? colors.warning : done ? colors.success : colors.textDim}>
-              {done ? "Complete" : cleaning ? "Cleaning..." : loading ? "Scanning..." : "Ready"}
-            </Text>
-          </Box>
-        </Panel>
-      </Box>
-
-      <StatusBar stepProgress={done ? "clean complete" : cleaning ? "cleaning..." : "scanning"} />
+      <TuiFooter
+        width={terminal.width}
+        left="Ctrl+C abort · Tab next panel · ←/↑/↓/→ navigate · Type CLEAN confirm · q quit outside input"
+        right={`${targets.length} targets · ${formatSize(totalBytes)}`}
+      />
     </Box>
   );
 }
 
-function buildFocusItems(width: number, height: number, mainWidth: number, sideWidth: number, stacked: boolean): FocusItem[] {
-  if (stacked) {
+function WideClean(props: CleanViewProps) {
+  return (
+    <Box flexDirection="row" width={props.layout.width} height={props.layout.bodyHeight}>
+      <Panel title="Targets" focusState={props.focus("targets")} width={props.layout.targetsWidth} height="100%">
+        <TargetsPanel {...props} />
+      </Panel>
+      <Panel title="Safety Review" focusState={props.focus("review")} width={props.layout.reviewWidth} height="100%">
+        <SafetyPanel {...props} />
+      </Panel>
+      <Panel title="Risk Summary" focusState={props.focus("risk")} width={props.layout.riskWidth} height="100%">
+        <RiskPanel {...props} />
+      </Panel>
+    </Box>
+  );
+}
+
+function StackedClean(props: CleanViewProps) {
+  const targetsHeight = Math.max(8, Math.floor(props.layout.bodyHeight * 0.45));
+  const reviewHeight = Math.max(7, Math.floor(props.layout.bodyHeight * 0.32));
+  const riskHeight = Math.max(5, props.layout.bodyHeight - targetsHeight - reviewHeight);
+  return (
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
+      <Panel title="Targets" focusState={props.focus("targets")} width="100%" height={targetsHeight}>
+        <TargetsPanel {...props} limit={targetsHeight - 3} />
+      </Panel>
+      <Panel title="Safety Review" focusState={props.focus("review")} width="100%" height={reviewHeight}>
+        <SafetyPanel {...props} />
+      </Panel>
+      <Panel title="Risk Summary" focusState={props.focus("risk")} width="100%" height={riskHeight}>
+        <RiskPanel {...props} compact />
+      </Panel>
+    </Box>
+  );
+}
+
+function TargetsPanel({ targets, phase, limit = 12 }: CleanViewProps & { limit?: number }) {
+  return (
+    <Box flexDirection="column">
+      {phase === "scanning" && <Spinner label="Scanning for removable files..." />}
+      {targets.slice(0, Math.max(1, limit)).map((target) => (
+        <Box key={target.path} minWidth={0} justifyContent="space-between">
+          <Box minWidth={0} flexShrink={1}>
+            <Text color={getTargetColor(target)} wrap="truncate">
+              {target.status === "done" ? icons.check : target.status === "failed" ? icons.cross : target.status === "removing" ? icons.spinner[0] : icons.circle}
+              {" "}{target.path}
+            </Text>
+          </Box>
+          <Text color={colors.textDim}> {target.size}</Text>
+        </Box>
+      ))}
+      {targets.length > limit && <Text color={colors.textDim}>… {targets.length - limit} more targets</Text>}
+      {phase !== "scanning" && targets.length === 0 && <Text color={colors.success}>{icons.check} Nothing to clean.</Text>}
+    </Box>
+  );
+}
+
+function SafetyPanel({ layout, mode, phase, message, targets, inputActive, inputBounds, focus, onConfirm }: CleanViewProps) {
+  const willDelete = targets.filter((target) => target.status === "pending" || target.status === "removing").length;
+  return (
+    <Box flexDirection="column" flexGrow={1} minHeight={0}>
+      <Box flexDirection="column" flexGrow={1}>
+        <Text color={colors.heading} bold>WHAT WILL BE DELETED</Text>
+        <Text color={colors.text} wrap="truncate">{modeDescription(mode)}</Text>
+        <Text color={colors.heading} bold>WHAT WILL BE PROTECTED</Text>
+        <Text color={colors.textDim} wrap="truncate">Source code, git history, and tracked config files are not targeted.</Text>
+        <Text color={phase === "blocked" ? colors.warning : phase === "done" ? colors.success : colors.text} wrap="truncate">{message}</Text>
+        <KVRow label="Pending targets" value={willDelete} color={willDelete > 0 ? colors.warning : colors.success} />
+      </Box>
+      {(phase === "review" || phase === "blocked") && (
+        <ChatInput
+          active={inputActive}
+          focusState={focus("input")}
+          onSubmit={onConfirm}
+          placeholder='Type CLEAN to confirm deletion...'
+          width={Math.max(12, layout.reviewWidth - 4)}
+          maxLines={layout.inputMaxLines}
+          scrollBounds={inputBounds}
+        />
+      )}
+    </Box>
+  );
+}
+
+function RiskPanel({ phase, risk, failed, totalBytes, targets, compact = false }: CleanViewProps & { compact?: boolean }) {
+  return (
+    <Box flexDirection="column">
+      <MetricText value={formatSize(totalBytes)} label="estimated space" color={totalBytes > 0 ? colors.error : colors.success} />
+      <KVRow label="Risk level" value={risk} color={statusColor(risk)} />
+      <KVRow label="Phase" value={phase} color={statusColor(phase)} />
+      <KVRow label="Failed" value={failed} color={failed > 0 ? colors.error : colors.success} />
+      {!compact && targets.filter((target) => target.type === "sensitive").slice(0, 4).map((target) => (
+        <Text key={target.path} color={colors.error} wrap="truncate">● sensitive: {target.path}</Text>
+      ))}
+      {!compact && <Text color={colors.textDim} wrap="wrap">This action is irreversible unless the files are backed up elsewhere.</Text>}
+    </Box>
+  );
+}
+
+export function buildCleanLayout(width: number, height: number): CleanLayoutGeometry {
+  const bodyHeight = Math.max(8, height - 2);
+  const stacked = width < 106 || bodyHeight < 22;
+  const targetsWidth = stacked ? width : clamp(Math.floor(width * 0.30), 28, 42);
+  const riskWidth = stacked ? width : clamp(Math.floor(width * 0.27), 28, 40);
+  const reviewWidth = stacked ? width : width - targetsWidth - riskWidth;
+  const inputMaxLines = Math.max(1, Math.min(4, Math.floor(bodyHeight / 6)));
+  const inputHeight = inputMaxLines + 2;
+  const inputBounds = { x: stacked ? 3 : targetsWidth + 3, y: Math.max(4, height - inputHeight - 1), width: Math.max(8, reviewWidth - 6), height: inputHeight };
+  return { width, height, stacked, bodyHeight, targetsWidth, reviewWidth, riskWidth, inputMaxLines, inputHeight, inputBounds };
+}
+
+export function buildCleanFocusItems(layout: CleanLayoutGeometry): FocusItem[] {
+  if (layout.stacked) {
+    const targetsHeight = Math.max(8, Math.floor(layout.bodyHeight * 0.45));
+    const reviewHeight = Math.max(7, Math.floor(layout.bodyHeight * 0.32));
+    const riskHeight = Math.max(5, layout.bodyHeight - targetsHeight - reviewHeight);
     return [
-      { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width, height: Math.max(8, height - 10) } },
-      { id: "info", row: 1, column: 0, bounds: { x: 1, y: Math.max(3, height - 8), width, height: 7 } },
+      { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.width, height: targetsHeight } },
+      { id: "review", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: 2 + targetsHeight, width: layout.width, height: reviewHeight } },
+      { id: "input", row: 2, column: 0, parentIds: ["review"], bounds: layout.inputBounds },
+      { id: "risk", row: 3, column: 0, bounds: { x: 1, y: 2 + targetsHeight + reviewHeight, width: layout.width, height: riskHeight } },
     ];
   }
   return [
-    { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: mainWidth, height: height - 2 } },
-    { id: "info", row: 0, column: 1, bounds: { x: mainWidth + 1, y: 2, width: sideWidth, height: height - 2 } },
+    { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.targetsWidth, height: layout.bodyHeight } },
+    { id: "review", row: 0, column: 1, redirectTo: "input", bounds: { x: layout.targetsWidth + 1, y: 2, width: layout.reviewWidth, height: layout.bodyHeight } },
+    { id: "input", row: 1, column: 1, parentIds: ["review"], bounds: layout.inputBounds },
+    { id: "risk", row: 0, column: 2, bounds: { x: layout.targetsWidth + layout.reviewWidth + 1, y: 2, width: layout.riskWidth, height: layout.bodyHeight } },
   ];
+}
+
+interface CleanViewProps {
+  layout: CleanLayoutGeometry;
+  targets: CleanTarget[];
+  phase: CleanPhase;
+  mode: "deps" | "share" | "all";
+  message: string;
+  totalBytes: number;
+  failed: number;
+  risk: string;
+  focus: (id: string) => "focused" | "ancestor" | undefined;
+  inputActive: boolean;
+  inputBounds?: FocusBounds;
+  onConfirm: (text: string) => void;
 }
 
 async function findCleanTargets(cwd: string, mode: string): Promise<CleanTarget[]> {
   const targets: CleanTarget[] = [];
-
   const depsDirs = ["node_modules", "__pycache__", "venv", ".venv", "vendor", "target/debug"];
   const buildDirs = ["dist", "build", ".next", ".nuxt", ".output", "out"];
   const cacheDirs = [".cache", ".turbo", ".parcel-cache", ".vite"];
@@ -133,46 +305,43 @@ async function findCleanTargets(cwd: string, mode: string): Promise<CleanTarget[
 
   if (mode === "deps" || mode === "all") {
     for (const dir of depsDirs) {
-      const size = await getDirSize(join(cwd, dir));
-      if (size) targets.push({ path: dir, size, type: "deps", status: "pending" });
+      const info = await getPathSize(join(cwd, dir));
+      if (info) targets.push({ path: dir, size: info.size, bytes: info.bytes, type: "deps", status: "pending" });
     }
   }
-
   if (mode === "all") {
     for (const dir of [...buildDirs, ...cacheDirs]) {
-      const size = await getDirSize(join(cwd, dir));
-      if (size) targets.push({ path: dir, size, type: "build", status: "pending" });
+      const info = await getPathSize(join(cwd, dir));
+      if (info) targets.push({ path: dir, size: info.size, bytes: info.bytes, type: "build", status: "pending" });
     }
   }
-
   if (mode === "share" || mode === "all") {
     for (const file of sensitiveFiles) {
       if (!file.includes("*")) {
-        const size = await getFileSize(join(cwd, file));
-        if (size) targets.push({ path: file, size, type: "sensitive", status: "pending" });
+        const info = await getPathSize(join(cwd, file));
+        if (info) targets.push({ path: file, size: info.size, bytes: info.bytes, type: "sensitive", status: "pending" });
       }
     }
   }
-
   return targets;
 }
 
 async function cleanTargets(cwd: string, targets: CleanTarget[]): Promise<CleanTarget[]> {
   const results = [...targets];
-  for (let i = 0; i < results.length; i++) {
-    results[i] = { ...results[i], status: "removing" };
+  for (let index = 0; index < results.length; index++) {
+    results[index] = { ...results[index], status: "removing" };
     try {
-      await rm(join(cwd, results[i].path), { recursive: true, force: true });
-      results[i] = { ...results[i], status: "done" };
+      await rm(join(cwd, results[index].path), { recursive: true, force: true });
+      results[index] = { ...results[index], status: "done" };
     } catch (err) {
-      results[i] = {
-        ...results[i],
+      results[index] = {
+        ...results[index],
         status: "failed",
         error: createSetuprError({
           code: "CLEAN_TARGET_FAILED",
           command: "clean",
           cwd,
-          details: [`Target: ${results[i].path}`, err instanceof Error ? err.message : String(err)],
+          details: [`Target: ${results[index].path}`, err instanceof Error ? err.message : String(err)],
         }),
       };
     }
@@ -180,34 +349,35 @@ async function cleanTargets(cwd: string, targets: CleanTarget[]): Promise<CleanT
   return results;
 }
 
-async function getDirSize(path: string): Promise<string | null> {
+async function getPathSize(path: string): Promise<{ size: string; bytes: number } | null> {
   try {
-    const s = await stat(path);
-    if (!s.isDirectory()) return null;
-    return formatSize(s.size || 4096);
+    const item = await stat(path);
+    const bytes = item.isDirectory() ? item.size || 4096 : item.size;
+    return { size: formatSize(bytes), bytes };
   } catch {
     return null;
   }
 }
 
-async function getFileSize(path: string): Promise<string | null> {
-  try {
-    const s = await stat(path);
-    return formatSize(s.size);
-  } catch {
-    return null;
-  }
+function modeDescription(mode: "deps" | "share" | "all"): string {
+  if (mode === "deps") return "Dependency folders and dependency caches.";
+  if (mode === "share") return "Local sensitive and machine-specific files.";
+  return "Dependencies, build outputs, caches, and local env files.";
 }
 
 function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)}KB`;
-  return `${(bytes / 1048576).toFixed(1)}MB`;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-function getTargetColor(t: CleanTarget): string {
-  if (t.status === "done") return colors.success;
-  if (t.status === "failed") return colors.error;
-  if (t.status === "removing") return colors.accent;
-  return colors.text;
+function getTargetColor(target: CleanTarget): string {
+  if (target.status === "done") return colors.success;
+  if (target.status === "failed") return colors.error;
+  if (target.status === "removing") return colors.accent;
+  return target.type === "sensitive" ? colors.warning : colors.text;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }

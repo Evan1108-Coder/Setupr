@@ -6,6 +6,8 @@ import { buildDashboardFocusItems, buildDashboardLayout } from "../src/tui/layou
 import { buildDoctorFocusItems, buildDoctorLayout } from "../src/tui/layouts/DoctorLayout.js";
 import { buildEnvFocusItems, buildEnvLayout } from "../src/tui/layouts/EnvLayout.js";
 import { buildStartFocusItems, buildStartLayout } from "../src/tui/layouts/StartLayout.js";
+import { buildUpdateFocusItems, buildUpdateLayout } from "../src/tui/layouts/UpdateLayout.js";
+import { buildCleanFocusItems, buildCleanLayout } from "../src/tui/layouts/CleanLayout.js";
 
 const wideSetupItems: FocusItem[] = [
   { id: "steps", row: 0, column: 0, bounds: { x: 1, y: 2, width: 20, height: 6 } },
@@ -144,6 +146,46 @@ describe("TUI focus navigation", () => {
     const cases = [
       { layout: buildStartLayout(76, 22), items: buildStartFocusItems(buildStartLayout(76, 22)) },
       { layout: buildDoctorLayout(76, 22), items: buildDoctorFocusItems(buildDoctorLayout(76, 22)) },
+    ];
+    for (const { layout, items } of cases) {
+      const maxBottom = Math.max(...items.map((item) => (item.bounds?.y || 0) + (item.bounds?.height || 0)));
+      expect(layout.stacked).toBe(true);
+      expect(maxBottom).toBeLessThanOrEqual(layout.height + 2);
+    }
+  });
+
+  it("keeps update confirmation input inside the packages panel", () => {
+    const layout = buildUpdateLayout(150, 36);
+    const items = buildUpdateFocusItems(layout);
+    const packages = items.find((item) => item.id === "packages");
+    const input = items.find((item) => item.id === "input");
+    const risks = items.find((item) => item.id === "risks");
+
+    expect(layout.stacked).toBe(false);
+    expect(input?.parentIds).toContain("packages");
+    expect(input?.bounds?.y).toBeGreaterThan(24);
+    expect(findDirectionalFocusItem(items, input!, "right", ["input", "packages"])?.id).toBe("notices");
+    expect(findDirectionalFocusItem(items, risks!, "left", ["risks"])?.id).toBe("packages");
+  });
+
+  it("keeps clean confirmation input inside the safety review panel", () => {
+    const layout = buildCleanLayout(150, 34);
+    const items = buildCleanFocusItems(layout);
+    const review = items.find((item) => item.id === "review");
+    const input = items.find((item) => item.id === "input");
+    const risk = items.find((item) => item.id === "risk");
+
+    expect(layout.stacked).toBe(false);
+    expect(input?.parentIds).toContain("review");
+    expect(input?.bounds?.y).toBeGreaterThan(24);
+    expect(findDirectionalFocusItem(items, input!, "right", ["input", "review"])?.id).toBe("risk");
+    expect(findDirectionalFocusItem(items, risk!, "left", ["risk"])?.id).toBe("review");
+  });
+
+  it("stacks update/clean layouts without overflowing constrained terminals", () => {
+    const cases = [
+      { layout: buildUpdateLayout(76, 22), items: buildUpdateFocusItems(buildUpdateLayout(76, 22)) },
+      { layout: buildCleanLayout(76, 22), items: buildCleanFocusItems(buildCleanLayout(76, 22)) },
     ];
     for (const { layout, items } of cases) {
       const maxBottom = Math.max(...items.map((item) => (item.bounds?.y || 0) + (item.bounds?.height || 0)));

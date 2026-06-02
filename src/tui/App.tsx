@@ -69,7 +69,7 @@ export function App({ command, cwd, store, cleanMode = "deps", force = false, da
     case "update":
       return scan ? <UpdateLayout scan={scan} cwd={cwd} /> : <SetupLayout store={store} />;
     case "clean":
-      return scan ? <CleanLayout scan={scan} cwd={cwd} mode={cleanMode} /> : <SetupLayout store={store} />;
+      return scan ? <CleanLayout scan={scan} cwd={cwd} mode={cleanMode} force={force} /> : <SetupLayout store={store} />;
     case "auth":
       return <AuthLayout />;
     case "chat":

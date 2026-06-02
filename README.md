@@ -45,7 +45,7 @@ setupr setup --plain
 | `start` | Start and track a managed project process |
 | `doctor` | Diagnose environment health (runtimes, deps, ports) |
 | `update` | Check for dependency updates with breaking change warnings |
-| `clean` | Remove artifacts (`--deps`, `--share`, `--all`; positional `deps`, `share`, `all` also work) |
+| `clean` | Review and remove artifacts (`--deps`, `--share`, `--all`; positional `deps`, `share`, `all` also work) |
 | `auth` | Manage global Setupr AI provider API keys and models |
 
 ### Non-TUI Commands (Plain Terminal)
@@ -466,6 +466,8 @@ Project-level config via `.setupr.json`:
 - **q**: Quit when focus is not inside an input
 
 The TUI runs in the terminal alternate screen, so exiting returns to the original shell history instead of leaving the dashboard printed in the scrollback. It enables SGR mouse reporting and bracketed paste while active, then disables both on cleanup. It does not set a background color; Terminal, iTerm2, Ghostty, and other terminal profiles keep control of their own theme/background. Panels are drawn with Unicode box-drawing characters because terminal UIs render in character cells rather than graphical window primitives.
+
+Setupr TUIs share the same terminal-native style: blue uppercase panel titles, thin blue borders, yellow focused borders/actions, green success states, yellow warnings/current work, and red failures. Interactive inputs stay anchored at the bottom of their panel, wrap within the box, and scroll once long input reaches the panel's line cap. `setupr clean` opens a safety review first; type `CLEAN` to delete reviewed targets, or use `--force` only when you intentionally want Setupr to skip the review prompt.
 
 ## Requirements
 

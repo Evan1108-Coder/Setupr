@@ -3,7 +3,7 @@ import { Box, Text, useApp } from "ink";
 import { getDefaultModel, getProviderEnvValue, getProviderKeySource, MODELS, PROVIDERS, type AIProvider } from "../../ai/models.js";
 import { AUTH_PROVIDERS, maskApiKey } from "../../auth/secrets.js";
 import { Panel } from "../components/Panel.js";
-import { StatusBar } from "../components/StatusBar.js";
+import { KVRow, TuiFooter, TuiHeader } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { colors } from "../theme.js";
@@ -43,10 +43,7 @@ export function AuthLayout() {
   if (layout.mode === "compact") {
     return (
       <Box key={`${terminal.width}x${terminal.height}`} flexDirection="column" width={terminal.width} height={terminal.height}>
-        <Box height={1} justifyContent="space-between">
-          <Text color={colors.primary} bold> Setupr Auth</Text>
-          <Text color={colors.textDim} wrap="truncate">masked keys only</Text>
-        </Box>
+        <TuiHeader command="setupr auth" title="masked keys only" status={`${rows.filter((row) => row.configured).length} providers`} width={terminal.width} />
 
         <Panel title="Auth Overview" focusState={focus.focusState("overview")} width="100%" height={layout.contentHeight}>
           <Box flexDirection="column" width="100%" minWidth={0}>
@@ -65,17 +62,14 @@ export function AuthLayout() {
           </Box>
         </Panel>
 
-        <StatusBar stepProgress={`${rows.filter((row) => row.configured).length} providers configured`} />
+        <TuiFooter width={terminal.width} left="Ctrl+C abort · Tab next panel · ←/↑/↓/→ navigate · q quit" right={`${rows.filter((row) => row.configured).length} providers configured`} />
       </Box>
     );
   }
 
   return (
     <Box key={`${terminal.width}x${terminal.height}`} flexDirection="column" width={terminal.width} height={terminal.height}>
-      <Box height={1} justifyContent="space-between">
-        <Text color={colors.primary} bold> Setupr Auth</Text>
-        <Text color={colors.textDim}>global auth · masked keys only</Text>
-      </Box>
+      <TuiHeader command="setupr auth" title="global auth" status={activeModel.id} statusColor={colors.success} right="masked keys only" width={terminal.width} />
 
       <Box flexDirection={layout.stacked ? "column" : "row"} width="100%" height={layout.contentHeight} flexShrink={1} overflow="hidden">
         <Panel title="Providers" focusState={focus.focusState("providers")} width={layout.stacked ? "100%" : layout.providers.width} height={layout.providers.height}>
@@ -89,37 +83,74 @@ export function AuthLayout() {
           </Box>
         </Panel>
 
-        <Panel title="Model" focusState={focus.focusState("model")} width={layout.stacked ? "100%" : layout.model.width} height={layout.model.height}>
-          <Box flexDirection="column">
-            <Text color={colors.heading} bold>ACTIVE</Text>
-            <Text color={colors.textBright} wrap="truncate">{activeModel.id}</Text>
-            {layout.model.height >= 7 && <Text color={colors.textDim} wrap="truncate">{LABELS[activeModel.provider]} · {activeModel.name}</Text>}
-            {layout.model.height >= 8 && <Text> </Text>}
-            {layout.model.height >= 6 && <Text color={colors.heading} bold>AVAILABLE</Text>}
-            {availableModels.length > 0 ? availableModels.slice(0, layout.modelLimit).map((model) => (
-              <Text key={model.id} color={model.id === activeModel.id ? colors.accent : colors.text} wrap="truncate">
-                {model.id === activeModel.id ? "★" : "•"} {model.id}
-              </Text>
-            )) : <Text color={colors.warning}>No provider keys configured</Text>}
-          </Box>
+        <Panel title="Active Model" focusState={focus.focusState("model")} width={layout.stacked ? "100%" : layout.model.width} height={layout.stacked ? layout.model.height : Math.max(8, Math.floor(layout.model.height * 0.36))}>
+          <ModelPanel activeModel={activeModel} />
         </Panel>
 
-        <Panel title="Actions" focusState={focus.focusState("actions")} width={layout.stacked ? "100%" : layout.actions.width} height={layout.actions.height}>
-          <Box flexDirection="column">
-            <Text color={colors.heading} bold>COMMANDS</Text>
-            <Text color={colors.text} wrap="truncate">setup auth set-key github</Text>
-            <Text color={colors.text} wrap="truncate">setup auth test</Text>
-            <Text color={colors.text} wrap="truncate">setup auth use &lt;model&gt;</Text>
-            {layout.actions.height >= 8 && <Text color={colors.text} wrap="truncate">setup auth migrate</Text>}
-            {layout.actions.height >= 10 && <Text> </Text>}
-            {layout.actions.height >= 7 && <Text color={colors.heading} bold>STORAGE</Text>}
-            {layout.actions.height >= 7 && <Text color={colors.textDim} wrap="truncate">~/.setupr/secrets.json</Text>}
-            {layout.actions.height >= 9 && <Text color={colors.textDim} wrap="truncate">mode 0600 · project .env stays app-only</Text>}
-          </Box>
-        </Panel>
+        {!layout.stacked && (
+          <Panel title="Model Catalog" focusState={focus.focusState("catalog")} width={layout.model.width} height={layout.model.height - Math.max(8, Math.floor(layout.model.height * 0.36))}>
+            <ModelCatalog availableModels={availableModels} activeModelId={activeModel.id} limit={layout.modelLimit} />
+          </Panel>
+        )}
+
+        <Box flexDirection="column" width={layout.stacked ? "100%" : layout.actions.width} height={layout.actions.height}>
+          <Panel title="Test Results" focusState={focus.focusState("tests")} width="100%" height={layout.stacked ? Math.max(6, Math.floor(layout.actions.height * 0.46)) : Math.max(8, Math.floor(layout.actions.height * 0.48))}>
+            <TestResults rows={rows} activeModelProvider={activeModel.provider} />
+          </Panel>
+          <Panel title="Secure Storage" focusState={focus.focusState("storage")} width="100%" flexGrow={1} minHeight={6}>
+            <StoragePanel />
+          </Panel>
+        </Box>
       </Box>
 
-      <StatusBar stepProgress={`${rows.filter((row) => row.configured).length} providers configured`} />
+      <TuiFooter width={terminal.width} left="Ctrl+C abort · Tab next panel · ←/↑/↓/→ navigate · q quit · use auth subcommands to edit keys" right={`${rows.filter((row) => row.configured).length} providers configured`} />
+    </Box>
+  );
+}
+
+function ModelPanel({ activeModel }: { activeModel: (typeof MODELS)[number] }) {
+  return (
+    <Box flexDirection="column">
+      <KVRow label="Provider" value={LABELS[activeModel.provider]} />
+      <KVRow label="Model" value={activeModel.id} color={colors.success} />
+      <KVRow label="Status" value={getProviderEnvValue(activeModel.provider) ? "ready" : "missing key"} color={getProviderEnvValue(activeModel.provider) ? colors.success : colors.warning} />
+      <KVRow label="Context" value={`${activeModel.maxTokens.toLocaleString()} tokens`} />
+      <KVRow label="Price" value={activeModel.pricingKnown === false ? "unknown" : `$${activeModel.costPer1kInput}/$${activeModel.costPer1kOutput}`} dim />
+    </Box>
+  );
+}
+
+function ModelCatalog({ availableModels, activeModelId, limit }: { availableModels: typeof MODELS; activeModelId: string; limit: number }) {
+  if (availableModels.length === 0) return <Text color={colors.warning}>No provider keys configured</Text>;
+  return (
+    <Box flexDirection="column">
+      {availableModels.slice(0, limit).map((model) => (
+        <Text key={model.id} color={model.id === activeModelId ? colors.accent : colors.text} wrap="truncate">
+          {model.id === activeModelId ? "★" : "•"} {model.id}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
+function TestResults({ rows, activeModelProvider }: { rows: Array<{ provider: AIProvider; label: string; key?: string; source: string | null; configured: boolean }>; activeModelProvider: AIProvider }) {
+  return (
+    <Box flexDirection="column">
+      {rows.filter((row) => row.configured || row.provider === activeModelProvider).slice(0, 5).map((row) => (
+        <KVRow key={row.provider} label={row.label} value={row.configured ? "ready" : "missing"} color={row.configured ? colors.success : colors.warning} />
+      ))}
+      <Text color={colors.textDim} wrap="truncate">Run setupr auth test for live provider checks.</Text>
+    </Box>
+  );
+}
+
+function StoragePanel() {
+  return (
+    <Box flexDirection="column">
+      <KVRow label="Location" value="~/.setupr/secrets.json" />
+      <KVRow label="Mode" value="0600 expected" color={colors.success} />
+      <KVRow label="Keys" value="masked in TUI" color={colors.success} />
+      <KVRow label="Project .env" value="app vars only" dim />
     </Box>
   );
 }
@@ -228,13 +259,16 @@ function buildFocusItems(layout: AuthLayoutGeometry): FocusItem[] {
     return [
       { id: "providers", row: 0, column: 0, bounds: layout.providers },
       { id: "model", row: 1, column: 0, bounds: layout.model },
-      { id: "actions", row: 2, column: 0, bounds: layout.actions },
+      { id: "tests", row: 2, column: 0, bounds: layout.actions },
+      { id: "storage", row: 3, column: 0, bounds: layout.actions },
     ];
   }
   return [
     { id: "providers", row: 0, column: 0, bounds: layout.providers },
     { id: "model", row: 0, column: 1, bounds: layout.model },
-    { id: "actions", row: 0, column: 2, bounds: layout.actions },
+    { id: "catalog", row: 1, column: 1, bounds: layout.model },
+    { id: "tests", row: 0, column: 2, bounds: layout.actions },
+    { id: "storage", row: 1, column: 2, bounds: layout.actions },
   ];
 }
 

@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text, useApp } from "ink";
-import { Panel } from "../components/Panel.js";
-import { ChatInput } from "../components/ChatInput.js";
-import { StatusBar } from "../components/StatusBar.js";
-import { Spinner } from "../components/Spinner.js";
-import { useFocusNavigation, type FocusItem } from "../hooks/useFocusNavigation.js";
-import { useTerminalSize } from "../hooks/useTerminalSize.js";
-import { colors, icons } from "../theme.js";
-import { hasProjectSignals } from "../projectSignals.js";
-import { runCommand } from "../../executor/index.js";
 import { intelligentResponse } from "../../ai/intelligence.js";
 import { scanResultToDSL } from "../../ai/dsl.js";
 import { classifyCommandFailure, createSetuprError, fromUnknownError, type SetuprError } from "../../errors/index.js";
+import { runCommand } from "../../executor/index.js";
 import type { ScanResult } from "../../scanner/index.js";
+import { ChatInput } from "../components/ChatInput.js";
+import { Panel } from "../components/Panel.js";
+import { Spinner } from "../components/Spinner.js";
+import { KVRow, MetricText, TuiFooter, TuiHeader, statusColor } from "../components/TuiFrame.js";
+import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
+import { useTerminalSize } from "../hooks/useTerminalSize.js";
+import { hasProjectSignals } from "../projectSignals.js";
+import { colors, icons } from "../theme.js";
 
 interface OutdatedPkg {
   name: string;
@@ -32,20 +32,26 @@ interface UpdateLayoutProps {
   cwd: string;
 }
 
+interface UpdateLayoutGeometry {
+  width: number;
+  height: number;
+  stacked: boolean;
+  bodyHeight: number;
+  summaryHeight: number;
+  mainHeight: number;
+  mainWidth: number;
+  sideWidth: number;
+  summaryWidths: number[];
+  inputMaxLines: number;
+  inputHeight: number;
+  inputBounds: FocusBounds;
+}
+
 export function UpdateLayout({ scan, cwd }: UpdateLayoutProps) {
   const { exit } = useApp();
   const terminal = useTerminalSize();
-  const stacked = terminal.width < 96;
-  const mainWidth = stacked ? terminal.width : Math.max(46, Math.floor(terminal.width * 0.62));
-  const sideWidth = stacked ? terminal.width : terminal.width - mainWidth;
-  const mainPanelHeight = stacked ? Math.max(8, terminal.height - 11) : terminal.height - 2;
-  const inputLines = inputLinesForPanel(mainPanelHeight);
-  const packageLimit = Math.max(1, mainPanelHeight - inputLines - 7);
-  const focusItems = useMemo(
-    () => buildFocusItems(terminal.width, terminal.height, mainWidth, sideWidth, stacked),
-    [terminal.width, terminal.height, mainWidth, sideWidth, stacked]
-  );
-  const focus = useFocusNavigation({ items: focusItems, onQuit: () => exit() });
+  const layout = useMemo(() => buildUpdateLayout(terminal.width, terminal.height), [terminal.width, terminal.height]);
+  const focus = useFocusNavigation({ items: useMemo(() => buildUpdateFocusItems(layout), [layout]), onQuit: () => exit() });
   const [packages, setPackages] = useState<OutdatedPkg[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
@@ -65,7 +71,7 @@ export function UpdateLayout({ scan, cwd }: UpdateLayoutProps) {
   const handleChat = useCallback(async (text: string) => {
     setChatMessages((prev) => [...prev, `You → ${text}`]);
     const dsl = scanResultToDSL(scan);
-    const outdatedContext = packages.map((p) => `${p.name}: ${p.current}→${p.latest} (${p.type})`).join(", ");
+    const outdatedContext = packages.map((pkg) => `${pkg.name}: ${pkg.current}→${pkg.latest} (${pkg.type})`).join(", ");
     const result = await intelligentResponse(
       `${text}\n\nOutdated packages: ${outdatedContext || "none"}`,
       scan,
@@ -74,135 +80,295 @@ export function UpdateLayout({ scan, cwd }: UpdateLayoutProps) {
     setChatMessages((prev) => [...prev, `AI → ${result.response}`]);
   }, [scan, packages]);
 
-  const majorCount = packages.filter((p) => p.type === "major").length;
-  const minorCount = packages.filter((p) => p.type === "minor").length;
-  const patchCount = packages.filter((p) => p.type === "patch").length;
+  const counts = packageCounts(packages);
+  const risk = counts.major > 0 ? "High" : counts.minor > 0 ? "Medium" : counts.patch > 0 ? "Low" : "Clean";
 
   return (
     <Box flexDirection="column" width={terminal.width} height={terminal.height}>
-      <Box height={1} justifyContent="space-between">
-        <Text color={colors.primary} bold> Setupr Update</Text>
-        <Text color={noProject ? colors.warning : colors.textDim}>
-          {noProject ? "no project" : loading ? "scanning..." : `${packages.length} outdated`}
-        </Text>
-      </Box>
+      <TuiHeader
+        command="setupr update"
+        cwd={cwd}
+        stack={buildStack(scan)}
+        status={noProject ? "no project" : loading ? "scanning" : `${packages.length} outdated`}
+        statusColor={noProject || error ? colors.warning : statusColor(risk)}
+        right={noProject ? "no project" : `Risk ${risk}`}
+        width={terminal.width}
+      />
 
-      <Box flexDirection={stacked ? "column" : "row"} width="100%" flexGrow={1} minHeight={8}>
-        <Panel title="Outdated Dependencies" focusState={focus.focusState("packages")} width={stacked ? "100%" : mainWidth} height={stacked ? undefined : "100%"} flexGrow={stacked ? 1 : undefined}>
-          <Box flexDirection="column" flexGrow={1}>
-            <Box flexDirection="column" flexGrow={1}>
-              {loading && <Spinner label="Checking for updates..." />}
-              {!loading && noProject && (
-                <Text color={colors.warning}>{icons.warning} {error?.title || "No project files detected in this directory."}</Text>
-              )}
-              {!loading && error && (
-                <Box flexDirection="column">
-                  <Text color={error.severity === "info" ? colors.info : colors.warning}>{icons.warning} {error.code}</Text>
-                  <Text color={colors.text}>{error.explanation}</Text>
-                  {error.details?.slice(0, 3).map((detail, i) => (
-                    <Text key={i} color={colors.textDim} wrap="truncate">  {detail}</Text>
-                  ))}
-                </Box>
-              )}
-              {!loading && notice && (
-                <Text color={colors.warning}>{icons.warning} {notice}</Text>
-              )}
-              {!loading && !noProject && !notice && !error && packages.length === 0 && (
-                <Text color={colors.success}>{icons.check} All dependencies up to date!</Text>
-              )}
-              {packages.slice(0, packageLimit).map((pkg) => (
-                <Box key={pkg.name} minWidth={0}>
-                  <Text color={getTypeColor(pkg.type)} wrap="truncate">
-                    {pkg.type === "major" ? icons.warning : icons.dot} {pkg.name}
-                  </Text>
-                  <Text color={colors.textDim}> {pkg.current} → </Text>
-                  <Text color={getTypeColor(pkg.type)}>{pkg.latest}</Text>
-                </Box>
-              ))}
-              {packages.length > packageLimit && (
-                <Text color={colors.textDim}>  ... and {packages.length - packageLimit} more</Text>
-              )}
-            </Box>
-            <ChatInput
-              active={focus.isActive("input")}
-              focusState={focus.focusState("input")}
-              onSubmit={handleChat}
-              placeholder="Ask about updates..."
-              width={mainWidth}
-              maxLines={inputLines}
-              scrollBounds={focus.activeItem?.id === "input" ? focus.activeItem.bounds : undefined}
-            />
-          </Box>
-        </Panel>
+      {layout.stacked ? (
+        <StackedUpdate
+          layout={layout}
+          packages={packages}
+          counts={counts}
+          risk={risk}
+          loading={loading}
+          notice={notice}
+          error={error}
+          noProject={noProject}
+          scan={scan}
+          chatMessages={chatMessages}
+          focus={focus.focusState}
+          inputActive={focus.isActive("input")}
+          inputBounds={focus.activeItem?.id === "input" ? focus.activeItem.bounds : undefined}
+          onChat={handleChat}
+        />
+      ) : (
+        <WideUpdate
+          layout={layout}
+          packages={packages}
+          counts={counts}
+          risk={risk}
+          loading={loading}
+          notice={notice}
+          error={error}
+          noProject={noProject}
+          scan={scan}
+          chatMessages={chatMessages}
+          focus={focus.focusState}
+          inputActive={focus.isActive("input")}
+          inputBounds={focus.activeItem?.id === "input" ? focus.activeItem.bounds : undefined}
+          onChat={handleChat}
+        />
+      )}
 
-        <Panel title="Summary" focusState={focus.focusState("summary")} width={stacked ? "100%" : sideWidth} height={stacked ? 10 : "100%"}>
-          <Box flexDirection="column">
-            <Text color={colors.error}>{icons.dot} Major: <Text bold>{majorCount}</Text>{majorCount > 0 ? " BREAKING" : ""}</Text>
-            <Text color={colors.warning}>{icons.dot} Minor: <Text bold>{minorCount}</Text></Text>
-            <Text color={colors.success}>{icons.dot} Patch: <Text bold>{patchCount}</Text></Text>
-            <Text color={colors.textDim}> </Text>
-            <Text color={colors.text}>{icons.dot} PM: {scan.packageManager || "none"}</Text>
-            <Text color={colors.text}>{icons.dot} Total deps: {scan.dependencies.prod + scan.dependencies.dev}</Text>
-            {chatMessages.length > 0 && (
-              <>
-                <Text> </Text>
-                <Text color={colors.heading} bold>AI CHAT</Text>
-                {chatMessages.slice(-4).map((msg, i) => (
-                  <Text key={i} color={msg.startsWith("AI") ? colors.primary : colors.accent} wrap="truncate">{msg}</Text>
-                ))}
-              </>
-            )}
-          </Box>
-        </Panel>
-      </Box>
-
-      <StatusBar
-        stepProgress={noProject ? "no project" : loading ? "checking..." : `${packages.length} outdated`}
-        aiStatus={majorCount > 0 ? `${majorCount} breaking changes` : undefined}
+      <TuiFooter
+        width={terminal.width}
+        left="Ctrl+C abort · Tab next panel · ←/↑/↓/→ navigate · Enter ask/confirm · q quit outside input"
+        right={loading ? "checking..." : `${packages.length} outdated`}
       />
     </Box>
   );
 }
 
-function inputLinesForPanel(panelHeight: number): number {
-  return Math.max(1, Math.floor(panelHeight / 4));
+function WideUpdate(props: UpdateViewProps) {
+  return (
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
+      <Box flexDirection="row" width="100%" height={props.layout.summaryHeight}>
+        <Panel title="Major" focusState={props.focus("major")} width={props.layout.summaryWidths[0]} height="100%">
+          <MetricText value={props.counts.major} label="packages" color={props.counts.major ? colors.error : colors.success} />
+        </Panel>
+        <Panel title="Minor" focusState={props.focus("minor")} width={props.layout.summaryWidths[1]} height="100%">
+          <MetricText value={props.counts.minor} label="packages" color={props.counts.minor ? colors.warning : colors.success} />
+        </Panel>
+        <Panel title="Patch" focusState={props.focus("patch")} width={props.layout.summaryWidths[2]} height="100%">
+          <MetricText value={props.counts.patch} label="packages" color={props.counts.patch ? colors.accent : colors.success} />
+        </Panel>
+        <Panel title="Security" focusState={props.focus("security")} width={props.layout.summaryWidths[3]} height="100%">
+          <MetricText value={props.counts.major > 0 ? "review" : "ok"} label="risk gate" color={props.counts.major > 0 ? colors.error : colors.success} />
+        </Panel>
+      </Box>
+      <Box flexDirection="row" width="100%" flexGrow={1} minHeight={8}>
+        <PackagesPanel {...props} width={props.layout.mainWidth} height="100%" />
+        <Box flexDirection="column" width={props.layout.sideWidth} height="100%">
+          <Panel title="Breaking Risks" focusState={props.focus("risks")} width="100%" height={Math.max(8, Math.floor(props.layout.mainHeight * 0.54))}>
+            <RiskPanel {...props} />
+          </Panel>
+          <Panel title="Notices" focusState={props.focus("notices")} width="100%" flexGrow={1} minHeight={6}>
+            <NoticePanel {...props} />
+          </Panel>
+        </Box>
+      </Box>
+    </Box>
+  );
 }
 
-function buildFocusItems(width: number, height: number, mainWidth: number, sideWidth: number, stacked: boolean): FocusItem[] {
-  if (stacked) {
-    const mainPanelHeight = Math.max(8, height - 11);
-    const inputHeight = inputBoundsHeightForPanel(mainPanelHeight);
+function StackedUpdate(props: UpdateViewProps) {
+  const summaryHeight = Math.max(6, Math.floor(props.layout.bodyHeight * 0.24));
+  const sideHeight = Math.max(7, Math.floor(props.layout.bodyHeight * 0.25));
+  const packageHeight = Math.max(8, props.layout.bodyHeight - summaryHeight - sideHeight);
+  return (
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
+      <Box flexDirection="row" width="100%" height={summaryHeight}>
+        <Panel title="Major" focusState={props.focus("major")} width={Math.floor(props.layout.width / 3)} height="100%">
+          <MetricText value={props.counts.major} label="major" color={props.counts.major ? colors.error : colors.success} />
+        </Panel>
+        <Panel title="Minor" focusState={props.focus("minor")} width={Math.floor(props.layout.width / 3)} height="100%">
+          <MetricText value={props.counts.minor} label="minor" color={props.counts.minor ? colors.warning : colors.success} />
+        </Panel>
+        <Panel title="Patch" focusState={props.focus("patch")} width={props.layout.width - Math.floor(props.layout.width / 3) * 2} height="100%">
+          <MetricText value={props.counts.patch} label="patch" color={props.counts.patch ? colors.accent : colors.success} />
+        </Panel>
+      </Box>
+      <PackagesPanel {...props} width={props.layout.width} height={packageHeight} />
+      <Panel title="Risks + Notices" focusState={props.focus("risks")} width="100%" height={sideHeight}>
+        <RiskPanel {...props} compact />
+      </Panel>
+    </Box>
+  );
+}
+
+function PackagesPanel({
+  layout,
+  packages,
+  loading,
+  notice,
+  error,
+  noProject,
+  inputActive,
+  inputBounds,
+  focus,
+  onChat,
+  width,
+  height,
+}: UpdateViewProps & { width: number; height: number | string }) {
+  const packageLimit = Math.max(1, layout.mainHeight - layout.inputMaxLines - 7);
+  return (
+    <Panel title={`Outdated Packages (${packages.length})`} focusState={focus("packages")} width={width} height={height}>
+      <Box flexDirection="column" flexGrow={1} minHeight={0}>
+        <Box flexDirection="column" flexGrow={1} overflow="hidden">
+          <TableHeader />
+          {loading && <Spinner label="Checking for updates..." />}
+          {!loading && noProject && <Text color={colors.warning}>{icons.warning} {error?.title || "No project files detected in this directory."}</Text>}
+          {!loading && error && <ErrorBlock error={error} />}
+          {!loading && notice && <Text color={colors.warning}>{icons.warning} {notice}</Text>}
+          {!loading && !noProject && !notice && !error && packages.length === 0 && <Text color={colors.success}>{icons.check} All dependencies up to date.</Text>}
+          {packages.slice(0, packageLimit).map((pkg) => <PackageRow key={pkg.name} pkg={pkg} />)}
+          {packages.length > packageLimit && <Text color={colors.textDim}>… and {packages.length - packageLimit} more</Text>}
+        </Box>
+        <ChatInput
+          active={inputActive}
+          focusState={focus("input")}
+          onSubmit={onChat}
+          placeholder="Proceed with update? Ask about risk, or type a package name..."
+          width={Math.max(12, width - 4)}
+          maxLines={layout.inputMaxLines}
+          scrollBounds={inputBounds}
+        />
+      </Box>
+    </Panel>
+  );
+}
+
+function RiskPanel({ packages, counts, risk, scan, compact = false }: UpdateViewProps & { compact?: boolean }) {
+  return (
+    <Box flexDirection="column">
+      <KVRow label="Risk" value={risk} color={statusColor(risk)} />
+      <KVRow label="PM" value={scan.packageManager || "none"} />
+      <KVRow label="Total deps" value={scan.dependencies.prod + scan.dependencies.dev} />
+      {counts.major > 0 && <Text color={colors.error} wrap="truncate">● Read release notes before major updates.</Text>}
+      {counts.minor > 0 && <Text color={colors.warning} wrap="truncate">△ Minor updates may require config changes.</Text>}
+      {!compact && packages.filter((pkg) => pkg.type === "major").slice(0, 4).map((pkg) => (
+        <Text key={pkg.name} color={colors.error} wrap="truncate">· {pkg.name}: {pkg.current} → {pkg.latest}</Text>
+      ))}
+    </Box>
+  );
+}
+
+function NoticePanel({ notice, error, chatMessages }: UpdateViewProps) {
+  return (
+    <Box flexDirection="column">
+      {error && <Text color={colors.error} wrap="truncate">● {error.code}</Text>}
+      {notice && <Text color={colors.warning} wrap="truncate">△ {notice}</Text>}
+      {!error && !notice && <Text color={colors.textDim}>No blocking notices.</Text>}
+      {chatMessages.slice(-4).map((message, index) => (
+        <Text key={`${message}-${index}`} color={message.startsWith("AI") ? colors.primary : colors.accent} wrap="truncate">{message}</Text>
+      ))}
+    </Box>
+  );
+}
+
+function TableHeader() {
+  return (
+    <Box justifyContent="space-between">
+      <Text color={colors.heading}>PACKAGE</Text>
+      <Text color={colors.heading}>CURRENT → LATEST  TYPE</Text>
+    </Box>
+  );
+}
+
+function PackageRow({ pkg }: { pkg: OutdatedPkg }) {
+  return (
+    <Box justifyContent="space-between" minWidth={0}>
+      <Box flexShrink={1} minWidth={0}>
+        <Text color={getTypeColor(pkg.type)}>{pkg.type === "major" ? icons.warning : icons.dot}</Text>
+        <Text color={colors.text} wrap="truncate"> {pkg.name}</Text>
+      </Box>
+      <Box flexShrink={0}>
+        <Text color={colors.textDim}>{pkg.current} → </Text>
+        <Text color={getTypeColor(pkg.type)}>{pkg.latest}</Text>
+        <Text color={colors.textDim}> {pkg.type}</Text>
+      </Box>
+    </Box>
+  );
+}
+
+function ErrorBlock({ error }: { error: SetuprError }) {
+  return (
+    <Box flexDirection="column">
+      <Text color={error.severity === "info" ? colors.info : colors.warning}>{icons.warning} {error.code}</Text>
+      <Text color={colors.text}>{error.explanation}</Text>
+      {error.details?.slice(0, 3).map((detail, index) => (
+        <Text key={index} color={colors.textDim} wrap="truncate">  {detail}</Text>
+      ))}
+    </Box>
+  );
+}
+
+export function buildUpdateLayout(width: number, height: number): UpdateLayoutGeometry {
+  const bodyHeight = Math.max(8, height - 2);
+  const stacked = width < 108 || bodyHeight < 22;
+  const summaryHeight = stacked ? Math.max(6, Math.floor(bodyHeight * 0.24)) : clamp(Math.floor(bodyHeight * 0.22), 6, 8);
+  const mainHeight = Math.max(8, bodyHeight - summaryHeight);
+  const sideWidth = stacked ? width : clamp(Math.floor(width * 0.30), 34, 48);
+  const mainWidth = stacked ? width : width - sideWidth;
+  const summaryWidths = distributeWidths(width, [1, 1, 1, 1], [18, 18, 18, 18]);
+  const inputMaxLines = Math.max(1, Math.min(6, Math.floor(mainHeight / 4)));
+  const inputHeight = inputMaxLines + 2;
+  const inputBounds = { x: 3, y: Math.max(4, 2 + summaryHeight + mainHeight - inputHeight - 1), width: Math.max(8, mainWidth - 6), height: inputHeight };
+  return { width, height, stacked, bodyHeight, summaryHeight, mainHeight, mainWidth, sideWidth, summaryWidths, inputMaxLines, inputHeight, inputBounds };
+}
+
+export function buildUpdateFocusItems(layout: UpdateLayoutGeometry): FocusItem[] {
+  if (layout.stacked) {
+    const summaryHeight = Math.max(6, Math.floor(layout.bodyHeight * 0.24));
+    const sideHeight = Math.max(7, Math.floor(layout.bodyHeight * 0.25));
+    const packageHeight = Math.max(8, layout.bodyHeight - summaryHeight - sideHeight);
     return [
-      { id: "packages", row: 0, column: 0, redirectTo: "input", bounds: { x: 1, y: 2, width, height: mainPanelHeight } },
-      { id: "input", row: 1, column: 0, parentIds: ["packages"], bounds: { x: 3, y: Math.max(4, 2 + mainPanelHeight - inputHeight - 1), width: width - 4, height: inputHeight } },
-      { id: "summary", row: 2, column: 0, bounds: { x: 1, y: Math.max(3, height - 9), width, height: 8 } },
+      { id: "major", row: 0, column: 0, bounds: { x: 1, y: 2, width: Math.floor(layout.width / 3), height: summaryHeight } },
+      { id: "minor", row: 0, column: 1, bounds: { x: Math.floor(layout.width / 3) + 1, y: 2, width: Math.floor(layout.width / 3), height: summaryHeight } },
+      { id: "patch", row: 0, column: 2, bounds: { x: Math.floor(layout.width / 3) * 2 + 1, y: 2, width: layout.width - Math.floor(layout.width / 3) * 2, height: summaryHeight } },
+      { id: "packages", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: 2 + summaryHeight, width: layout.width, height: packageHeight } },
+      { id: "input", row: 2, column: 0, parentIds: ["packages"], bounds: layout.inputBounds },
+      { id: "risks", row: 3, column: 0, bounds: { x: 1, y: 2 + summaryHeight + packageHeight, width: layout.width, height: sideHeight } },
     ];
   }
-  const mainPanelHeight = height - 2;
-  const inputHeight = inputBoundsHeightForPanel(mainPanelHeight);
-  return [
-    { id: "packages", row: 0, column: 0, redirectTo: "input", bounds: { x: 1, y: 2, width: mainWidth, height: mainPanelHeight } },
-    { id: "input", row: 1, column: 0, parentIds: ["packages"], bounds: { x: 3, y: Math.max(4, height - inputHeight - 1), width: mainWidth - 4, height: inputHeight } },
-    { id: "summary", row: 0, column: 1, bounds: { x: mainWidth + 1, y: 2, width: sideWidth, height: height - 2 } },
-  ];
+  let x = 1;
+  const items: FocusItem[] = ["major", "minor", "patch", "security"].map((id, index) => {
+    const item = { id, row: 0, column: index, bounds: { x, y: 2, width: layout.summaryWidths[index], height: layout.summaryHeight } };
+    x += layout.summaryWidths[index];
+    return item;
+  });
+  const mainY = 2 + layout.summaryHeight;
+  items.push({ id: "packages", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: mainY, width: layout.mainWidth, height: layout.mainHeight } });
+  items.push({ id: "input", row: 2, column: 0, parentIds: ["packages"], bounds: layout.inputBounds });
+  items.push({ id: "risks", row: 1, column: 1, bounds: { x: layout.mainWidth + 1, y: mainY, width: layout.sideWidth, height: Math.max(8, Math.floor(layout.mainHeight * 0.54)) } });
+  items.push({ id: "notices", row: 2, column: 1, bounds: { x: layout.mainWidth + 1, y: mainY + Math.max(8, Math.floor(layout.mainHeight * 0.54)), width: layout.sideWidth, height: Math.max(6, layout.mainHeight - Math.max(8, Math.floor(layout.mainHeight * 0.54))) } });
+  return items;
 }
 
-function inputBoundsHeightForPanel(panelHeight: number): number {
-  return inputLinesForPanel(panelHeight) + 2;
+interface UpdateViewProps {
+  layout: UpdateLayoutGeometry;
+  packages: OutdatedPkg[];
+  counts: { major: number; minor: number; patch: number };
+  risk: string;
+  loading: boolean;
+  notice: string | null;
+  error: SetuprError | null;
+  noProject: boolean;
+  scan: ScanResult;
+  chatMessages: string[];
+  focus: (id: string) => "focused" | "ancestor" | undefined;
+  inputActive: boolean;
+  inputBounds?: FocusBounds;
+  onChat: (text: string) => void;
 }
 
 async function checkOutdated(scan: ScanResult, cwd: string, noProject: boolean): Promise<UpdateResult> {
   if (noProject) {
-    return {
-      packages: [],
-      error: createSetuprError({ code: "NO_PROJECT_DETECTED", command: "update", cwd, canContinue: false }),
-    };
+    return { packages: [], error: createSetuprError({ code: "NO_PROJECT_DETECTED", command: "update", cwd, canContinue: false }) };
   }
   if (!scan.packageManager) {
-    return {
-      packages: [],
-      error: createSetuprError({ code: "MISSING_PACKAGE_MANAGER", command: "update", cwd, details: ["No npm, yarn, pnpm, bun, pip, cargo, or go package manager was detected."] }),
-    };
+    return { packages: [], error: createSetuprError({ code: "MISSING_PACKAGE_MANAGER", command: "update", cwd, details: ["No npm, yarn, pnpm, bun, pip, cargo, or go package manager was detected."] }) };
   }
   const pm = scan.packageManager;
   const abortController = new AbortController();
@@ -215,10 +381,7 @@ async function checkOutdated(scan: ScanResult, cwd: string, noProject: boolean):
   try {
     const result = await runCommand(`${pm} outdated --json 2>/dev/null`, cwd, undefined, abortController.signal);
     if (timedOut) {
-      return {
-        packages: [],
-        error: createSetuprError({ code: "COMMAND_TIMEOUT", command: "update", cwd, details: [`Command: ${pm} outdated --json`] }),
-      };
+      return { packages: [], error: createSetuprError({ code: "COMMAND_TIMEOUT", command: "update", cwd, details: [`Command: ${pm} outdated --json`] }) };
     }
     const raw = result.stdout || result.stderr || "{}";
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -268,4 +431,37 @@ function getTypeColor(type: OutdatedPkg["type"]): string {
     case "minor": return colors.warning;
     case "patch": return colors.success;
   }
+}
+
+function packageCounts(packages: OutdatedPkg[]) {
+  return {
+    major: packages.filter((pkg) => pkg.type === "major").length,
+    minor: packages.filter((pkg) => pkg.type === "minor").length,
+    patch: packages.filter((pkg) => pkg.type === "patch").length,
+  };
+}
+
+function buildStack(scan: ScanResult): string {
+  return [scan.framework, scan.language, scan.packageManager].filter(Boolean).join(" + ") || "unknown";
+}
+
+function distributeWidths(total: number, weights: number[], mins: number[]): number[] {
+  const minTotal = mins.reduce((sum, item) => sum + item, 0);
+  if (total <= minTotal) return fitWidths(total, mins.length);
+  const extra = total - minTotal;
+  const weightTotal = weights.reduce((sum, item) => sum + item, 0);
+  const widths = mins.map((min, index) => min + Math.floor(extra * (weights[index] / weightTotal)));
+  widths[widths.length - 1] += total - widths.reduce((sum, item) => sum + item, 0);
+  return widths;
+}
+
+function fitWidths(total: number, count: number): number[] {
+  const base = Math.max(1, Math.floor(total / count));
+  const widths = Array.from({ length: count }, () => base);
+  widths[widths.length - 1] += total - widths.reduce((sum, item) => sum + item, 0);
+  return widths;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
