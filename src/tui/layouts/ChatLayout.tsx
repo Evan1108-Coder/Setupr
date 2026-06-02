@@ -11,6 +11,7 @@ import type { AgentPrompt, AppMessage, AppStore, LogEntry, NoticeInfo } from "..
 import { ChatInput } from "../components/ChatInput.js";
 import { Panel } from "../components/Panel.js";
 import { PromptCard } from "../components/PromptCard.js";
+import { TuiFooter, TuiHeader } from "../components/TuiFrame.js";
 import { Timeline, type TimelineEvent } from "../components/Timeline.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useAppStore } from "../hooks/useStore.js";
@@ -333,20 +334,16 @@ export function buildChatFocusItems(layout: ChatLayoutModel): FocusItem[] {
 
 function Header({ cwd, projectName, status, ready, width }: { cwd: string; projectName: string; status: ChatSessionStatus; ready: boolean; width: number }) {
   const statusText = ready ? status : "loading";
-  const rightWidth = Math.min(width - 8, Math.max(10, statusText.length + 2));
-  const leftWidth = Math.max(8, width - rightWidth);
-  const label = width < 100
-    ? `${icons.diamond} Chat  ${projectName}`
-    : `${icons.diamond} Setupr Chat  ${projectName} · ${shortPath(cwd, Math.max(12, width - 58))}`;
   return (
-    <Box width="100%" height={1}>
-      <Box width={leftWidth} minWidth={0} flexShrink={1}>
-        <Text color={colors.accent} bold wrap="truncate">{label}</Text>
-      </Box>
-      <Box width={rightWidth} justifyContent="flex-end">
-        <Text color={statusColor(status)} bold>{statusText}</Text>
-      </Box>
-    </Box>
+    <TuiHeader
+      command="setupr chat"
+      title={projectName}
+      cwd={cwd}
+      status={statusText}
+      statusColor={statusColor(status)}
+      right={statusText}
+      width={width}
+    />
   );
 }
 
@@ -469,9 +466,7 @@ function Footer({ status, width }: { status: ChatSessionStatus; width: number })
     ? "Esc pause AI · Ctrl+R resume · Tab panels · q quit outside input"
     : "Enter send · Ctrl+Enter or /steer steer · Tab panels · ↑/↓ navigate · q quit outside input";
   return (
-    <Box width="100%" height={1}>
-      <Text color={colors.textDim} wrap="truncate">{width < 90 ? text.replace(" · ↑/↓ navigate", "") : text}</Text>
-    </Box>
+    <TuiFooter width={width} left={width < 90 ? text.replace(" · ↑/↓ navigate", "") : text} right="v1.0.0" />
   );
 }
 

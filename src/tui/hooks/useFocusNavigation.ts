@@ -91,7 +91,7 @@ export function useFocusNavigation({ items, initialId, onQuit }: UseFocusNavigat
   const move = (direction: "left" | "right" | "up" | "down") => {
     if (!activeItem || items.length === 0) return;
     const origin = navigationOrigin(items, activeItem);
-    const next = findDirectionalFocusItem(items, origin, direction, [activeItem.id, origin.id]);
+    const next = findDirectionalFocusItem(items, origin, direction, uniqueIds([activeItem.id, origin.id, ...(activeItem.parentIds || [])]));
     activateItem(next);
   };
 
@@ -121,6 +121,7 @@ export function useFocusNavigation({ items, initialId, onQuit }: UseFocusNavigat
 }
 
 function navigationOrigin(items: FocusItem[], activeItem: FocusItem): FocusItem {
+  if (activeItem.bounds) return activeItem;
   const parentId = activeItem.parentIds?.[activeItem.parentIds.length - 1];
   return items.find((item) => item.id === parentId) || activeItem;
 }
@@ -239,4 +240,8 @@ function findMouseHit(items: FocusItem[], x: number, y: number) {
     const { x: bx, y: by, width, height } = item.bounds;
     return x >= bx && x < bx + width && y >= by && y < by + height;
   });
+}
+
+function uniqueIds(ids: string[]): string[] {
+  return Array.from(new Set(ids));
 }

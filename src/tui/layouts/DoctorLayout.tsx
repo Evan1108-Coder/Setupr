@@ -1,20 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text, useApp } from "ink";
-import { Panel } from "../components/Panel.js";
-import { ChatInput } from "../components/ChatInput.js";
-import { StatusBar } from "../components/StatusBar.js";
-import { Spinner } from "../components/Spinner.js";
-import { useFocusNavigation, type FocusItem } from "../hooks/useFocusNavigation.js";
-import { useTerminalSize } from "../hooks/useTerminalSize.js";
-import { colors, icons } from "../theme.js";
-import { hasProjectSignals } from "../projectSignals.js";
-import { runCommand } from "../../executor/index.js";
+import { collectContext } from "../../context/collector.js";
+import { doctorInsights, type DoctorInsight } from "../../agent/runtime.js";
 import { intelligentResponse } from "../../ai/intelligence.js";
 import { scanResultToDSL } from "../../ai/dsl.js";
 import { classifyCommandFailure, createSetuprError, type SetuprError } from "../../errors/index.js";
+import { runCommand } from "../../executor/index.js";
 import type { ScanResult } from "../../scanner/index.js";
-import { collectContext } from "../../context/collector.js";
-import { doctorInsights, type DoctorInsight } from "../../agent/runtime.js";
+import { ChatInput } from "../components/ChatInput.js";
+import { Panel } from "../components/Panel.js";
+import { Spinner } from "../components/Spinner.js";
+import { KVRow, TuiFooter, TuiHeader, statusColor } from "../components/TuiFrame.js";
+import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
+import { useTerminalSize } from "../hooks/useTerminalSize.js";
+import { hasProjectSignals } from "../projectSignals.js";
+import { colors, icons } from "../theme.js";
 
 interface Check {
   label: string;
@@ -28,21 +28,26 @@ interface DoctorLayoutProps {
   cwd: string;
 }
 
+interface DoctorLayoutGeometry {
+  width: number;
+  height: number;
+  stacked: boolean;
+  bodyHeight: number;
+  groupWidth: number;
+  diagWidth: number;
+  sideWidth: number;
+  diagHeight: number;
+  inputMaxLines: number;
+  inputHeight: number;
+  inputBounds: FocusBounds;
+}
+
 export function DoctorLayout({ scan, cwd }: DoctorLayoutProps) {
   const { exit } = useApp();
   const terminal = useTerminalSize();
-  const stacked = terminal.width < 96;
-  const mainWidth = stacked ? terminal.width : Math.max(46, Math.floor(terminal.width * 0.62));
-  const sideWidth = stacked ? terminal.width : terminal.width - mainWidth;
-  const mainPanelHeight = stacked ? Math.max(8, terminal.height - 11) : terminal.height - 2;
-  const inputLines = inputLinesForPanel(mainPanelHeight);
-  const checkLimit = Math.max(1, mainPanelHeight - inputLines - 6);
+  const layout = useMemo(() => buildDoctorLayout(terminal.width, terminal.height), [terminal.width, terminal.height]);
+  const focus = useFocusNavigation({ items: useMemo(() => buildDoctorFocusItems(layout), [layout]), onQuit: () => exit() });
   const noProject = !hasProjectSignals(scan);
-  const focusItems = useMemo(
-    () => buildFocusItems(terminal.width, terminal.height, mainWidth, sideWidth, stacked),
-    [terminal.width, terminal.height, mainWidth, sideWidth, stacked]
-  );
-  const focus = useFocusNavigation({ items: focusItems, onQuit: () => exit() });
   const [checks, setChecks] = useState<Check[]>([]);
   const [insights, setInsights] = useState<DoctorInsight[]>([]);
   const [done, setDone] = useState(false);
@@ -60,7 +65,7 @@ export function DoctorLayout({ scan, cwd }: DoctorLayoutProps) {
   const handleChat = useCallback(async (text: string) => {
     setChatMessages((prev) => [...prev, `You → ${text}`]);
     const dsl = scanResultToDSL(scan);
-    const checksContext = checks.map((c) => `${c.label}: ${c.status}${c.detail ? ` (${c.detail})` : ""}`).join(", ");
+    const checksContext = checks.map((check) => `${check.label}: ${check.status}${check.detail ? ` (${check.detail})` : ""}`).join(", ");
     const result = await intelligentResponse(
       `${text}\n\nDoctor results: ${checksContext}`,
       scan,
@@ -69,111 +74,246 @@ export function DoctorLayout({ scan, cwd }: DoctorLayoutProps) {
     setChatMessages((prev) => [...prev, `AI → ${result.response}`]);
   }, [scan, checks]);
 
-  const passCount = checks.filter((c) => c.status === "pass").length;
-  const failCount = checks.filter((c) => c.status === "fail").length;
-  const warnCount = checks.filter((c) => c.status === "warn").length;
-  const summary = done ? `${passCount}${icons.check} ${failCount}${icons.cross} ${warnCount}${icons.warning}` : "checking...";
+  const passCount = checks.filter((check) => check.status === "pass").length;
+  const failCount = checks.filter((check) => check.status === "fail").length;
+  const warnCount = checks.filter((check) => check.status === "warn").length;
+  const risk = failCount > 0 ? "High" : warnCount > 0 ? "Moderate" : done ? "Low" : "Checking";
 
   return (
     <Box flexDirection="column" width={terminal.width} height={terminal.height}>
-      <Box height={1} justifyContent="space-between">
-        <Text color={colors.primary} bold> Setupr Doctor</Text>
-        <Text color={noProject ? colors.warning : colors.textDim}>{summary}</Text>
-      </Box>
+      <TuiHeader
+        command="setupr doctor"
+        cwd={cwd}
+        stack={buildStack(scan)}
+        status={done ? `${passCount} ok · ${failCount} failed · ${warnCount} warn` : "checking"}
+        statusColor={statusColor(risk)}
+        right={`Risk ${risk}`}
+        width={terminal.width}
+      />
 
-      <Box flexDirection={stacked ? "column" : "row"} width="100%" flexGrow={1} minHeight={8}>
-        <Panel title="Diagnostics" focusState={focus.focusState("diagnostics")} width={stacked ? "100%" : mainWidth} height={stacked ? undefined : "100%"} flexGrow={stacked ? 1 : undefined}>
-          <Box flexDirection="column" flexGrow={1}>
-            <Box flexDirection="column" flexGrow={1}>
-              {checks.slice(0, checkLimit).map((c, i) => (
-                <Box key={i} minWidth={0}>
-                  <Text color={getCheckColor(c.status)} wrap="truncate">
-                    {getCheckIcon(c.status)} {c.label}{c.detail ? ` - ${c.detail}` : ""}{c.error ? ` (${c.error.code})` : ""}
-                  </Text>
-                </Box>
-              ))}
-              {checks.length > checkLimit && (
-                <Text color={colors.textDim}>… {checks.length - checkLimit} more checks</Text>
-              )}
-              {!done && <Spinner label="Running diagnostics..." />}
-            </Box>
-            <ChatInput
-              active={focus.isActive("input")}
-              focusState={focus.focusState("input")}
-              onSubmit={handleChat}
-              placeholder={noProject ? "Open a project folder, then run doctor again..." : "Ask about the diagnosis..."}
-              width={mainWidth}
-              maxLines={inputLines}
-              scrollBounds={focus.activeItem?.id === "input" ? focus.activeItem.bounds : undefined}
-            />
-          </Box>
-        </Panel>
+      {layout.stacked ? (
+        <StackedDoctor
+          layout={layout}
+          scan={scan}
+          checks={checks}
+          insights={insights}
+          done={done}
+          risk={risk}
+          noProject={noProject}
+          chatMessages={chatMessages}
+          focus={focus.focusState}
+          inputActive={focus.isActive("input")}
+          inputBounds={focus.activeItem?.id === "input" ? focus.activeItem.bounds : undefined}
+          onChat={handleChat}
+        />
+      ) : (
+        <WideDoctor
+          layout={layout}
+          scan={scan}
+          checks={checks}
+          insights={insights}
+          done={done}
+          risk={risk}
+          noProject={noProject}
+          chatMessages={chatMessages}
+          focus={focus.focusState}
+          inputActive={focus.isActive("input")}
+          inputBounds={focus.activeItem?.id === "input" ? focus.activeItem.bounds : undefined}
+          onChat={handleChat}
+        />
+      )}
 
-        <Panel title="Environment" focusState={focus.focusState("environment")} width={stacked ? "100%" : sideWidth} height={stacked ? 9 : "100%"}>
-          <Box flexDirection="column">
-            <Text color={colors.text}>{icons.dot} OS: <Text color={colors.info}>{process.platform} {process.arch}</Text></Text>
-            <Text color={colors.text}>{icons.dot} Node: <Text color={colors.info}>{process.version}</Text></Text>
-            <Text color={colors.text}>{icons.dot} Shell: <Text color={colors.info}>{process.env.SHELL || "unknown"}</Text></Text>
-            <Text color={colors.text}>{icons.dot} PM: <Text color={colors.info}>{scan.packageManager || "none"}</Text></Text>
-            <Text color={colors.text}>{icons.dot} Language: <Text color={colors.info}>{scan.language || "unknown"}</Text></Text>
-            <Text color={colors.text}>{icons.dot} Framework: <Text color={colors.info}>{scan.framework || "none"}</Text></Text>
-            {scan.services.length > 0 && (
-              <Text color={colors.text}>{icons.dot} Services: <Text color={colors.warning}>{scan.services.join(", ")}</Text></Text>
-            )}
-            {chatMessages.length > 0 && (
-              <>
-                <Text> </Text>
-                <Text color={colors.heading} bold>AI CHAT</Text>
-                {chatMessages.slice(-4).map((msg, i) => (
-                  <Text key={i} color={msg.startsWith("AI") ? colors.primary : colors.accent} wrap="truncate">{msg}</Text>
-                ))}
-              </>
-            )}
-            {insights.length > 0 && (
-              <>
-                <Text> </Text>
-                <Text color={colors.heading} bold>AI DIAGNOSIS</Text>
-                {insights.slice(0, 5).map((insight) => (
-                  <Text key={insight.issue} color={insight.severity === "error" ? colors.error : insight.severity === "warning" ? colors.warning : colors.info} wrap="truncate">
-                    {insight.issue}: {insight.fix?.command || insight.explanation}
-                  </Text>
-                ))}
-              </>
-            )}
-          </Box>
-        </Panel>
-      </Box>
-
-      <StatusBar stepProgress={done ? `${checks.length} checks done` : "checking..."} />
+      <TuiFooter
+        width={terminal.width}
+        left="Ctrl+C abort · Tab next panel · ←/↑/↓/→ navigate · Enter ask · q quit outside input"
+        right={done ? `${checks.length} checks done` : "checking..."}
+      />
     </Box>
   );
 }
 
-function inputLinesForPanel(panelHeight: number): number {
-  return Math.max(1, Math.floor(panelHeight / 4));
+function WideDoctor(props: DoctorViewProps) {
+  return (
+    <Box flexDirection="row" width={props.layout.width} height={props.layout.bodyHeight}>
+      <Panel title="Check Groups" focusState={props.focus("groups")} width={props.layout.groupWidth} height="100%">
+        <CheckGroups checks={props.checks} done={props.done} />
+      </Panel>
+      <DiagnosticsPanel {...props} width={props.layout.diagWidth} height="100%" />
+      <Box flexDirection="column" width={props.layout.sideWidth} height="100%">
+        <Panel title="Environment" focusState={props.focus("environment")} width="100%" height={Math.max(8, Math.floor(props.layout.bodyHeight * 0.45))}>
+          <EnvironmentPanel scan={props.scan} />
+        </Panel>
+        <Panel title="AI Diagnosis" focusState={props.focus("ai")} width="100%" flexGrow={1} minHeight={7}>
+          <AIDiagnosis insights={props.insights} risk={props.risk} chatMessages={props.chatMessages} />
+        </Panel>
+      </Box>
+    </Box>
+  );
 }
 
-function buildFocusItems(width: number, height: number, mainWidth: number, sideWidth: number, stacked: boolean): FocusItem[] {
-  if (stacked) {
-    const mainPanelHeight = Math.max(8, height - 11);
-    const inputHeight = inputBoundsHeightForPanel(mainPanelHeight);
+function StackedDoctor(props: DoctorViewProps) {
+  const groupHeight = Math.max(5, Math.floor(props.layout.bodyHeight * 0.22));
+  const sideHeight = Math.max(7, props.layout.bodyHeight - groupHeight - props.layout.diagHeight);
+  return (
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
+      <Panel title="Check Groups" focusState={props.focus("groups")} width="100%" height={groupHeight}>
+        <CheckGroups checks={props.checks} done={props.done} compact />
+      </Panel>
+      <DiagnosticsPanel {...props} width={props.layout.width} height={props.layout.diagHeight} />
+      <Panel title="AI Diagnosis" focusState={props.focus("ai")} width="100%" height={sideHeight}>
+        <AIDiagnosis insights={props.insights} risk={props.risk} chatMessages={props.chatMessages} />
+      </Panel>
+    </Box>
+  );
+}
+
+function DiagnosticsPanel({
+  layout,
+  checks,
+  done,
+  noProject,
+  chatMessages,
+  focus,
+  inputActive,
+  inputBounds,
+  onChat,
+  width,
+  height,
+}: DoctorViewProps & { width: number; height: number | string }) {
+  const checkLimit = Math.max(1, layout.diagHeight - layout.inputMaxLines - 6);
+  return (
+    <Panel title="Diagnostics" focusState={focus("diagnostics")} width={width} height={height}>
+      <Box flexDirection="column" flexGrow={1} minHeight={0}>
+        <Box flexDirection="column" flexGrow={1} overflow="hidden">
+          {checks.slice(0, checkLimit).map((check, index) => (
+            <Text key={`${check.label}-${index}`} color={getCheckColor(check.status)} wrap="truncate">
+              {getCheckIcon(check.status)} {check.label}{check.detail ? ` - ${check.detail}` : ""}{check.error ? ` (${check.error.code})` : ""}
+            </Text>
+          ))}
+          {checks.length > checkLimit && <Text color={colors.textDim}>… {checks.length - checkLimit} more checks</Text>}
+          {!done && <Spinner label="Running diagnostics..." />}
+          {chatMessages.slice(-4).map((message, index) => (
+            <Text key={`${message}-${index}`} color={message.startsWith("AI") ? colors.primary : colors.accent} wrap="truncate">{message}</Text>
+          ))}
+        </Box>
+        <ChatInput
+          active={inputActive}
+          focusState={focus("input")}
+          onSubmit={onChat}
+          placeholder={noProject ? "Open a project folder, then run doctor again..." : "Ask the doctor a question..."}
+          width={Math.max(12, width - 4)}
+          maxLines={layout.inputMaxLines}
+          scrollBounds={inputBounds}
+        />
+      </Box>
+    </Panel>
+  );
+}
+
+function CheckGroups({ checks, done, compact = false }: { checks: Check[]; done: boolean; compact?: boolean }) {
+  const groups = [
+    { label: "Runtime", match: /runtime|node|python|go|rust|cargo|npm|pnpm|yarn|bun/i },
+    { label: "Dependencies", match: /dependencies|package|install|lock/i },
+    { label: "Environment", match: /\.env|env|config/i },
+    { label: "Git", match: /git|remote/i },
+    { label: "Terminal", match: /terminal|port|shell/i },
+    { label: "AI Provider", match: /ai|provider|auth/i },
+    { label: "Network", match: /network|remote/i },
+  ];
+  return (
+    <Box flexDirection="column">
+      {groups.slice(0, compact ? 4 : groups.length).map((group) => {
+        const matching = checks.filter((check) => group.match.test(check.label));
+        const failed = matching.some((check) => check.status === "fail");
+        const warned = matching.some((check) => check.status === "warn");
+        const color = !done ? colors.textDim : failed ? colors.error : warned ? colors.warning : matching.length ? colors.success : colors.textDim;
+        return <Text key={group.label} color={color} wrap="truncate">{done ? statusIcon(failed, warned, matching.length) : icons.spinner[0]} {group.label}</Text>;
+      })}
+    </Box>
+  );
+}
+
+function EnvironmentPanel({ scan }: { scan: ScanResult }) {
+  return (
+    <Box flexDirection="column">
+      <KVRow label="OS" value={`${process.platform} ${process.arch}`} />
+      <KVRow label="Node" value={process.version} />
+      <KVRow label="Shell" value={process.env.SHELL || "unknown"} />
+      <KVRow label="Terminal" value={process.env.TERM_PROGRAM || process.env.TERM || "terminal"} />
+      <KVRow label="PM" value={scan.packageManager || "none"} />
+      <KVRow label="Language" value={scan.language || "unknown"} />
+      <KVRow label="Framework" value={scan.framework || "none"} />
+      {scan.services.length > 0 && <KVRow label="Services" value={scan.services.join(", ")} color={colors.warning} />}
+    </Box>
+  );
+}
+
+function AIDiagnosis({ insights, risk, chatMessages }: { insights: DoctorInsight[]; risk: string; chatMessages: string[] }) {
+  return (
+    <Box flexDirection="column">
+      <KVRow label="Risk level" value={risk} color={statusColor(risk)} />
+      {insights.length === 0 ? (
+        <Text color={colors.textDim}>No AI diagnosis items yet.</Text>
+      ) : insights.slice(0, 5).map((insight) => (
+        <Text key={insight.issue} color={insight.severity === "error" ? colors.error : insight.severity === "warning" ? colors.warning : colors.info} wrap="truncate">
+          {insight.issue}: {insight.fix?.command || insight.explanation}
+        </Text>
+      ))}
+      {chatMessages.slice(-2).map((message, index) => (
+        <Text key={`${message}-${index}`} color={message.startsWith("AI") ? colors.primary : colors.accent} wrap="truncate">{message}</Text>
+      ))}
+    </Box>
+  );
+}
+
+export function buildDoctorLayout(width: number, height: number): DoctorLayoutGeometry {
+  const bodyHeight = Math.max(8, height - 2);
+  const stacked = width < 112 || bodyHeight < 22;
+  const groupWidth = stacked ? width : clamp(Math.floor(width * 0.18), 20, 30);
+  const sideWidth = stacked ? width : clamp(Math.floor(width * 0.25), 30, 42);
+  const diagWidth = stacked ? width : width - groupWidth - sideWidth;
+  const diagHeight = stacked ? Math.max(8, bodyHeight - 13) : bodyHeight;
+  const inputMaxLines = Math.max(1, Math.min(6, Math.floor(diagHeight / 4)));
+  const inputHeight = inputMaxLines + 2;
+  const inputBounds = { x: stacked ? 3 : groupWidth + 3, y: Math.max(4, 2 + (stacked ? Math.max(5, Math.floor(bodyHeight * 0.22)) : 0) + diagHeight - inputHeight - 1), width: Math.max(8, diagWidth - 6), height: inputHeight };
+  return { width, height, stacked, bodyHeight, groupWidth, diagWidth, sideWidth, diagHeight, inputMaxLines, inputHeight, inputBounds };
+}
+
+export function buildDoctorFocusItems(layout: DoctorLayoutGeometry): FocusItem[] {
+  if (layout.stacked) {
+    const groupHeight = Math.max(5, Math.floor(layout.bodyHeight * 0.22));
+    const sideHeight = Math.max(7, layout.bodyHeight - groupHeight - layout.diagHeight);
     return [
-      { id: "diagnostics", row: 0, column: 0, redirectTo: "input", bounds: { x: 1, y: 2, width, height: mainPanelHeight } },
-      { id: "input", row: 1, column: 0, parentIds: ["diagnostics"], bounds: { x: 3, y: Math.max(4, 2 + mainPanelHeight - inputHeight - 1), width: width - 4, height: inputHeight } },
-      { id: "environment", row: 2, column: 0, bounds: { x: 1, y: Math.max(3, height - 9), width, height: 8 } },
+      { id: "groups", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.width, height: groupHeight } },
+      { id: "diagnostics", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: 2 + groupHeight, width: layout.width, height: layout.diagHeight } },
+      { id: "input", row: 2, column: 0, parentIds: ["diagnostics"], bounds: layout.inputBounds },
+      { id: "ai", row: 3, column: 0, bounds: { x: 1, y: 2 + groupHeight + layout.diagHeight, width: layout.width, height: sideHeight } },
     ];
   }
-  const mainPanelHeight = height - 2;
-  const inputHeight = inputBoundsHeightForPanel(mainPanelHeight);
+  const sideX = layout.groupWidth + layout.diagWidth + 1;
+  const envHeight = Math.max(8, Math.floor(layout.bodyHeight * 0.45));
   return [
-    { id: "diagnostics", row: 0, column: 0, redirectTo: "input", bounds: { x: 1, y: 2, width: mainWidth, height: mainPanelHeight } },
-    { id: "input", row: 1, column: 0, parentIds: ["diagnostics"], bounds: { x: 3, y: Math.max(4, height - inputHeight - 1), width: mainWidth - 4, height: inputHeight } },
-    { id: "environment", row: 0, column: 1, bounds: { x: mainWidth + 1, y: 2, width: sideWidth, height: height - 2 } },
+    { id: "groups", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.groupWidth, height: layout.bodyHeight } },
+    { id: "diagnostics", row: 0, column: 1, redirectTo: "input", bounds: { x: layout.groupWidth + 1, y: 2, width: layout.diagWidth, height: layout.bodyHeight } },
+    { id: "input", row: 1, column: 1, parentIds: ["diagnostics"], bounds: layout.inputBounds },
+    { id: "environment", row: 0, column: 2, bounds: { x: sideX, y: 2, width: layout.sideWidth, height: envHeight } },
+    { id: "ai", row: 1, column: 2, bounds: { x: sideX, y: 2 + envHeight, width: layout.sideWidth, height: layout.bodyHeight - envHeight } },
   ];
 }
 
-function inputBoundsHeightForPanel(panelHeight: number): number {
-  return inputLinesForPanel(panelHeight) + 2;
+interface DoctorViewProps {
+  layout: DoctorLayoutGeometry;
+  scan: ScanResult;
+  checks: Check[];
+  insights: DoctorInsight[];
+  done: boolean;
+  risk: string;
+  noProject: boolean;
+  chatMessages: string[];
+  focus: (id: string) => "focused" | "ancestor" | undefined;
+  inputActive: boolean;
+  inputBounds?: FocusBounds;
+  onChat: (text: string) => void;
 }
 
 async function runDiagnostics(scan: ScanResult, cwd: string, noProject: boolean): Promise<Check[]> {
@@ -285,15 +425,9 @@ async function runDiagnostics(scan: ScanResult, cwd: string, noProject: boolean)
     }
   }
 
-  if (scan.scripts.build) {
-    checks.push({ label: "Build script", status: "pass", detail: scan.scripts.build });
-  }
-  if (scan.scripts.test) {
-    checks.push({ label: "Test script", status: "pass", detail: scan.scripts.test });
-  }
-  if (!scan.scripts.test && !scan.scripts.build && !noProject) {
-    checks.push({ label: "Build/test scripts", status: "warn", detail: "none defined" });
-  }
+  if (scan.scripts.build) checks.push({ label: "Build script", status: "pass", detail: scan.scripts.build });
+  if (scan.scripts.test) checks.push({ label: "Test script", status: "pass", detail: scan.scripts.test });
+  if (!scan.scripts.test && !scan.scripts.build && !noProject) checks.push({ label: "Build/test scripts", status: "warn", detail: "none defined" });
 
   const commonPorts = [3000, 5173, 8080, 4200];
   for (const port of commonPorts) {
@@ -312,10 +446,7 @@ async function runDiagnostics(scan: ScanResult, cwd: string, noProject: boolean)
     }
   } catch {}
 
-  if (checks.length === 0) {
-    checks.push({ label: "Project files", status: "warn", detail: "nothing checkable detected" });
-  }
-
+  if (checks.length === 0) checks.push({ label: "Project files", status: "warn", detail: "nothing checkable detected" });
   return checks;
 }
 
@@ -337,28 +468,35 @@ function getCheckColor(status: Check["status"]): string {
   }
 }
 
+function statusIcon(failed: boolean, warned: boolean, present: number): string {
+  if (!present) return icons.circle;
+  if (failed) return icons.cross;
+  if (warned) return icons.warning;
+  return icons.check;
+}
+
+function buildStack(scan: ScanResult): string {
+  return [scan.framework, scan.language, scan.packageManager].filter(Boolean).join(" + ") || "unknown";
+}
+
 function versionSatisfies(actualText: string, expected: string): boolean {
   const actual = parseVersion(actualText);
   if (!actual) return actualText.includes(expected);
-
   const clauses = expected.split(/\s+/).filter(Boolean);
   if (clauses.length === 0) return true;
-
   return clauses.every((clause) => {
     const match = clause.match(/^(>=|<=|>|<|=|\^|~)?\s*v?(\d+(?:\.\d+){0,2})/);
     if (!match) return actualText.includes(clause);
     const [, op = "=", version] = match;
-    const cmp = compareVersions(actual, normalizeVersion(version));
+    const target = normalizeVersion(version);
+    const cmp = compareVersions(actual, target);
     switch (op) {
       case ">=": return cmp >= 0;
       case "<=": return cmp <= 0;
       case ">": return cmp > 0;
       case "<": return cmp < 0;
-      case "^": return actual[0] === normalizeVersion(version)[0] && cmp >= 0;
-      case "~": {
-        const target = normalizeVersion(version);
-        return actual[0] === target[0] && actual[1] === target[1] && cmp >= 0;
-      }
+      case "^": return actual[0] === target[0] && cmp >= 0;
+      case "~": return actual[0] === target[0] && actual[1] === target[1] && cmp >= 0;
       default: return cmp === 0;
     }
   });
@@ -376,8 +514,12 @@ function normalizeVersion(version: string): [number, number, number] {
 }
 
 function compareVersions(a: [number, number, number], b: [number, number, number]): number {
-  for (let i = 0; i < 3; i++) {
-    if (a[i] !== b[i]) return a[i] - b[i];
+  for (let index = 0; index < 3; index++) {
+    if (a[index] !== b[index]) return a[index] - b[index];
   }
   return 0;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }

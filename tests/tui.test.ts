@@ -3,7 +3,9 @@ import { findDirectionalFocusItem, type FocusItem } from "../src/tui/hooks/useFo
 import { parseSgrMouse, stripTerminalControlInput } from "../src/tui/terminalInput.js";
 import { buildChatFocusItems, buildChatLayout } from "../src/tui/layouts/ChatLayout.js";
 import { buildDashboardFocusItems, buildDashboardLayout } from "../src/tui/layouts/DashboardLayout.js";
+import { buildDoctorFocusItems, buildDoctorLayout } from "../src/tui/layouts/DoctorLayout.js";
 import { buildEnvFocusItems, buildEnvLayout } from "../src/tui/layouts/EnvLayout.js";
+import { buildStartFocusItems, buildStartLayout } from "../src/tui/layouts/StartLayout.js";
 
 const wideSetupItems: FocusItem[] = [
   { id: "steps", row: 0, column: 0, bounds: { x: 1, y: 2, width: 20, height: 6 } },
@@ -105,6 +107,46 @@ describe("TUI focus navigation", () => {
       const items = buildDashboardFocusItems(layout);
       const maxBottom = Math.max(...items.map((item) => (item.bounds?.y || 0) + (item.bounds?.height || 0)));
 
+      expect(layout.stacked).toBe(true);
+      expect(maxBottom).toBeLessThanOrEqual(layout.height + 2);
+    }
+  });
+
+  it("keeps start log input bottom-anchored with side panels on wide terminals", () => {
+    const layout = buildStartLayout(150, 36);
+    const items = buildStartFocusItems(layout);
+    const logs = items.find((item) => item.id === "logs");
+    const input = items.find((item) => item.id === "input");
+    const current = items.find((item) => item.id === "current");
+
+    expect(layout.stacked).toBe(false);
+    expect(input?.parentIds).toContain("logs");
+    expect(input?.bounds?.y).toBeGreaterThan(24);
+    expect(findDirectionalFocusItem(items, input!, "right", ["input", "logs"])?.id).toBe("crash");
+    expect(findDirectionalFocusItem(items, current!, "left", ["current"])?.id).toBe("logs");
+  });
+
+  it("keeps doctor diagnostics input bottom-anchored and AI panel reachable", () => {
+    const layout = buildDoctorLayout(150, 36);
+    const items = buildDoctorFocusItems(layout);
+    const diagnostics = items.find((item) => item.id === "diagnostics");
+    const input = items.find((item) => item.id === "input");
+    const environment = items.find((item) => item.id === "environment");
+
+    expect(layout.stacked).toBe(false);
+    expect(input?.parentIds).toContain("diagnostics");
+    expect(input?.bounds?.y).toBeGreaterThan(24);
+    expect(findDirectionalFocusItem(items, input!, "right", ["input", "diagnostics"])?.id).toBe("ai");
+    expect(findDirectionalFocusItem(items, environment!, "left", ["environment"])?.id).toBe("diagnostics");
+  });
+
+  it("stacks start/doctor layouts without overflowing constrained terminals", () => {
+    const cases = [
+      { layout: buildStartLayout(76, 22), items: buildStartFocusItems(buildStartLayout(76, 22)) },
+      { layout: buildDoctorLayout(76, 22), items: buildDoctorFocusItems(buildDoctorLayout(76, 22)) },
+    ];
+    for (const { layout, items } of cases) {
+      const maxBottom = Math.max(...items.map((item) => (item.bounds?.y || 0) + (item.bounds?.height || 0)));
       expect(layout.stacked).toBe(true);
       expect(maxBottom).toBeLessThanOrEqual(layout.height + 2);
     }

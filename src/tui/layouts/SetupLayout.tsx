@@ -4,11 +4,12 @@ import { ChatInput } from "../components/ChatInput.js";
 import { EnvInput } from "../components/EnvInput.js";
 import { Panel } from "../components/Panel.js";
 import { PromptCard } from "../components/PromptCard.js";
+import { TuiFooter, TuiHeader } from "../components/TuiFrame.js";
 import { Timeline, type TimelineEvent } from "../components/Timeline.js";
 import { useAppStore } from "../hooks/useStore.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
-import { colors, icons, shortcuts } from "../theme.js";
+import { colors, icons } from "../theme.js";
 import { hasProjectSignals } from "../projectSignals.js";
 import type { AgentPrompt, AppMessage, AppStore, LogEntry, NoticeInfo } from "../../state/store.js";
 import { handleDirectorInput } from "../../ai/director.js";
@@ -315,46 +316,16 @@ function Header({
   width: number;
 }) {
   const statusColor = noProject ? colors.warning : isComplete ? colors.success : failedCount > 0 ? colors.error : colors.text;
-  if (width < 130) {
-    return (
-      <Box width="100%" height={1} justifyContent="space-between">
-        <Box minWidth={0} flexShrink={1} marginRight={1}>
-          <Text color={colors.accent} bold>◆ </Text>
-          <Text color={colors.text} wrap="truncate">{truncPath(cwd)}</Text>
-        </Box>
-        <Box flexShrink={0} minWidth={Math.min(width, status.length + formatTime(elapsed).length + 2)}>
-          <Text color={statusColor} bold>{status}</Text>
-          <Text color={colors.textDim}> {formatTime(elapsed)}</Text>
-        </Box>
-      </Box>
-    );
-  }
-
-  const elapsedText = formatTime(elapsed);
-  const checkpointText = checkpointSaved ? " checkpoint" : "";
-  const rightWidth = Math.min(width - 10, status.length + elapsedText.length + checkpointText.length + 4);
-  const leftWidth = Math.max(10, width - rightWidth);
-  const showStack = width >= 150;
-
   return (
-    <Box width="100%" height={1}>
-      <Box width={leftWidth} minWidth={0} flexShrink={1}>
-        <Text color={colors.accent} bold>◆ setupr</Text>
-        <Text color={colors.textDim}>  </Text>
-        <Text color={colors.text} wrap="truncate">{truncPath(cwd)}</Text>
-        {showStack && (
-          <>
-            <Text color={colors.textDim}>  stack </Text>
-            <Text color={colors.textBright} bold wrap="truncate">{stack}</Text>
-          </>
-        )}
-      </Box>
-      <Box width={rightWidth} flexShrink={0} justifyContent="flex-end">
-        <Text color={statusColor} bold>{status}</Text>
-        <Text color={colors.textDim}>  {elapsedText}</Text>
-        {checkpointSaved && <Text color={colors.success}>  checkpoint</Text>}
-      </Box>
-    </Box>
+    <TuiHeader
+      command="setupr setup"
+      cwd={cwd}
+      stack={stack}
+      status={status}
+      statusColor={statusColor}
+      right={`${status}  ${formatTime(elapsed)}${checkpointSaved ? "  checkpoint saved" : ""}`}
+      width={width}
+    />
   );
 }
 
@@ -773,34 +744,12 @@ function SideDetails({
 }
 
 function Footer({ width }: { width: number }) {
-  if (width < 130) {
-    return (
-      <Box width="100%" height={1}>
-        <Text color={colors.textDim} wrap="truncate">
-          <Text color={colors.accent} bold>Ctrl+C</Text> abort  <Text color={colors.accent} bold>Tab</Text> next  <Text color={colors.accent} bold>q</Text> quit outside input
-        </Text>
-      </Box>
-    );
-  }
-
-  const visible = shortcuts.map((shortcut) =>
-    shortcut.key === "q" ? { ...shortcut, desc: "quit outside input" } : shortcut
-  );
   return (
-    <Box width="100%" height={1} justifyContent="space-between">
-      <Box gap={2}>
-        {visible.map((s) => (
-          <Box key={s.key}>
-            <Text color={colors.accent} bold>{s.key}</Text>
-            <Text color={colors.textDim}> {s.desc}</Text>
-          </Box>
-        ))}
-        <Text color={colors.textDim}>Click panels where supported</Text>
-      </Box>
-      <Box>
-        <Text color={colors.textDim}>OS {getOS()} · Node {process.version} · {process.env.TERM_PROGRAM || "terminal"}</Text>
-      </Box>
-    </Box>
+    <TuiFooter
+      width={width}
+      left="Ctrl+C abort · Tab next panel · ←/↑/↓/→ navigate · Esc back · q quit outside input · Click panels where supported"
+      right={`OS ${getOS()} · Node ${process.version} · ${process.env.TERM_PROGRAM || "terminal"}`}
+    />
   );
 }
 
