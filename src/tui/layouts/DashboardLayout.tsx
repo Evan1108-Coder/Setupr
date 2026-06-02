@@ -3,7 +3,7 @@ import { Box, Text, useApp } from "ink";
 import { collectDashboardStatus, createDashboardFallbackStatus, type DashboardStatus } from "../../status/collector.js";
 import { Panel } from "../components/Panel.js";
 import { Spinner } from "../components/Spinner.js";
-import { KVRow, MetricText, TuiFooter, TuiHeader, formatAge, shortPath, statusColor } from "../components/TuiFrame.js";
+import { KVRow, TuiFooter, TuiHeader, formatAge, shortPath, statusColor } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { colors, icons } from "../theme.js";

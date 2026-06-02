@@ -371,10 +371,6 @@ interface StartViewProps {
   onChat: (text: string) => void;
 }
 
-function inputLinesForPanel(panelHeight: number): number {
-  return Math.max(1, Math.floor(panelHeight / 4));
-}
-
 function detectStartCommand(scan: ScanResult): string | null {
   const pm = scan.packageManager || "npm";
   if (scan.scripts.dev) return `${pm} run dev`;

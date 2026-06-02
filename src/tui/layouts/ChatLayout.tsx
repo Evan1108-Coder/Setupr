@@ -559,12 +559,6 @@ function statusColor(status: ChatSessionStatus): string {
   return colors.success;
 }
 
-function shortPath(cwd: string, max: number): string {
-  const home = process.env.HOME || "";
-  const path = home && cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd;
-  return path.length <= max ? path : `…${path.slice(Math.max(0, path.length - max + 1))}`;
-}
-
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
