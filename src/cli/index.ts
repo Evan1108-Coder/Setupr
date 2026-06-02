@@ -15,11 +15,13 @@ import { fileExists, initEnvFile } from "../env/index.js";
 const cli = meow(
   `
   Usage
-    $ setup <command> [options]
+    $ setupr [command] [options]
 
   Commands
+    dashboard   Open the project dashboard TUI
     setup       Full project setup (scan, install, configure)
     chat        Ask the AI director about the current project
+    status      Show project health, git, env, process, and history status
     start       Detect and run project
     doctor      Diagnose environment health
     update      Check for dependency updates
@@ -68,26 +70,29 @@ const cli = meow(
     --all       Clean everything removable (clean only)
     --deps      Clean installed dependencies (clean only)
     --share     Clean sensitive local files for sharing (clean only)
+    --tui       Prefer rich TUI output when supported
     --no-tui    Plain terminal output (alias: --plain)
     --plain     Same as --no-tui
     --help      Show help
     --version   Show version
 
   Examples
-    $ setup
-    $ setup doctor
-    $ setup auth login
-    $ setup env
-    $ setup env smart
-    $ setup chat how do I start this app?
-    $ setup release publish-check
-    $ setup perf startup
-    $ setup git flow feature my-feature
-    $ setup init --template react-app
-    $ setup ci github
-    $ setup secrets set API_KEY
-    $ setup --force
-    $ setup clean --all
+    $ setupr
+    $ setupr dashboard
+    $ setupr status --tui
+    $ setupr doctor
+    $ setupr auth login
+    $ setupr env
+    $ setupr env smart
+    $ setupr chat how do I start this app?
+    $ setupr release publish-check
+    $ setupr perf startup
+    $ setupr git flow feature my-feature
+    $ setupr init --template react-app
+    $ setupr ci github
+    $ setupr secrets set API_KEY
+    $ setupr --force
+    $ setupr clean --all
 `,
   {
     importMeta: import.meta,

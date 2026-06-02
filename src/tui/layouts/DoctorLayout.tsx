@@ -152,15 +152,19 @@ function WideDoctor(props: DoctorViewProps) {
 }
 
 function StackedDoctor(props: DoctorViewProps) {
-  const groupHeight = Math.max(5, Math.floor(props.layout.bodyHeight * 0.22));
-  const sideHeight = Math.max(7, props.layout.bodyHeight - groupHeight - props.layout.diagHeight);
+  const groupHeight = stackedGroupHeight(props.layout);
+  const envHeight = stackedEnvironmentHeight(props.layout);
+  const aiHeight = Math.max(3, props.layout.bodyHeight - groupHeight - props.layout.diagHeight - envHeight);
   return (
     <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
       <Panel title="Check Groups" focusState={props.focus("groups")} width="100%" height={groupHeight}>
         <CheckGroups checks={props.checks} done={props.done} compact />
       </Panel>
       <DiagnosticsPanel {...props} width={props.layout.width} height={props.layout.diagHeight} />
-      <Panel title="AI Diagnosis" focusState={props.focus("ai")} width="100%" height={sideHeight}>
+      <Panel title="Environment" focusState={props.focus("environment")} width="100%" height={envHeight}>
+        <EnvironmentPanel scan={props.scan} compact />
+      </Panel>
+      <Panel title="AI Diagnosis" focusState={props.focus("ai")} width="100%" height={aiHeight}>
         <AIDiagnosis insights={props.insights} risk={props.risk} chatMessages={props.chatMessages} />
       </Panel>
     </Box>
@@ -222,7 +226,7 @@ function CheckGroups({ checks, done, compact = false }: { checks: Check[]; done:
   ];
   return (
     <Box flexDirection="column">
-      {groups.slice(0, compact ? 4 : groups.length).map((group) => {
+      {groups.slice(0, compact ? 3 : groups.length).map((group) => {
         const matching = checks.filter((check) => group.match.test(check.label));
         const failed = matching.some((check) => check.status === "fail");
         const warned = matching.some((check) => check.status === "warn");
@@ -233,17 +237,17 @@ function CheckGroups({ checks, done, compact = false }: { checks: Check[]; done:
   );
 }
 
-function EnvironmentPanel({ scan }: { scan: ScanResult }) {
+function EnvironmentPanel({ scan, compact = false }: { scan: ScanResult; compact?: boolean }) {
   return (
     <Box flexDirection="column">
       <KVRow label="OS" value={`${process.platform} ${process.arch}`} />
       <KVRow label="Node" value={process.version} />
-      <KVRow label="Shell" value={process.env.SHELL || "unknown"} />
+      {!compact && <KVRow label="Shell" value={process.env.SHELL || "unknown"} />}
       <KVRow label="Terminal" value={process.env.TERM_PROGRAM || process.env.TERM || "terminal"} />
       <KVRow label="PM" value={scan.packageManager || "none"} />
-      <KVRow label="Language" value={scan.language || "unknown"} />
-      <KVRow label="Framework" value={scan.framework || "none"} />
-      {scan.services.length > 0 && <KVRow label="Services" value={scan.services.join(", ")} color={colors.warning} />}
+      {!compact && <KVRow label="Language" value={scan.language || "unknown"} />}
+      {!compact && <KVRow label="Framework" value={scan.framework || "none"} />}
+      {!compact && scan.services.length > 0 && <KVRow label="Services" value={scan.services.join(", ")} color={colors.warning} />}
     </Box>
   );
 }
@@ -275,19 +279,24 @@ export function buildDoctorLayout(width: number, height: number): DoctorLayoutGe
   const diagHeight = stacked ? Math.max(8, bodyHeight - 13) : bodyHeight;
   const inputMaxLines = Math.max(1, Math.min(6, Math.floor(diagHeight / 4)));
   const inputHeight = inputMaxLines + 2;
-  const inputBounds = { x: stacked ? 3 : groupWidth + 3, y: Math.max(4, 2 + (stacked ? Math.max(5, Math.floor(bodyHeight * 0.22)) : 0) + diagHeight - inputHeight - 1), width: Math.max(8, diagWidth - 6), height: inputHeight };
+  const stackedGroups = stacked ? Math.max(5, Math.min(6, Math.floor(bodyHeight * 0.22))) : 0;
+  const inputBounds = { x: stacked ? 3 : groupWidth + 3, y: Math.max(4, 2 + stackedGroups + diagHeight - inputHeight - 1), width: Math.max(8, diagWidth - 6), height: inputHeight };
   return { width, height, stacked, bodyHeight, groupWidth, diagWidth, sideWidth, diagHeight, inputMaxLines, inputHeight, inputBounds };
 }
 
 export function buildDoctorFocusItems(layout: DoctorLayoutGeometry): FocusItem[] {
   if (layout.stacked) {
-    const groupHeight = Math.max(5, Math.floor(layout.bodyHeight * 0.22));
-    const sideHeight = Math.max(7, layout.bodyHeight - groupHeight - layout.diagHeight);
+    const groupHeight = stackedGroupHeight(layout);
+    const envHeight = stackedEnvironmentHeight(layout);
+    const aiHeight = Math.max(3, layout.bodyHeight - groupHeight - layout.diagHeight - envHeight);
+    const diagY = 2 + groupHeight;
+    const envY = diagY + layout.diagHeight;
     return [
       { id: "groups", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.width, height: groupHeight } },
-      { id: "diagnostics", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: 2 + groupHeight, width: layout.width, height: layout.diagHeight } },
+      { id: "diagnostics", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: diagY, width: layout.width, height: layout.diagHeight } },
       { id: "input", row: 2, column: 0, parentIds: ["diagnostics"], bounds: layout.inputBounds },
-      { id: "ai", row: 3, column: 0, bounds: { x: 1, y: 2 + groupHeight + layout.diagHeight, width: layout.width, height: sideHeight } },
+      { id: "environment", row: 3, column: 0, bounds: { x: 1, y: envY, width: layout.width, height: envHeight } },
+      { id: "ai", row: 4, column: 0, bounds: { x: 1, y: envY + envHeight, width: layout.width, height: aiHeight } },
     ];
   }
   const sideX = layout.groupWidth + layout.diagWidth + 1;
@@ -299,6 +308,14 @@ export function buildDoctorFocusItems(layout: DoctorLayoutGeometry): FocusItem[]
     { id: "environment", row: 0, column: 2, bounds: { x: sideX, y: 2, width: layout.sideWidth, height: envHeight } },
     { id: "ai", row: 1, column: 2, bounds: { x: sideX, y: 2 + envHeight, width: layout.sideWidth, height: layout.bodyHeight - envHeight } },
   ];
+}
+
+function stackedGroupHeight(layout: DoctorLayoutGeometry): number {
+  return Math.max(5, Math.min(6, Math.floor(layout.bodyHeight * 0.22)));
+}
+
+function stackedEnvironmentHeight(layout: DoctorLayoutGeometry): number {
+  return Math.max(4, Math.min(5, Math.floor(layout.bodyHeight * 0.2)));
 }
 
 interface DoctorViewProps {

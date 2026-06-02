@@ -118,11 +118,12 @@ export function formatAge(timestamp: number): string {
 }
 
 function highlightShortcuts(text: string) {
-  const parts = text.split(/(Ctrl\+[A-Za-z]|Tab|Esc|Enter|q|←\/↑\/↓\/→|↑\/↓|Click)/g);
+  const shortcutPattern = /^(Ctrl\+[A-Za-z]|Tab|Esc|Enter|q|←\/↑\/↓\/→|↑\/↓|Click)$/;
+  const parts = text.split(/(Ctrl\+[A-Za-z]|Tab|Esc|Enter|\bq\b|←\/↑\/↓\/→|↑\/↓|Click)/g);
   return (
     <>
       {parts.map((part, index) => {
-        const isKey = /^(Ctrl\+[A-Za-z]|Tab|Esc|Enter|q|←\/↑\/↓\/→|↑\/↓|Click)$/.test(part);
+        const isKey = shortcutPattern.test(part);
         return <Text key={`${part}-${index}`} color={isKey ? colors.accent : colors.textDim} bold={isKey}>{part}</Text>;
       })}
     </>

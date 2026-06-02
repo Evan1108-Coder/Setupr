@@ -112,24 +112,26 @@ export function DashboardLayout({ cwd, initialStatus, variant = "dashboard" }: D
 function DashboardScreen({ layout, status, focus }: ScreenProps) {
   if (layout.stacked) {
     if (layout.compactStacked) {
-      const overviewHeight = clamp(Math.floor(layout.bodyHeight * 0.26), 5, 7);
-      const projectHeight = 5;
-      const noticesHeight = clamp(Math.floor(layout.bodyHeight * 0.18), 3, 5);
-      const actionsHeight = Math.max(4, layout.bodyHeight - overviewHeight - projectHeight - noticesHeight);
+      const topHeight = clamp(Math.floor(layout.bodyHeight * 0.4), 8, Math.max(8, layout.bodyHeight - 8));
+      const bottomHeight = Math.max(8, layout.bodyHeight - topHeight);
       return (
         <Box flexDirection="column" width={layout.width} height={layout.bodyHeight} overflow="hidden">
-          <Panel title="Project" focusState={focus("project")} width="100%" height={projectHeight}>
-            <ProjectPanel status={status} compact />
-          </Panel>
-          <Panel title="Overview" focusState={focus("overview")} width="100%" height={overviewHeight}>
-            <CompactDashboardOverview status={status} />
-          </Panel>
-          <Panel title="Actions + History" focusState={focus("actions")} width="100%" height={actionsHeight}>
-            <ActionsHistoryPanel status={status} limit={actionsHeight - 3} />
-          </Panel>
-          <Panel title="Notices" focusState={focus("notices")} width="100%" height={noticesHeight}>
-            <NoticePanel status={status} limit={noticesHeight - 2} />
-          </Panel>
+          <Box flexDirection="row" width="100%" height={topHeight}>
+            <Panel title="Project" focusState={focus("project")} width={layout.leftWidth} height="100%">
+              <ProjectPanel status={status} compact />
+            </Panel>
+            <Panel title="Overview" focusState={focus("overview")} width={layout.rightWidth} height="100%">
+              <CompactDashboardOverview status={status} />
+            </Panel>
+          </Box>
+          <Box flexDirection="row" width="100%" height={bottomHeight}>
+            <Panel title="Actions + History" focusState={focus("actions")} width={layout.leftWidth} height="100%">
+              <ActionsHistoryPanel status={status} limit={bottomHeight - 3} />
+            </Panel>
+            <Panel title="Notices" focusState={focus("notices")} width={layout.rightWidth} height="100%">
+              <NoticePanel status={status} limit={bottomHeight - 3} />
+            </Panel>
+          </Box>
         </Box>
       );
     }
@@ -194,24 +196,26 @@ function DashboardScreen({ layout, status, focus }: ScreenProps) {
 function StatusScreen({ layout, status, focus }: ScreenProps) {
   if (layout.stacked) {
     if (layout.compactStacked) {
-      const healthHeight = 5;
-      const overviewHeight = clamp(Math.floor(layout.bodyHeight * 0.26), 5, 7);
-      const actionsHeight = clamp(Math.floor(layout.bodyHeight * 0.22), 4, 6);
-      const stateHeight = Math.max(4, layout.bodyHeight - healthHeight - overviewHeight - actionsHeight);
+      const topHeight = clamp(Math.floor(layout.bodyHeight * 0.4), 8, Math.max(8, layout.bodyHeight - 8));
+      const bottomHeight = Math.max(8, layout.bodyHeight - topHeight);
       return (
         <Box flexDirection="column" width={layout.width} height={layout.bodyHeight} overflow="hidden">
-          <Panel title="Health" focusState={focus("health")} width="100%" height={healthHeight}>
-            <HealthPanel status={status} compact />
-          </Panel>
-          <Panel title="Overview" focusState={focus("overview")} width="100%" height={overviewHeight}>
-            <CompactStatusOverview status={status} />
-          </Panel>
-          <Panel title="Project State" focusState={focus("state")} width="100%" height={stateHeight}>
-            <ProjectStatePanel status={status} limit={stateHeight - 3} />
-          </Panel>
-          <Panel title="Next Actions" focusState={focus("actions")} width="100%" height={actionsHeight}>
-            <NextActionsPanel status={status} limit={actionsHeight - 2} />
-          </Panel>
+          <Box flexDirection="row" width="100%" height={topHeight}>
+            <Panel title="Health" focusState={focus("health")} width={layout.leftWidth} height="100%">
+              <HealthPanel status={status} compact />
+            </Panel>
+            <Panel title="Overview" focusState={focus("overview")} width={layout.rightWidth} height="100%">
+              <CompactStatusOverview status={status} />
+            </Panel>
+          </Box>
+          <Box flexDirection="row" width="100%" height={bottomHeight}>
+            <Panel title="Project State" focusState={focus("state")} width={layout.leftWidth} height="100%">
+              <ProjectStatePanel status={status} limit={bottomHeight - 3} />
+            </Panel>
+            <Panel title="Next Actions" focusState={focus("actions")} width={layout.rightWidth} height="100%">
+              <NextActionsPanel status={status} limit={bottomHeight - 3} />
+            </Panel>
+          </Box>
         </Box>
       );
     }
@@ -530,15 +534,14 @@ export function buildDashboardFocusItems(layout: DashboardLayoutGeometry): Focus
   if (layout.stacked) {
     if (layout.compactStacked) {
       const ids = layout.variant === "status" ? ["health", "overview", "state", "actions"] : ["project", "overview", "actions", "notices"];
-      const heights = layout.variant === "status"
-        ? [5, clamp(Math.floor(layout.bodyHeight * 0.26), 5, 7), Math.max(4, layout.bodyHeight - 5 - clamp(Math.floor(layout.bodyHeight * 0.26), 5, 7) - clamp(Math.floor(layout.bodyHeight * 0.22), 4, 6)), clamp(Math.floor(layout.bodyHeight * 0.22), 4, 6)]
-        : [5, clamp(Math.floor(layout.bodyHeight * 0.26), 5, 7), Math.max(4, layout.bodyHeight - 5 - clamp(Math.floor(layout.bodyHeight * 0.26), 5, 7) - clamp(Math.floor(layout.bodyHeight * 0.18), 3, 5)), clamp(Math.floor(layout.bodyHeight * 0.18), 3, 5)];
-      let y = 2;
-      return ids.map((id, index) => {
-        const item = { id, row: index, column: 0, bounds: { x: 1, y, width: layout.width, height: heights[index] } };
-        y += heights[index];
-        return item;
-      });
+      const topHeight = clamp(Math.floor(layout.bodyHeight * 0.4), 8, Math.max(8, layout.bodyHeight - 8));
+      const bottomHeight = Math.max(8, layout.bodyHeight - topHeight);
+      return [
+        { id: ids[0], row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.leftWidth, height: topHeight } },
+        { id: ids[1], row: 0, column: 1, bounds: { x: layout.leftWidth + 1, y: 2, width: layout.rightWidth, height: topHeight } },
+        { id: ids[2], row: 1, column: 0, bounds: { x: 1, y: 2 + topHeight, width: layout.leftWidth, height: bottomHeight } },
+        { id: ids[3], row: 1, column: 1, bounds: { x: layout.leftWidth + 1, y: 2 + topHeight, width: layout.rightWidth, height: bottomHeight } },
+      ];
     }
     const common = layout.variant === "status"
       ? ["health", "git", "env", "tests", "security", "state", "actions"]

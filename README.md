@@ -41,19 +41,20 @@ setupr setup --plain
 |---------|-------------|
 | `setupr` / `dashboard` | Project dashboard with health, git, env, processes, history, and quick commands |
 | `setup` | Full project setup — scan, install runtime, deps, env, verify |
+| `chat <question>` | AI director chat TUI for project questions, steering, plans, logs, and context |
 | `status` | Dashboard/status view with plain, JSON, or TUI output |
 | `start` | Start and track a managed project process |
 | `doctor` | Diagnose environment health (runtimes, deps, ports) |
 | `update` | Check for dependency updates with breaking change warnings |
 | `clean` | Review and remove artifacts (`--deps`, `--share`, `--all`; positional `deps`, `share`, `all` also work) |
+| `env` | Open the .env editor TUI or manage project .env files from .env.example |
 | `auth` | Manage global Setupr AI provider API keys and models |
 
 ### Non-TUI Commands (Plain Terminal)
 
 | Command | Description |
 |---------|-------------|
-| `chat <question>` | Ask the AI director about the current project, plan, errors, env, git, or commands |
-| `env [init\|check\|sync\|smart]` | Manage .env files |
+| `env init\|check\|sync\|smart` | Manage .env files in plain mode with subcommands |
 | `ps` | List Setupr-managed processes |
 | `stop [target]` | Stop one or all managed processes |
 | `restart [target]` | Restart a managed process |
