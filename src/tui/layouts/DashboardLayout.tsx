@@ -427,33 +427,29 @@ function ActionsHistoryPanel({ status, limit }: { status: DashboardStatus; limit
     ...status.history.slice(-Math.max(0, Math.floor(limit / 2))).map((event) => ({
       left: formatTime(event.timestamp),
       middle: event.type,
-      right: event.message || "complete",
+      status: event.type.includes("error") ? "error" : event.type.includes("warning") ? "warn" : "complete",
+      detail: event.message || "finished",
       color: event.type.includes("error") ? colors.error : event.type.includes("warning") ? colors.warning : colors.success,
     })),
     ...preferredCommands(status).slice(0, Math.max(2, limit - Math.floor(limit / 2))).map((command) => ({
-      left: "ACTION",
+      left: "shortcut",
       middle: command.name,
-      right: command.summary,
+      status: "ready",
+      detail: command.summary,
       color: colors.primary,
     })),
   ].slice(0, Math.max(1, limit));
 
   return (
     <Box flexDirection="column">
-      <Box justifyContent="space-between">
-        <Text color={colors.heading}>TIME / ACTION</Text>
-        <Text color={colors.heading}>STATUS</Text>
-      </Box>
+      <Text color={colors.heading}>TIME     ACTION                 STATUS    DETAIL</Text>
       {rows.length === 0 ? <Text color={colors.textDim}>No local history yet.</Text> : rows.map((row, index) => (
-        <Box key={`${row.left}-${row.middle}-${index}`} justifyContent="space-between" minWidth={0}>
-          <Box flexShrink={1} minWidth={0}>
-            <Text color={colors.textDim}>{row.left}  </Text>
-            <Text color={colors.text} wrap="truncate">{row.middle}</Text>
-          </Box>
-          <Box flexShrink={1} minWidth={0}>
-            <Text color={row.color} wrap="truncate">{row.right}</Text>
-          </Box>
-        </Box>
+        <Text key={`${row.left}-${row.middle}-${index}`} wrap="truncate">
+          <Text color={colors.textDim}>{fitCell(row.left, 8)} </Text>
+          <Text color={row.color}>{fitCell(row.middle, 20)} </Text>
+          <Text color={row.color}>{fitCell(row.status, 9)} </Text>
+          <Text color={colors.textDim}>{row.detail}</Text>
+        </Text>
       ))}
     </Box>
   );
@@ -478,13 +474,11 @@ function ProjectStatePanel({ status, limit }: { status: DashboardStatus; limit: 
   return (
     <Box flexDirection="column">
       {rows.slice(-Math.max(1, limit)).map((event, index) => (
-        <Box key={`${event.timestamp}-${event.type}-${index}`} justifyContent="space-between" minWidth={0}>
-          <Box minWidth={0} flexShrink={1}>
-            <Text color={colors.textDim}>{formatTime(event.timestamp)}  </Text>
-            <Text color={colors.text} wrap="truncate">{event.message || event.type}</Text>
-          </Box>
+        <Text key={`${event.timestamp}-${event.type}-${index}`} wrap="truncate">
+          <Text color={colors.textDim}>{fitCell(formatTime(event.timestamp), 8)} </Text>
+          <Text color={colors.text}>{fitCell(event.message || event.type, 42)} </Text>
           <Text color={event.type.includes("error") ? colors.error : colors.success}>complete</Text>
-        </Box>
+        </Text>
       ))}
     </Box>
   );
@@ -633,6 +627,12 @@ function healthBar(score: number): string {
 
 function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function fitCell(value: string, width: number): string {
+  if (value.length === width) return value;
+  if (value.length > width) return `${value.slice(0, Math.max(0, width - 1))}…`;
+  return value.padEnd(width, " ");
 }
 
 function distributeWidths(total: number, weights: number[], mins: number[]): number[] {

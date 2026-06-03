@@ -218,6 +218,13 @@ function LogPanel({
           {status === "running" && (
             <>
               <Text color={colors.success} wrap="truncate">{icons.dot} Running: <Text color={colors.accent}>{command}</Text></Text>
+              {output.length === 0 && (
+                <>
+                  <Text color={colors.textDim}>waiting for first process output…</Text>
+                  <Text color={colors.label} wrap="truncate">cwd <Text color={colors.value}>{cwdForLogPlaceholder()}</Text></Text>
+                  <Text color={colors.label}>logs <Text color={colors.textDim}>live stream will appear here</Text></Text>
+                </>
+              )}
               {output.slice(-outputLimit).map((line, index) => (
                 <Text key={`${line}-${index}`} color={logLineColor(line)} wrap="truncate">{line}</Text>
               ))}
@@ -379,6 +386,10 @@ function detectStartCommand(scan: ScanResult): string | null {
   if (scan.scripts.develop) return `${pm} run develop`;
   if (scan.scripts.watch) return `${pm} run watch`;
   return null;
+}
+
+function cwdForLogPlaceholder(): string {
+  return process.cwd().replace(process.env.HOME || "", "~");
 }
 
 function buildStack(scan: ScanResult): string {

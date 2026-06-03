@@ -23,13 +23,18 @@ interface EnvLayoutGeometry {
   stacked: boolean;
   listWidth: number;
   sideWidth: number;
+  helperWidth: number;
   detailsHeight: number;
   editorHeight: number;
+  explanationHeight: number;
+  warningsHeight: number;
   inputMaxLines: number;
   inputBounds: FocusBounds;
   listBounds: FocusBounds;
   detailsBounds: FocusBounds;
   editorBounds: FocusBounds;
+  explanationBounds: FocusBounds;
+  warningsBounds: FocusBounds;
   summaryWidths: number[];
   visibleRows: number;
 }
@@ -207,6 +212,17 @@ export function EnvLayout({ cwd }: EnvLayoutProps) {
                 />
               </Panel>
             </Box>
+
+            {!layout.stacked && (
+              <Box flexDirection="column" width={layout.helperWidth} height="100%">
+                <Panel title="Explanation" focusState={focus.focusState("explanation")} width="100%" height={layout.explanationHeight}>
+                  <ExplanationPanel selected={selected} state={state} />
+                </Panel>
+                <Panel title="Warnings" focusState={focus.focusState("warnings")} width="100%" height={layout.warningsHeight}>
+                  <WarningsPanel state={state} selected={selected} error={error} />
+                </Panel>
+              </Box>
+            )}
           </Box>
         </Box>
       )}
@@ -263,6 +279,54 @@ function DetailsPanel({ state, selected, message, error }: { state: EnvEditorSta
       {selected?.sensitive && <Text color={colors.warning}>Sensitive value: input is masked.</Text>}
       {message && <Text color={colors.success} wrap="truncate">{message}</Text>}
       {error && <Text color={colors.error} wrap="truncate">{error.code}: {error.title}</Text>}
+    </Box>
+  );
+}
+
+function ExplanationPanel({ state, selected }: { state: EnvEditorState; selected: EnvEditorEntry | null }) {
+  if (!selected) {
+    return (
+      <Box flexDirection="column">
+        <Text color={colors.textDim}>Select a variable to view source, sensitivity, and local-development guidance.</Text>
+        <Text color={state.hasExample ? colors.success : colors.warning}>
+          {state.hasExample ? "Template-driven values are available." : "No template is available."}
+        </Text>
+      </Box>
+    );
+  }
+
+  return (
+    <Box flexDirection="column">
+      <Text color={colors.heading} bold wrap="truncate">{selected.key}</Text>
+      <Text color={selected.sensitive ? colors.warning : colors.success}>
+        {selected.sensitive ? "Sensitive value" : "Normal value"}
+      </Text>
+      <Text color={colors.textDim} wrap="wrap">
+        {selected.sensitive
+          ? "Set this from the real service or a local test credential. It is masked in the TUI."
+          : "Use a local development value when possible. Paste KEY=value lines to batch-fill related vars."}
+      </Text>
+      {selected.templateValue && (
+        <Text color={colors.label} wrap="truncate">Template: {selected.sensitive ? maskValue(selected.templateValue) : selected.templateValue}</Text>
+      )}
+    </Box>
+  );
+}
+
+function WarningsPanel({ state, selected, error }: { state: EnvEditorState; selected: EnvEditorEntry | null; error: SetuprError | null }) {
+  const warnings: string[] = [];
+  if (!state.hasExample) warnings.push("No .env.example template found.");
+  if (state.missing.length > 0) warnings.push(`${state.missing.length} missing or empty vars.`);
+  if (selected?.sensitive) warnings.push("Do not commit real credentials.");
+  if (state.extra.length > 0) warnings.push(`${state.extra.length} extra vars not in template.`);
+  if (error) warnings.push(`${error.code}: ${error.title}`);
+
+  if (warnings.length === 0) return <Text color={colors.success}>✓ Env state looks clean.</Text>;
+  return (
+    <Box flexDirection="column">
+      {warnings.slice(0, 6).map((warning) => (
+        <Text key={warning} color={warning.includes("Do not") ? colors.error : colors.warning} wrap="truncate">△ {warning}</Text>
+      ))}
     </Box>
   );
 }
@@ -339,22 +403,30 @@ export function buildEnvLayout(width: number, height: number): EnvLayoutGeometry
       stacked,
       listWidth: width,
       sideWidth: width,
+      helperWidth: width,
       detailsHeight,
       editorHeight,
+      explanationHeight: 0,
+      warningsHeight: 0,
       inputMaxLines,
       inputBounds: { x: 4, y: inputY, width: Math.max(8, width - 10), height: inputMaxLines + 2 },
       listBounds: { x: 1, y: 2, width, height: listHeight },
       detailsBounds: { x: 1, y: 2 + listHeight, width, height: detailsHeight },
       editorBounds: { x: 1, y: 2 + listHeight + detailsHeight, width, height: editorHeight },
+      explanationBounds: { x: 1, y: 2, width: 0, height: 0 },
+      warningsBounds: { x: 1, y: 2, width: 0, height: 0 },
       summaryWidths: [],
       visibleRows: Math.max(1, listHeight - 3),
     };
   }
   const inputMaxLines = baseInputMaxLines;
   const editorHeight = Math.max(7, inputMaxLines + 5);
-  const listWidth = Math.max(32, Math.floor(width * 0.38));
-  const sideWidth = width - listWidth;
+  const listWidth = Math.max(30, Math.floor(width * 0.30));
+  const helperWidth = clamp(Math.floor(width * 0.26), 28, 40);
+  const sideWidth = width - listWidth - helperWidth;
   const detailsHeight = Math.max(8, contentHeight - editorHeight);
+  const explanationHeight = clamp(Math.floor(contentHeight * 0.56), 8, Math.max(8, contentHeight - 5));
+  const warningsHeight = Math.max(5, contentHeight - explanationHeight);
   const inputY = Math.max(4, 2 + summaryHeight + detailsHeight + editorHeight - inputMaxLines - 2);
   return {
     width,
@@ -365,13 +437,18 @@ export function buildEnvLayout(width: number, height: number): EnvLayoutGeometry
     stacked,
     listWidth,
     sideWidth,
+    helperWidth,
     detailsHeight,
     editorHeight,
+    explanationHeight,
+    warningsHeight,
     inputMaxLines,
     inputBounds: { x: listWidth + 4, y: inputY, width: Math.max(8, sideWidth - 10), height: inputMaxLines + 2 },
     listBounds: { x: 1, y: 2 + summaryHeight, width: listWidth, height: contentHeight },
     detailsBounds: { x: listWidth + 1, y: 2 + summaryHeight, width: sideWidth, height: detailsHeight },
     editorBounds: { x: listWidth + 1, y: 2 + summaryHeight + detailsHeight, width: sideWidth, height: editorHeight },
+    explanationBounds: { x: listWidth + sideWidth + 1, y: 2 + summaryHeight, width: helperWidth, height: explanationHeight },
+    warningsBounds: { x: listWidth + sideWidth + 1, y: 2 + summaryHeight + explanationHeight, width: helperWidth, height: warningsHeight },
     summaryWidths: distributeWidths(width, [1, 1, 1, 1], [20, 20, 18, 18]),
     visibleRows: Math.max(1, contentHeight - 3),
   };
@@ -395,6 +472,8 @@ export function buildEnvFocusItems(layout: EnvLayoutGeometry): FocusItem[] {
     { id: "details", row: 1, column: 1, bounds: layout.detailsBounds },
     { id: "editor", row: 2, column: 1, redirectTo: "input", bounds: layout.editorBounds },
     { id: "input", row: 3, column: 1, parentIds: ["editor"], bounds: layout.inputBounds },
+    { id: "explanation", row: 1, column: 2, bounds: layout.explanationBounds },
+    { id: "warnings", row: 2, column: 2, bounds: layout.warningsBounds },
   ];
 }
 

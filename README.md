@@ -470,6 +470,14 @@ The TUI runs in the terminal alternate screen, so exiting returns to the origina
 
 Setupr TUIs share the same terminal-native style: blue uppercase panel titles, thin blue borders, yellow focused borders/actions, green success states, yellow warnings/current work, and red failures. Interactive inputs stay anchored at the bottom of their panel, wrap within the box, and scroll once long input reaches the panel's line cap. `setupr clean` opens a safety review first; type `CLEAN` to delete reviewed targets, or use `--force` only when you intentionally want Setupr to skip the review prompt.
 
+The visual grammar is shared, but each command uses a command-specific board:
+
+- `setupr` and `setupr status --tui` use summary metric cards plus project state, history, processes, env, security, and next-action panels.
+- `setupr setup` uses setup progress, project/dependency/env/service cards, a terminal diary, a bottom input, and a right rail for port map, key dependencies, and notices.
+- `setupr chat` uses a large conversation panel with a bottom input plus a right rail for the active plan and session context.
+- `setupr start` uses managed processes, live logs, current process state, restart policy, and crash info.
+- `setupr doctor`, `setupr update`, `setupr clean`, `setupr env`, and `setupr auth` keep their primary action input at the bottom and use side panels for diagnostics, risks, explanations, warnings, provider status, or secure storage state.
+
 ## Requirements
 
 - Node.js >= 18.0.0

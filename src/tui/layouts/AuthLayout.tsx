@@ -157,30 +157,23 @@ function StoragePanel() {
 
 function ProviderRow({ row, compact = false }: { row: { provider: AIProvider; label: string; key?: string; source: string | null; configured: boolean }; compact?: boolean }) {
   const config = PROVIDERS[row.provider];
-  const source = row.source ? ` ${row.source}` : "";
+  const envLabel = config.envKey.replace("_API_KEY", "");
+  const keyLabel = row.key ? maskApiKey(row.key) : "missing";
   if (compact) {
     return (
       <Text color={row.configured ? colors.success : colors.textDim} wrap="truncate">
-        {row.configured ? "✓" : "○"} {row.label} · {row.key ? maskApiKey(row.key) : "missing"}{source}
+        {row.configured ? "✓" : "○"} {row.label} · {keyLabel}{row.source ? ` · ${row.source}` : ""}
       </Text>
     );
   }
 
   return (
-    <Box justifyContent="space-between" width="100%" minWidth={0}>
-      <Box flexShrink={1} minWidth={0} marginRight={1}>
-        <Text color={row.configured ? colors.success : colors.textDim} wrap="truncate">
-          {row.configured ? "✓" : "○"} {row.label}
-        </Text>
-        <Text color={colors.textDim} wrap="truncate"> {config.envKey.replace("_API_KEY", "")}</Text>
-      </Box>
-      <Box flexShrink={0}>
-        <Text color={row.configured ? colors.value : colors.textDim}>
-          {row.key ? maskApiKey(row.key) : "missing"}
-        </Text>
-        <Text color={colors.textDim}> {row.source || ""}</Text>
-      </Box>
-    </Box>
+    <Text wrap="truncate">
+      <Text color={row.configured ? colors.success : colors.textDim}>{fitCell(`${row.configured ? "✓" : "○"} ${row.label}`, 16)}</Text>
+      <Text color={colors.textDim}>{fitCell(envLabel, 16)}</Text>
+      <Text color={row.configured ? colors.value : colors.textDim}>{fitCell(keyLabel, 14)}</Text>
+      <Text color={colors.textDim}>{row.source || ""}</Text>
+    </Text>
   );
 }
 
@@ -234,7 +227,7 @@ function buildAuthLayout(width: number, height: number): AuthLayoutGeometry {
     };
   }
 
-  const [providersWidth, modelWidth, actionsWidth] = distributeWidths(width, [0.45, 0.32, 0.23], [34, 30, 24]);
+  const [providersWidth, modelWidth, actionsWidth] = distributeWidths(width, [0.28, 0.48, 0.24], [30, 40, 28]);
   return {
     width,
     height,
@@ -291,4 +284,10 @@ function fitWidths(total: number, count: number): number[] {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function fitCell(value: string, width: number): string {
+  if (value.length === width) return value;
+  if (value.length > width) return `${value.slice(0, Math.max(0, width - 1))}…`;
+  return value.padEnd(width, " ");
 }

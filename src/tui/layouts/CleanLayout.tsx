@@ -152,25 +152,30 @@ export function CleanLayout({ cwd, mode, force = false }: CleanLayoutProps) {
 }
 
 function WideClean(props: CleanViewProps) {
+  const panelHeight = Math.max(6, props.layout.bodyHeight - props.layout.inputHeight);
   return (
-    <Box flexDirection="row" width={props.layout.width} height={props.layout.bodyHeight}>
-      <Panel title="Targets" focusState={props.focus("targets")} width={props.layout.targetsWidth} height="100%">
-        <TargetsPanel {...props} />
-      </Panel>
-      <Panel title="Safety Review" focusState={props.focus("review")} width={props.layout.reviewWidth} height="100%">
-        <SafetyPanel {...props} />
-      </Panel>
-      <Panel title="Risk Summary" focusState={props.focus("risk")} width={props.layout.riskWidth} height="100%">
-        <RiskPanel {...props} />
-      </Panel>
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
+      <Box flexDirection="row" width="100%" height={panelHeight}>
+        <Panel title="Targets" focusState={props.focus("targets")} width={props.layout.targetsWidth} height="100%">
+          <TargetsPanel {...props} limit={panelHeight - 3} />
+        </Panel>
+        <Panel title="Safety Review" focusState={props.focus("review")} width={props.layout.reviewWidth} height="100%">
+          <SafetyPanel {...props} />
+        </Panel>
+        <Panel title="Risk Summary" focusState={props.focus("risk")} width={props.layout.riskWidth} height="100%">
+          <RiskPanel {...props} />
+        </Panel>
+      </Box>
+      <CleanCommandStrip {...props} width={props.layout.width} />
     </Box>
   );
 }
 
 function StackedClean(props: CleanViewProps) {
-  const targetsHeight = Math.max(8, Math.floor(props.layout.bodyHeight * 0.45));
-  const reviewHeight = Math.max(7, Math.floor(props.layout.bodyHeight * 0.32));
-  const riskHeight = Math.max(5, props.layout.bodyHeight - targetsHeight - reviewHeight);
+  const panelHeight = Math.max(8, props.layout.bodyHeight - props.layout.inputHeight);
+  const targetsHeight = Math.max(8, Math.floor(panelHeight * 0.45));
+  const reviewHeight = Math.max(7, Math.floor(panelHeight * 0.32));
+  const riskHeight = Math.max(5, panelHeight - targetsHeight - reviewHeight);
   return (
     <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
       <Panel title="Targets" focusState={props.focus("targets")} width="100%" height={targetsHeight}>
@@ -182,6 +187,7 @@ function StackedClean(props: CleanViewProps) {
       <Panel title="Risk Summary" focusState={props.focus("risk")} width="100%" height={riskHeight}>
         <RiskPanel {...props} compact />
       </Panel>
+      <CleanCommandStrip {...props} width={props.layout.width} />
     </Box>
   );
 }
@@ -207,7 +213,7 @@ function TargetsPanel({ targets, phase, limit = 12 }: CleanViewProps & { limit?:
   );
 }
 
-function SafetyPanel({ layout, mode, phase, message, targets, inputActive, inputBounds, focus, onConfirm }: CleanViewProps) {
+function SafetyPanel({ mode, phase, message, targets }: CleanViewProps) {
   const willDelete = targets.filter((target) => target.status === "pending" || target.status === "removing").length;
   return (
     <Box flexDirection="column" flexGrow={1} minHeight={0}>
@@ -219,17 +225,30 @@ function SafetyPanel({ layout, mode, phase, message, targets, inputActive, input
         <Text color={phase === "blocked" ? colors.warning : phase === "done" ? colors.success : colors.text} wrap="truncate">{message}</Text>
         <KVRow label="Pending targets" value={willDelete} color={willDelete > 0 ? colors.warning : colors.success} />
       </Box>
-      {(phase === "review" || phase === "blocked") && (
-        <ChatInput
-          active={inputActive}
-          focusState={focus("input")}
-          onSubmit={onConfirm}
-          placeholder='Type CLEAN to confirm deletion...'
-          width={Math.max(12, layout.reviewWidth - 4)}
-          maxLines={layout.inputMaxLines}
-          scrollBounds={inputBounds}
-        />
-      )}
+    </Box>
+  );
+}
+
+function CleanCommandStrip({ layout, phase, inputActive, inputBounds, focus, onConfirm, width }: CleanViewProps & { width: number }) {
+  const disabled = phase !== "review" && phase !== "blocked";
+  const placeholder = phase === "blocked"
+    ? 'Type CLEAN to confirm, or q to quit...'
+    : phase === "done"
+      ? "Clean finished. Ask or press q to quit..."
+      : "Type CLEAN to confirm deletion...";
+  return (
+    <Box width="100%" height={layout.inputHeight} justifyContent="center" alignItems="center">
+      <ChatInput
+        active={inputActive}
+        focusState={focus("input")}
+        onSubmit={onConfirm}
+        placeholder={placeholder}
+        width={Math.max(12, width - 2)}
+        maxLines={layout.inputMaxLines}
+        scrollBounds={inputBounds}
+        disabled={disabled}
+        disabledText={placeholder}
+      />
     </Box>
   );
 }
@@ -257,15 +276,21 @@ export function buildCleanLayout(width: number, height: number): CleanLayoutGeom
   const reviewWidth = stacked ? width : width - targetsWidth - riskWidth;
   const inputMaxLines = Math.max(1, Math.min(4, Math.floor(bodyHeight / 6)));
   const inputHeight = inputMaxLines + 2;
-  const inputBounds = { x: stacked ? 3 : targetsWidth + 3, y: Math.max(4, height - inputHeight - 1), width: Math.max(8, reviewWidth - 6), height: inputHeight };
+  const inputBounds = {
+    x: stacked ? 3 : 3,
+    y: Math.max(4, height - inputHeight - 1),
+    width: Math.max(8, stacked ? width - 6 : width - 6),
+    height: inputHeight,
+  };
   return { width, height, stacked, bodyHeight, targetsWidth, reviewWidth, riskWidth, inputMaxLines, inputHeight, inputBounds };
 }
 
 export function buildCleanFocusItems(layout: CleanLayoutGeometry): FocusItem[] {
   if (layout.stacked) {
-    const targetsHeight = Math.max(8, Math.floor(layout.bodyHeight * 0.45));
-    const reviewHeight = Math.max(7, Math.floor(layout.bodyHeight * 0.32));
-    const riskHeight = Math.max(5, layout.bodyHeight - targetsHeight - reviewHeight);
+    const panelHeight = Math.max(8, layout.bodyHeight - layout.inputHeight);
+    const targetsHeight = Math.max(8, Math.floor(panelHeight * 0.45));
+    const reviewHeight = Math.max(7, Math.floor(panelHeight * 0.32));
+    const riskHeight = Math.max(5, panelHeight - targetsHeight - reviewHeight);
     return [
       { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.width, height: targetsHeight } },
       { id: "review", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: 2 + targetsHeight, width: layout.width, height: reviewHeight } },
@@ -274,10 +299,10 @@ export function buildCleanFocusItems(layout: CleanLayoutGeometry): FocusItem[] {
     ];
   }
   return [
-    { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.targetsWidth, height: layout.bodyHeight } },
-    { id: "review", row: 0, column: 1, redirectTo: "input", bounds: { x: layout.targetsWidth + 1, y: 2, width: layout.reviewWidth, height: layout.bodyHeight } },
+    { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.targetsWidth, height: layout.bodyHeight - layout.inputHeight } },
+    { id: "review", row: 0, column: 1, redirectTo: "input", bounds: { x: layout.targetsWidth + 1, y: 2, width: layout.reviewWidth, height: layout.bodyHeight - layout.inputHeight } },
     { id: "input", row: 1, column: 1, parentIds: ["review"], bounds: layout.inputBounds },
-    { id: "risk", row: 0, column: 2, bounds: { x: layout.targetsWidth + layout.reviewWidth + 1, y: 2, width: layout.riskWidth, height: layout.bodyHeight } },
+    { id: "risk", row: 0, column: 2, bounds: { x: layout.targetsWidth + layout.reviewWidth + 1, y: 2, width: layout.riskWidth, height: layout.bodyHeight - layout.inputHeight } },
   ];
 }
 

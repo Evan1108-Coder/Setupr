@@ -217,7 +217,14 @@ function PackagesPanel({
       <Box flexDirection="column" flexGrow={1} minHeight={0}>
         <Box flexDirection="column" flexGrow={1} overflow="hidden">
           <TableHeader />
-          {loading && <Spinner label="Checking for updates..." />}
+          {loading && (
+            <>
+              {pendingUpdateRows().slice(0, packageLimit).map((row) => (
+                <Text key={row} color={colors.textDim} wrap="truncate">⠋ {row}</Text>
+              ))}
+              <Spinner label="Checking for updates..." />
+            </>
+          )}
           {!loading && noProject && <Text color={colors.warning}>{icons.warning} {error?.title || "No project files detected in this directory."}</Text>}
           {!loading && error && <ErrorBlock error={error} />}
           {!loading && notice && <Text color={colors.warning}>{icons.warning} {notice}</Text>}
@@ -274,6 +281,17 @@ function TableHeader() {
       <Text color={colors.heading}>CURRENT → LATEST  TYPE</Text>
     </Box>
   );
+}
+
+function pendingUpdateRows(): string[] {
+  return [
+    "Reading package manifest and lockfile",
+    "Detecting package manager strategy",
+    "Checking direct dependencies",
+    "Checking development dependencies",
+    "Estimating major/minor/patch risk",
+    "Preparing update safety review",
+  ];
 }
 
 function PackageRow({ pkg }: { pkg: OutdatedPkg }) {

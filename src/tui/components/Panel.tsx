@@ -48,7 +48,6 @@ export function Panel({
     >
       <Box width="100%" flexShrink={0} justifyContent="space-between">
         <Text color={titleColor} bold>
-          {focused ? "▸ " : ancestor ? "◆ " : "  "}
           {title.toUpperCase()}
         </Text>
         {subtitle && <Text color={colors.textDim} wrap="truncate">{subtitle}</Text>}

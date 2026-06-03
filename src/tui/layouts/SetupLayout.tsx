@@ -390,9 +390,15 @@ function WideSetup(props: WideSetupProps) {
           inputBounds={props.inputBounds}
           maxLogLines={Math.max(1, props.layout.mainHeight - props.inputMaxLines - 5)}
         />
-        <Panel title="NOTICES + DETAILS" focusState={props.focus("side")} width={props.layout.sideWidth} height="100%">
-          <SideDetails ports={props.ports} keyDeps={props.keyDeps} notices={props.notices} noProject={props.noProject} />
-        </Panel>
+        <SetupSideRail
+          width={props.layout.sideWidth}
+          focusState={props.focus("side")}
+          height={props.layout.mainHeight}
+          ports={props.ports}
+          keyDeps={props.keyDeps}
+          notices={props.notices}
+          noProject={props.noProject}
+        />
       </Box>
     </>
   );
@@ -717,28 +723,97 @@ function SideDetails({
 
   return (
     <>
-      <Text color={colors.heading} bold>PORTS</Text>
-      {ports.length > 0 ? ports.slice(0, compact ? 2 : 5).map((p) => (
+      <PortRows ports={ports} limit={compact ? 2 : 5} />
+      <Text> </Text>
+      <KeyDependencyRows keyDeps={keyDeps} limit={7} />
+      <Text> </Text>
+      <NoticeRows notices={notices} limit={5} />
+    </>
+  );
+}
+
+function SetupSideRail({
+  width,
+  height,
+  focusState,
+  ports,
+  keyDeps,
+  notices,
+  noProject,
+}: {
+  width: number;
+  height: number;
+  focusState?: "focused" | "ancestor";
+  ports: Array<{ service: string; port: number; status: "free" | "in_use" }>;
+  keyDeps: Array<{ name: string; version: string }>;
+  notices: Array<{ type: "warning" | "error" | "info"; message: string }>;
+  noProject: boolean;
+}) {
+  const portHeight = clamp(Math.floor(height * 0.30), 7, Math.max(7, height - 12));
+  const depsHeight = clamp(Math.floor(height * 0.34), 8, Math.max(8, height - portHeight - 5));
+  const noticesHeight = Math.max(5, height - portHeight - depsHeight);
+
+  if (noProject) {
+    return (
+      <Panel title="Notices" focusState={focusState} width={width} height="100%">
+        <Text color={colors.warning} bold>Open a project directory before running setup.</Text>
+        <Text color={colors.textDim}>Expected files include package.json, pyproject.toml, Cargo.toml, go.mod, or similar.</Text>
+      </Panel>
+    );
+  }
+
+  return (
+    <Box flexDirection="column" width={width} height="100%">
+      <Panel title="Port Map" focusState={focusState} width="100%" height={portHeight}>
+        <PortRows ports={ports} limit={portHeight - 3} />
+      </Panel>
+      <Panel title="Key Dependencies" focusState={focusState} width="100%" height={depsHeight}>
+        <KeyDependencyRows keyDeps={keyDeps} limit={depsHeight - 3} />
+      </Panel>
+      <Panel title="Notices" focusState={focusState} width="100%" height={noticesHeight}>
+        <NoticeRows notices={notices} limit={noticesHeight - 3} />
+      </Panel>
+    </Box>
+  );
+}
+
+function PortRows({ ports, limit }: { ports: Array<{ service: string; port: number; status: "free" | "in_use" }>; limit: number }) {
+  return (
+    <>
+      {ports.length > 0 ? ports.slice(0, Math.max(1, limit)).map((p) => (
         <Box key={p.service} justifyContent="space-between">
           <Text color={colors.label} wrap="truncate">{p.service}</Text>
-          <Text color={p.status === "free" ? colors.success : colors.error}>:{p.port}</Text>
+          <Text color={p.status === "free" ? colors.success : colors.error}>:{p.port} {p.status === "free" ? "free" : "in use"}</Text>
         </Box>
       )) : <Text color={colors.textDim}>No ports detected</Text>}
-      <Text> </Text>
-      <Text color={colors.heading} bold>KEY DEPENDENCIES</Text>
-      {keyDeps.length > 0 ? keyDeps.slice(0, 7).map((dep) => (
+      {ports.length > limit && <Text color={colors.textDim}>… {ports.length - limit} more ports</Text>}
+    </>
+  );
+}
+
+function KeyDependencyRows({ keyDeps, limit }: { keyDeps: Array<{ name: string; version: string }>; limit: number }) {
+  return (
+    <>
+      {keyDeps.length > 0 ? keyDeps.slice(0, Math.max(1, limit)).map((dep) => (
         <Box key={dep.name} justifyContent="space-between">
           <Text color={colors.label} wrap="truncate">{dep.name}</Text>
           <Text color={colors.value}>{dep.version}</Text>
         </Box>
       )) : <Text color={colors.textDim}>None found</Text>}
-      <Text> </Text>
-      <Text color={colors.heading} bold>NOTICES</Text>
-      {notices.length > 0 ? notices.slice(0, 5).map((n, i) => (
+      {keyDeps.length > limit && <Text color={colors.textDim}>… {keyDeps.length - limit} more deps</Text>}
+    </>
+  );
+}
+
+function NoticeRows({ notices, limit }: { notices: Array<{ type: "warning" | "error" | "info"; message: string }>; limit: number }) {
+  return (
+    <>
+      {notices.length > 0 ? notices.slice(0, Math.max(1, limit)).map((n, i) => (
         <Text key={i} color={n.type === "error" ? colors.error : n.type === "warning" ? colors.warning : colors.info} wrap="truncate">
           {n.type === "error" ? "●" : n.type === "warning" ? "△" : "ℹ"} {n.message}
         </Text>
       )) : <Text color={colors.textDim}>No issues</Text>}
+      {notices.length > limit && <Text color={colors.textDim}>… {notices.length - limit} more notices</Text>}
     </>
   );
 }

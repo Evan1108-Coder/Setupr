@@ -194,6 +194,11 @@ function DiagnosticsPanel({
               {getCheckIcon(check.status)} {check.label}{check.detail ? ` - ${check.detail}` : ""}{check.error ? ` (${check.error.code})` : ""}
             </Text>
           ))}
+          {!done && checks.length === 0 && pendingDiagnosticRows().slice(0, checkLimit).map((check) => (
+            <Text key={check.label} color={colors.textDim} wrap="truncate">
+              {icons.spinner[0]} {check.label} - {check.detail}
+            </Text>
+          ))}
           {checks.length > checkLimit && <Text color={colors.textDim}>… {checks.length - checkLimit} more checks</Text>}
           {!done && <Spinner label="Running diagnostics..." />}
           {chatMessages.slice(-4).map((message, index) => (
@@ -257,7 +262,10 @@ function AIDiagnosis({ insights, risk, chatMessages }: { insights: DoctorInsight
     <Box flexDirection="column">
       <KVRow label="Risk level" value={risk} color={statusColor(risk)} />
       {insights.length === 0 ? (
-        <Text color={colors.textDim}>No AI diagnosis items yet.</Text>
+        <>
+          <Text color={colors.textDim}>Waiting for diagnostic context.</Text>
+          <Text color={colors.label} wrap="wrap">The doctor will summarize causes and next actions after checks finish.</Text>
+        </>
       ) : insights.slice(0, 5).map((insight) => (
         <Text key={insight.issue} color={insight.severity === "error" ? colors.error : insight.severity === "warning" ? colors.warning : colors.info} wrap="truncate">
           {insight.issue}: {insight.fix?.command || insight.explanation}
@@ -465,6 +473,18 @@ async function runDiagnostics(scan: ScanResult, cwd: string, noProject: boolean)
 
   if (checks.length === 0) checks.push({ label: "Project files", status: "warn", detail: "nothing checkable detected" });
   return checks;
+}
+
+function pendingDiagnosticRows(): Check[] {
+  return [
+    { label: "Runtime", status: "checking", detail: "checking language runtime and version" },
+    { label: "Dependencies", status: "checking", detail: "checking package manager and lockfile" },
+    { label: "Environment", status: "checking", detail: "checking .env and template state" },
+    { label: "Git", status: "checking", detail: "checking repository and remote" },
+    { label: "Terminal", status: "checking", detail: "checking terminal capabilities" },
+    { label: "AI Provider", status: "checking", detail: "checking configured model provider" },
+    { label: "Network", status: "checking", detail: "checking remote access where needed" },
+  ];
 }
 
 function getCheckIcon(status: Check["status"]): string {

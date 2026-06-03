@@ -15,9 +15,10 @@ interface TuiHeaderProps {
 
 export function TuiHeader({ command, title, cwd, stack, status, statusColor, right, width }: TuiHeaderProps) {
   const compact = width < 118;
+  const pathText = cwd ? shortPath(cwd, compact ? 18 : 28) : "";
   const leftText = compact
     ? `${icons.diamond} ${command}${title ? ` · ${title}` : ""}`
-    : `${icons.diamond} ${command}${title ? `  ${title}` : ""}${stack ? `  Stack: ${stack}` : ""}${cwd ? `  ${shortPath(cwd, Math.max(12, width - 82))}` : ""}`;
+    : `${icons.diamond} ${command}${title ? `  ${title}` : ""}${stack ? `  Stack: ${stack}` : ""}${pathText ? `  ${pathText}` : ""}`;
   const rightText = right || status || "";
   const rightWidth = rightText ? Math.min(width - 8, Math.max(8, rightText.length + 2)) : 0;
   const leftWidth = Math.max(8, width - rightWidth);
@@ -51,7 +52,7 @@ export function TuiFooter({ width, left, right }: TuiFooterProps) {
   return (
     <Box width="100%" height={1} justifyContent="space-between">
       <Box minWidth={0} flexShrink={1}>
-        <Text color={colors.textDim} wrap="truncate">{highlightShortcuts(leftText)}</Text>
+        <Text color={colors.textDim} wrap="truncate">{leftText}</Text>
       </Box>
       {right && (
         <Box flexShrink={0} marginLeft={1}>
@@ -115,17 +116,4 @@ export function formatAge(timestamp: number): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h`;
   return `${Math.floor(hours / 24)}d`;
-}
-
-function highlightShortcuts(text: string) {
-  const shortcutPattern = /^(Ctrl\+[A-Za-z]|Tab|Esc|Enter|q|←\/↑\/↓\/→|↑\/↓|Click)$/;
-  const parts = text.split(/(Ctrl\+[A-Za-z]|Tab|Esc|Enter|\bq\b|←\/↑\/↓\/→|↑\/↓|Click)/g);
-  return (
-    <>
-      {parts.map((part, index) => {
-        const isKey = shortcutPattern.test(part);
-        return <Text key={`${part}-${index}`} color={isKey ? colors.accent : colors.textDim} bold={isKey}>{part}</Text>;
-      })}
-    </>
-  );
 }
