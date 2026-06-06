@@ -39,8 +39,9 @@ function createFixtures() {
   dir("fastapi-app");
   dir("rust-app/src");
   dir("go-app");
-  dir("docker-heavy");
-  dir("broken-lock");
+	  dir("docker-heavy");
+	  dir("broken-lock");
+  dir("process-lifecycle");
 
   write("malformed-pkg/package.json", "{\"scripts\":{\"test\":\"node -e \\\\\\\"process.exit(1)\\\\\\\"\"}");
   write("malformed-config/.setupr.json", "{broken");
@@ -116,8 +117,11 @@ function createFixtures() {
     scripts: { dev: "node server.js" },
     dependencies: { express: "^4.18.0" },
   }));
-  write("broken-lock/package-lock.json", "{broken");
-}
+	  write("broken-lock/package-lock.json", "{broken");
+  write("process-lifecycle/package.json", JSON.stringify({
+    scripts: { dev: "node -e \"setInterval(()=>{},1000)\"" },
+  }));
+	}
 
 function plainSmoke() {
   expectRun("malformed package", "malformed-pkg", ["info", "--plain"], ["MALFORMED_PROJECT_FILE", "package.json"]);
@@ -138,8 +142,10 @@ function plainSmoke() {
   expectRun("security quick", "js-new", ["security", "quick", "--plain"], ["Setupr Security scan", "Score:"]);
   expectRun("security deep report", "docker-heavy", ["security", "deep", "--plain", "--report", ".setupr/security-smoke.md"], ["Setupr Security deep", "Container may run as root"]);
   expectRun("security headers guarded", "js-new", ["security", "headers", "--plain", "--url", "https://example.com"], ["External URL requires explicit authorization", "Rerun with --force"]);
-  expectRun("no project setup", "no-project", ["setup", "--plain", "--force"], ["NO_PROJECT_DETECTED"]);
-  expectRun("monorepo info", "monorepo", ["info", "--plain"], ["Monorepo:", "npm-workspaces"]);
+	  expectRun("no project setup", "no-project", ["setup", "--plain", "--force"], ["NO_PROJECT_DETECTED"]);
+  expectRun("no project update", "no-project", ["update", "--plain"], ["NO_PROJECT_DETECTED"]);
+  expectRun("forced non-tty tui", "js-new", ["status", "--tui"], ["TUI_RENDER_FAILED", "--tui was requested"]);
+	  expectRun("monorepo info", "monorepo", ["info", "--plain"], ["Monorepo:", "npm-workspaces"]);
   expectRun("missing lock/log/repo", "env-missing", ["diff", "--plain"], ["LOCK_STATE_MISSING"]);
   expectRun("missing logs", "env-missing", ["logs", "--plain"], ["LOG_FILE_MISSING"]);
   expectRun("missing remote", "env-missing", ["open", "repo", "--plain"], ["OPEN_TARGET_MISSING"]);
@@ -158,9 +164,10 @@ function plainSmoke() {
   expectRun("agent context go app", "go-app", ["info", "--plain"], ["Go"]);
   expectRun("agent context docker app", "docker-heavy", ["doctor", "--plain"], ["Setupr Doctor", "AI Director Diagnosis"]);
   expectRun("broken lock handled", "broken-lock", ["status", "--plain"], ["Setupr Status", "Dependencies"]);
-  expectRun("plugin api scaffold", "js-new", ["plugin", "create", "demo", "--plain", "--force"], ["Created Setupr plugin project"]);
-  expectRun("plugin api validate", "js-new", ["plugin", "validate", "setupr-plugin-demo", "--plain"], ["Manifest looks valid"]);
-}
+	  expectRun("plugin api scaffold", "js-new", ["plugin", "create", "demo", "--plain", "--force"], ["Created Setupr plugin project"]);
+	  expectRun("plugin api validate", "js-new", ["plugin", "validate", "setupr-plugin-demo", "--plain"], ["Manifest looks valid"]);
+  expectProcessLifecycle();
+	}
 
 function tuiSmoke() {
   const hasExpect = spawnSync("bash", ["-lc", "command -v expect"], { encoding: "utf8" }).status === 0;
@@ -169,20 +176,27 @@ function tuiSmoke() {
     return;
   }
   const expectFile = join(temp, "tui-doctor.expect");
-  writeFileSync(expectFile, [
-    "set timeout 10",
-    "set node [lindex $argv 0]",
-    "set cli [lindex $argv 1]",
-    "set cwd [lindex $argv 2]",
-    "cd $cwd",
-    "set env(COLUMNS) 80",
-    "set env(LINES) 24",
-    "spawn $node $cli doctor",
-    "after 500",
-    "send \"\\r\"",
-    "after 4000",
-    "send \"\\003\"",
-    "expect eof",
+	  writeFileSync(expectFile, [
+	    "set timeout 10",
+	    "set node [lindex $argv 0]",
+	    "set cli [lindex $argv 1]",
+	    "set cwd [lindex $argv 2]",
+	    "cd $cwd",
+	    "set env(COLUMNS) 80",
+	    "set env(LINES) 24",
+	    "spawn $node $cli doctor",
+    "stty rows 24 columns 100",
+    "expect {",
+    "  -re \"Press Enter\" { send \"\\r\" }",
+    "  timeout { send \"\\r\" }",
+    "}",
+    "expect {",
+    "  -re \"(setupr doctor|Setupr Doctor|DIAGNOSTICS|ENVIRONMENT)\" {}",
+    "  timeout {}",
+    "}",
+	    "after 1000",
+	    "send \"\\003\"",
+	    "expect eof",
     "",
   ].join("\n"));
   const result = spawnSync("expect", [expectFile, process.execPath, cli, join(temp, "tui-empty")], {
@@ -191,15 +205,15 @@ function tuiSmoke() {
   });
   const output = `${result.stdout || ""}\n${result.stderr || ""}`;
   const ok = output.includes("Setupr Doctor") || output.includes("Diagnostics") || output.includes("Environment");
-  if (ok) {
-    results.push({ name: "tui doctor capture", ok: true, details: "captured TUI launch text" });
-  } else {
-    results.push({
-      name: "tui doctor capture",
-      ok: true,
-      skipped: "pseudo-terminal capture unavailable here; run manual iTerm2/Ghostty visual QA",
-    });
-  }
+	  if (ok) {
+	    results.push({ name: "tui doctor capture", ok: true, details: "captured TUI launch text" });
+	  } else {
+	    results.push({
+	      name: "tui doctor capture",
+	      ok: false,
+	      details: `doctor TUI did not render expected text\n${trim(output)}`,
+	    });
+	  }
 
   const envExpectFile = join(temp, "tui-env.expect");
   writeFileSync(envExpectFile, [
@@ -258,13 +272,41 @@ function expectNoFile(name, fixture, args, forbiddenPath, options = {}) {
   });
 }
 
-function run(fixture, args, options = {}) {
-  return spawnSync(process.execPath, [cli, ...args], {
-    cwd: join(temp, fixture),
-    env: { ...process.env, ...(options.env || {}) },
-    encoding: "utf8",
-    timeout: options.timeout || 15_000,
+function expectProcessLifecycle() {
+  const start = run("process-lifecycle", ["start", "--plain", "--force"], { timeout: 20_000 });
+  const psBefore = run("process-lifecycle", ["ps", "--plain"], { timeout: 10_000 });
+  const stop = run("process-lifecycle", ["stop", "all", "--force"], { timeout: 10_000 });
+  const psAfter = run("process-lifecycle", ["ps", "--plain"], { timeout: 10_000 });
+  const output = [start, psBefore, stop, psAfter].map((result) => result.stdout + result.stderr).join("\n");
+  const ok = output.includes("Started dev") && output.includes("running") && output.includes("Stopped dev") && output.includes("stopped");
+  results.push({
+    name: "process lifecycle start ps stop-all",
+    ok,
+    details: ok ? "started, listed, stopped all" : trim(output),
   });
+}
+
+function run(fixture, args, options = {}) {
+	  return spawnSync(process.execPath, [cli, ...args], {
+	    cwd: join(temp, fixture),
+	    env: { ...cleanSmokeEnv(), ...(options.env || {}) },
+	    encoding: "utf8",
+	    timeout: options.timeout || 15_000,
+	  });
+	}
+
+function cleanSmokeEnv() {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (/^(OPENAI|ANTHROPIC|GOOGLE|GROQ|MINIMAX|MOONSHOT|GITHUB_MODELS|GITHUB_TOKEN|GH_TOKEN|SETUPR_AI|AI)_/i.test(key)) {
+      delete env[key];
+    }
+  }
+  const home = join(temp, "smoke-home");
+  mkdirSync(home, { recursive: true });
+  env.HOME = home;
+  env.SETUPR_SMOKE = "1";
+  return env;
 }
 
 function report() {

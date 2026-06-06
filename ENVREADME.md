@@ -2,14 +2,14 @@
 
 ## Setupr AI Provider Keys
 
-Setupr provider API keys should be stored globally with `setup auth`, not in a project `.env` file:
+Setupr provider API keys should be stored globally with `setupr auth`, not in a project `.env` file:
 
 ```bash
-setup auth login
-setup auth set-key github
-setup auth list
-setup auth test
-setup auth use openai/gpt-4.1-mini
+setupr auth login
+setupr auth set-key github
+setupr auth list
+setupr auth test
+setupr auth use openai/gpt-4.1-mini
 ```
 
 Keys are stored at `~/.setupr/secrets.json` with file permissions `0600`, and Setupr only displays masked values.
@@ -33,15 +33,15 @@ For GitHub Models, use a token that can read GitHub Models. Fine-grained PATs or
 Setupr resolves provider keys in this order:
 
 1. Shell environment variables
-2. Global auth storage from `setup auth set-key`
+2. Global auth storage from `setupr auth set-key`
 3. Local `.env.local`
 4. Local `.env`
-5. Saved model preference from `setup auth use` (for model selection only)
+5. Saved model preference from `setupr auth use` (for model selection only)
 
 To migrate old provider keys out of a project `.env`:
 
 ```bash
-setup auth migrate
+setupr auth migrate
 ```
 
 Project `.env`, `.env.local`, and `.env.example` should primarily describe the app being set up, such as `DATABASE_URL`, `PORT`, or `NEXT_PUBLIC_API_URL`.
@@ -55,7 +55,7 @@ Project `.env`, `.env.local`, and `.env.example` should primarily describe the a
 
 If several provider keys are set, the selected model is deterministic:
 
-1. `P_SETUP_AI_MODEL` or `setup auth use ...` wins.
+1. `P_SETUP_AI_MODEL` or `setupr auth use ...` wins.
 2. Otherwise Setupr picks the cheapest configured model from its known local pricing table.
 3. GitHub Models catalog pricing is treated as unknown, so GitHub is picked automatically only if explicitly selected or if it is the only configured provider.
 4. The setup pre-warning and TUI timeline show which model the AI director is using.
@@ -74,31 +74,31 @@ Setupr detects required environment variables by:
 
 ```bash
 # Open the interactive .env editor TUI
-setup env
+setupr env
 
 # Create .env from .env.example
-setup env init
+setupr env init
 
 # Recreate .env from .env.example even if .env already exists.
 # If no .env.example exists, --force creates an empty .env with a warning.
-setup env init --force
+setupr env init --force
 
 # Check for missing variables
-setup env check
+setupr env check
 
 # Sync .env structure with .env.example (preserves values)
-setup env sync
+setupr env sync
 
 # Smart analysis: detect issues + interactive fix
-setup env smart
+setupr env smart
 ```
 
 ### `env` Editor Behavior
 
-- `setup env` opens a TUI editor for the local `.env`
+- `setupr env` opens a TUI editor for the local `.env`
 - if `.env` is missing but `.env.example` exists, Setupr asks before creating `.env` from the template
 - if both `.env` and `.env.example` are missing, Setupr returns `ENV_TEMPLATE_MISSING`
-- `setup env --force` creates an empty `.env` when no template exists and explains that no variables were inferred
+- `setupr env --force` creates an empty `.env` when no template exists and explains that no variables were inferred
 - the editor accepts normal value edits and pasted `KEY=value` lines
 - sensitive keys such as API keys, tokens, secrets, and passwords are masked in the editor input
 
@@ -113,11 +113,11 @@ setup env smart
 
 ### Safety Defaults
 
-- `setup env init` never overwrites an existing `.env` unless you pass `--force`
-- `setup env init` does not create `.env` when `.env.example` is missing unless you pass `--force`; without force it returns `ENV_TEMPLATE_MISSING`
+- `setupr env init` never overwrites an existing `.env` unless you pass `--force`
+- `setupr env init` does not create `.env` when `.env.example` is missing unless you pass `--force`; without force it returns `ENV_TEMPLATE_MISSING`
 - with `--force`, a missing `.env.example` creates an empty `.env` and reports that no variables were inferred
-- `setup` creates a missing `.env` from `.env.example` during the environment step
-- `setup env check` exits non-zero when required variables are missing
+- `setupr setup` creates a missing `.env` from `.env.example` during the environment step
+- `setupr env check` exits non-zero when required variables are missing
 - Plain-mode setup stops and exits non-zero if install, env setup, build, or verification fails
 
 ### Validation Rules

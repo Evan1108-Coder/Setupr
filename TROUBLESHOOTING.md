@@ -18,7 +18,7 @@ npm run build
 
 **Fix**: Use `--plain` flag for basic terminal output:
 ```bash
-setup --plain
+setupr --plain
 ```
 
 For the full TUI, use a modern terminal such as Terminal.app, iTerm2, Ghostty, WezTerm, Alacritty, or Kitty. Setupr does not force a background color; it inherits the active terminal profile. If the screen looks stuck after an interrupted run, reset the terminal with:
@@ -57,15 +57,15 @@ In `setupr chat`, Enter sends a normal message. Ctrl+Enter sends a steering inst
 **Fix**: Save at least one AI provider key in global Setupr auth storage:
 
 ```bash
-setup auth login
-# Or: setup auth set-key github
+setupr auth login
+# Or: setupr auth set-key github
 ```
 
 You can test provider connectivity and select a specific model with:
 
 ```bash
-setup auth test
-setup auth use kimi-k2-turbo-preview
+setupr auth test
+setupr auth use kimi-k2-turbo-preview
 ```
 
 Setupr works without AI — it falls back to pattern matching and heuristics.
@@ -90,7 +90,7 @@ If `AUTH_STORAGE_INVALID` appears, Setupr stops rather than treating all keys as
 
 ```bash
 mv ~/.setupr/secrets.json ~/.setupr/secrets.json.broken
-setup auth login
+setupr auth login
 ```
 
 Raw API keys and token-like values are masked in error output and AI context.
@@ -115,7 +115,7 @@ Or fix npm permissions: https://docs.npmjs.com/resolving-eacces-permissions-erro
 2. Check network connectivity
 3. Try running the install command manually
 
-In `--plain` mode, setup stops after the failed step and exits non-zero. Fix the failing command, then rerun `setup --plain`.
+In `--plain` mode, setup stops after the failed step and exits non-zero. Fix the failing command, then rerun `setupr --plain`.
 
 ### Test command cannot find a suite
 
@@ -173,20 +173,20 @@ Useful checks:
 
 ### `.env` was not created
 
-Setupr creates `.env` from `.env.example` when a template is present. If `.env` already exists, `setup env init` leaves it unchanged unless you pass:
+Setupr creates `.env` from `.env.example` when a template is present. If `.env` already exists, `setupr env init` leaves it unchanged unless you pass:
 
 ```bash
-setup env init --force
+setupr env init --force
 ```
 
-Bare `setup env` opens the editor TUI. If `.env` is missing and `.env.example` exists, Setupr asks before creating `.env` from the template. If no template exists, it returns `ENV_TEMPLATE_MISSING`; use `setup env --force` only when you intentionally want an empty `.env`.
+Bare `setupr env` opens the editor TUI. If `.env` is missing and `.env.example` exists, Setupr asks before creating `.env` from the template. If no template exists, it returns `ENV_TEMPLATE_MISSING`; use `setupr env --force` only when you intentionally want an empty `.env`.
 
 ### Port conflicts
 
 Use the port command to check:
 ```bash
-setup port 3000
-setup port  # Check all common ports
+setupr port 3000
+setupr port  # Check all common ports
 ```
 
 ### Checkpoint issues
@@ -195,7 +195,7 @@ If a checkpoint is corrupted or stale:
 ```bash
 rm -rf .setupr/checkpoint.json
 rm -rf .setupr/agent-workflow.json
-setup  # Start fresh
+setupr  # Start fresh
 ```
 
 ### AI re-planning did not happen
@@ -235,7 +235,7 @@ Override detection with a `.setupr.json` file:
 
 ## Getting Help
 
-- Run `setup --help` for command reference
-- Run `setup doctor` to diagnose environment issues
+- Run `setupr --help` for command reference
+- Run `setupr doctor` to diagnose environment issues
 - Run `npm run smoke:fixtures` from the repository before publishing or after large error/TUI/auth/env/command-execution changes
 - File issues at: https://github.com/Evan1108-Coder/Setupr/issues

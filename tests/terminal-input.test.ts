@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findDirectionalFocusItem, type FocusItem } from "../src/tui/hooks/useFocusNavigation.js";
-import { parseSgrMouse, stripTerminalControlInput } from "../src/tui/terminalInput.js";
+import { createTerminalControlInputStripper, parseSgrMouse, stripTerminalControlInput } from "../src/tui/terminalInput.js";
 
 const esc = "\x1b";
 
@@ -39,6 +39,16 @@ describe("terminal control input handling", () => {
     expect(stripTerminalControlInput("Dword")).toBe("word");
     expect(stripTerminalControlInput(`${esc}]0;Secret`)).toBe("");
     expect(stripTerminalControlInput(` Title${esc}\\visible`)).toBe("visible");
+  });
+
+  it("keeps split-control buffering isolated per input consumer", () => {
+    const promptConsumer = createTerminalControlInputStripper();
+    const textInputConsumer = createTerminalControlInputStripper();
+
+    expect(promptConsumer.strip(`${esc}[<0;78;`)).toBe("");
+    expect(textInputConsumer.strip(`${esc}[<0;78;`)).toBe("");
+    expect(promptConsumer.strip("17M")).toBe("");
+    expect(textInputConsumer.strip("17Mtyped")).toBe("typed");
   });
 });
 

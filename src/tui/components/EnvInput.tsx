@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { colors, icons } from "../theme.js";
 import { BoundedTextInput } from "./BoundedTextInput.js";
 import type { FocusBounds, FocusState } from "../hooks/useFocusNavigation.js";
-import { stripTerminalControlInput } from "../terminalInput.js";
+import { createTerminalControlInputStripper } from "../terminalInput.js";
 
 interface EnvInputProps {
   varKey: string;
@@ -19,6 +19,7 @@ interface EnvInputProps {
 
 export function EnvInput({ varKey, remainingCount, onSubmit, onSkip, isSensitive = false, focusState, width, maxLines = 4, scrollBounds }: EnvInputProps) {
   const [value, setValue] = useState("");
+  const controlStripper = useMemo(() => createTerminalControlInputStripper(), []);
   const focused = focusState === "focused";
   const boxWidth = Math.max(12, (width || 80) - 2);
   const inputWidth = Math.max(8, boxWidth - 6);
@@ -30,12 +31,18 @@ export function EnvInput({ varKey, remainingCount, onSubmit, onSkip, isSensitive
   }, { isActive: focused });
 
   const handleSubmit = (text: string) => {
-    onSubmit(stripTerminalControlInput(text));
+    const cleanText = controlStripper.strip(text);
+    if (cleanText.trim().length === 0) {
+      onSkip();
+      setValue("");
+      return;
+    }
+    onSubmit(cleanText);
     setValue("");
   };
 
   const handleChange = (text: string) => {
-    setValue(stripTerminalControlInput(text));
+    setValue(controlStripper.strip(text));
   };
 
   const sensitive = isSensitive || varKey.includes("SECRET") || varKey.includes("KEY") || varKey.includes("TOKEN") || varKey.includes("PASSWORD");

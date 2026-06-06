@@ -93,7 +93,10 @@ export async function startManagedProcess(
 
 export async function stopManagedProcess(cwd: string, idOrName?: string, options: { force?: boolean } = {}): Promise<ManagedProcess[]> {
   const processes = await listManagedProcesses(cwd);
-  const targets = idOrName ? processes.filter((proc) => proc.id === idOrName || proc.name === idOrName) : processes.filter((proc) => proc.status === "running");
+  const allTargets = !idOrName || /^(all|\*)$/i.test(idOrName);
+  const targets = allTargets
+    ? processes.filter((proc) => proc.status === "running")
+    : processes.filter((proc) => proc.id === idOrName || proc.name === idOrName);
   const stopped: ManagedProcess[] = [];
 
   for (const proc of targets) {

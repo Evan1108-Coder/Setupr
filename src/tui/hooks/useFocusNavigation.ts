@@ -70,14 +70,18 @@ export function useFocusNavigation({ items, initialId, onQuit }: UseFocusNavigat
       return;
     }
 
-    if (key.tab) {
-      const delta = key.shift ? -1 : 1;
-      activateItem(items[(activeIndex + delta + items.length) % items.length]);
+	    if (key.tab) {
+	      const delta = key.shift ? -1 : 1;
+	      activateItem(items[(activeIndex + delta + items.length) % items.length]);
+	      return;
+	    }
+
+    if (activeItem?.id === "input" && (key.leftArrow || key.rightArrow || key.upArrow || key.downArrow)) {
       return;
     }
 
-    if (key.rightArrow) {
-      move("right");
+	    if (key.rightArrow) {
+	      move("right");
       return;
     }
     if (key.leftArrow) {

@@ -143,41 +143,41 @@ GitHub Models tokens need GitHub Models access; fine-grained PATs or app tokens 
 
 ```bash
 # Guided setup for provider API keys
-setup auth login
+setupr auth login
 
 # Save one provider API key globally
-setup auth set-key github
+setupr auth set-key github
 
 # View configured providers without printing raw keys
-setup auth list
+setupr auth list
 
 # Test configured providers with tiny requests
-setup auth test
+setupr auth test
 
 # View available models
-setup auth models
+setupr auth models
 
 # Set preferred model
-setup auth use openai/gpt-4.1-mini
+setupr auth use openai/gpt-4.1-mini
 ```
 
-Setupr stores provider API keys globally in `~/.setupr/secrets.json` with file permissions `0600`. Raw keys are never printed; `setup auth list` and `setup auth status` show only masked keys.
+Setupr stores provider API keys globally in `~/.setupr/secrets.json` with file permissions `0600`. Raw keys are never printed; `setupr auth list` and `setupr auth status` show only masked keys.
 
-`setup auth test` runs configured providers concurrently with short per-provider timeouts. A slow or unavailable provider reports a classified timeout/error without blocking checks for the other configured providers.
+`setupr auth test` runs configured providers concurrently with short per-provider timeouts. A slow or unavailable provider reports a classified timeout/error without blocking checks for the other configured providers.
 
 Setupr resolves provider keys in this order:
 
 1. Shell environment variables, useful for CI or temporary overrides
-2. Global Setupr auth storage from `setup auth set-key`
+2. Global Setupr auth storage from `setupr auth set-key`
 3. Project `.env.local` / `.env` for backward compatibility only
 
 The project `.env` file is for the app being set up, not for Setupr's own API keys. To migrate old project-local provider keys into global auth:
 
 ```bash
-setup auth migrate
+setupr auth migrate
 ```
 
-When multiple provider keys are present, `P_SETUP_AI_MODEL` or `setup auth use <model>` wins. If no model is pinned, Setupr chooses the cheapest configured model from its known local pricing table and shows that choice in the pre-execution warning. GitHub Models catalog/custom pricing is treated as unknown, so GitHub is used automatically only when it is explicitly selected or it is the only configured provider.
+When multiple provider keys are present, `P_SETUP_AI_MODEL` or `setupr auth use <model>` wins. If no model is pinned, Setupr chooses the cheapest configured model from its known local pricing table and shows that choice in the pre-execution warning. GitHub Models catalog/custom pricing is treated as unknown, so GitHub is used automatically only when it is explicitly selected or it is the only configured provider.
 
 Setupr still accepts `export KEY=value` syntax in project env files for project variables and backward-compatible provider overrides.
 
@@ -241,8 +241,8 @@ Every command uses the same error format in plain mode and TUI mode:
 
 Examples:
 
-- `setup env init` stops if `.env.example` is missing, because Setupr cannot infer required variables. `setup env init --force` creates an empty `.env` and explains that no variables were inferred.
-- `setup auth list` stops on a corrupt `~/.setupr/secrets.json` instead of pretending keys are missing, so existing secrets are not accidentally overwritten.
+- `setupr env init` stops if `.env.example` is missing, because Setupr cannot infer required variables. `setupr env init --force` creates an empty `.env` and explains that no variables were inferred.
+- `setupr auth list` stops on a corrupt `~/.setupr/secrets.json` instead of pretending keys are missing, so existing secrets are not accidentally overwritten.
 - command failures are classified as install, build, test, network, permission, timeout, or missing-tool errors when possible.
 - `--force` skips ordinary prompts, but it does not ignore failed commands, invalid auth storage, missing secrets, or destructive blockers.
 
@@ -313,26 +313,26 @@ All command-like actions from setup, doctor, start, plugins, and AI steering pas
 
 ```bash
 # Open the interactive .env editor TUI
-setup env
+setupr env
 
 # Create .env from .env.example
-setup env init
+setupr env init
 
 # Overwrite an existing .env from .env.example, or create an empty .env
 # when no .env.example exists
-setup env init --force
+setupr env init --force
 
 # Check for missing variables
-setup env check
+setupr env check
 
 # Sync structure with .env.example
-setup env sync
+setupr env sync
 
 # Smart reorganize + auto-fill
-setup env smart
+setupr env smart
 ```
 
-Bare `setup env` opens the env editor. If `.env` exists, it opens directly. If only `.env.example` exists, Setupr asks before creating `.env` from the template. If neither file exists, it stops with `ENV_TEMPLATE_MISSING`; `setup env --force` creates an empty `.env` and explains that no variables were inferred.
+Bare `setupr env` opens the env editor. If `.env` exists, it opens directly. If only `.env.example` exists, Setupr asks before creating `.env` from the template. If neither file exists, it stops with `ENV_TEMPLATE_MISSING`; `setupr env --force` creates an empty `.env` and explains that no variables were inferred.
 
 ### Checkpoint & Resume
 
@@ -346,11 +346,11 @@ Bare `setup env` opens the env editor. If `.env` exists, it opens directly. If o
 ### Project Memory
 
 ```bash
-setup notes add "Use pnpm for installs"
-setup notes list
-setup history 10
-setup context export team-context.json
-setup context import team-context.json
+setupr notes add "Use pnpm for installs"
+setupr notes list
+setupr history 10
+setupr context export team-context.json
+setupr context import team-context.json
 ```
 
 Notes are saved in `.setupr/notes.json`. History uses `.setupr/history.jsonl`, and context export/import moves a deterministic bundle of notes plus history for team handoff.
@@ -428,15 +428,15 @@ Global config stored at `~/.setupr/config.json`:
 }
 ```
 
-Provider API keys are stored separately at `~/.setupr/secrets.json` and should be managed with `setup auth`.
+Provider API keys are stored separately at `~/.setupr/secrets.json` and should be managed with `setupr auth`.
 
 ### Help
 
 ```bash
-setup help
-setup help auth
-setup auth --help
-setup help auth set-key
+setupr help
+setupr help auth
+setupr auth --help
+setupr help auth set-key
 ```
 
 Global help lists every command. Command help shows subcommands, variations, options, and examples for that command.

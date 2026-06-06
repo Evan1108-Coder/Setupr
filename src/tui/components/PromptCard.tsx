@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { colors, icons } from "../theme.js";
 import type { FocusBounds, FocusState } from "../hooks/useFocusNavigation.js";
-import { stripTerminalControlInput } from "../terminalInput.js";
+import { createTerminalControlInputStripper } from "../terminalInput.js";
 import { BoundedTextInput } from "./BoundedTextInput.js";
 
 export interface PromptOption {
@@ -47,6 +47,8 @@ export function PromptCard({
 }: PromptCardProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [freeformValue, setFreeformValue] = useState("");
+  const suppressNextFreeformPrefix = useRef<string | null>(null);
+  const controlStripper = useMemo(() => createTerminalControlInputStripper(), []);
   const focused = active || focusState === "focused";
   const cardWidth = Math.max(14, width - 2);
   const inputWidth = Math.max(8, cardWidth - 8);
@@ -60,9 +62,15 @@ export function PromptCard({
 
   useInput((input, key) => {
     if (!focused) return;
-    const cleanInput = stripTerminalControlInput(input);
+    const cleanInput = controlStripper.strip(input);
 
-    if (key.upArrow || key.downArrow || key.leftArrow || key.rightArrow || key.tab) {
+    if (key.tab || key.leftArrow || key.rightArrow) {
+      return;
+    }
+
+    if (!isOtherSelected && (key.upArrow || key.downArrow)) {
+      const delta = key.upArrow ? -1 : 1;
+      setSelectedIndex((current) => (current + delta + visibleOptions.length) % visibleOptions.length);
       return;
     }
 
@@ -73,26 +81,42 @@ export function PromptCard({
 
     const numericChoice = Number(cleanInput);
     if (Number.isInteger(numericChoice) && numericChoice > 0 && numericChoice <= visibleOptions.length) {
+      if (visibleOptions[numericChoice - 1]?.id === OTHER_OPTION_ID) {
+        suppressNextFreeformPrefix.current = cleanInput;
+      }
       setSelectedIndex(numericChoice - 1);
       return;
     }
 
     if (!isOtherSelected && (cleanInput === "o" || cleanInput === "O") && includeOther) {
+      suppressNextFreeformPrefix.current = cleanInput;
       setSelectedIndex(visibleOptions.length - 1);
       return;
     }
 
     if (!isOtherSelected && includeOther && cleanInput && !key.return && !key.backspace && !key.delete && !key.escape) {
       setSelectedIndex(visibleOptions.length - 1);
-      setFreeformValue((current) => current + cleanInput);
+      setFreeformValue((current) => current + stripCoalescedOtherShortcut(cleanInput, visibleOptions.length));
     }
   }, { isActive: focused });
 
   const submitFreeform = (value: string) => {
-    const cleanValue = stripTerminalControlInput(value).trim();
+    const cleanValue = controlStripper.strip(value).trim();
     if (!cleanValue) return;
     onSubmit(cleanValue);
     setFreeformValue("");
+  };
+
+  const handleFreeformChange = (value: string) => {
+    const cleanValue = controlStripper.strip(value);
+    const suppress = suppressNextFreeformPrefix.current;
+    if (suppress && cleanValue.startsWith(suppress)) {
+      suppressNextFreeformPrefix.current = null;
+      setFreeformValue(cleanValue.slice(suppress.length));
+      return;
+    }
+    suppressNextFreeformPrefix.current = null;
+    setFreeformValue(cleanValue);
   };
 
   return (
@@ -130,7 +154,7 @@ export function PromptCard({
           <Text color={colors.primary}>{icons.arrowRight} </Text>
           <BoundedTextInput
             value={freeformValue}
-            onChange={(value) => setFreeformValue(stripTerminalControlInput(value))}
+            onChange={handleFreeformChange}
             onSubmit={submitFreeform}
             focus={focused}
             placeholder={placeholder}
@@ -178,6 +202,20 @@ function PromptOptionLine({
 function maskOption(label: string): string {
   if (label.length === 0) return "";
   return "•".repeat(Math.min(12, Math.max(4, label.length)));
+}
+
+export function stripCoalescedOtherShortcut(value: string, optionCount: number): string {
+  if (optionCount > 0 && value.startsWith(String(optionCount)) && looksLikeEnvAssignment(value.slice(String(optionCount).length))) {
+    return value.slice(String(optionCount).length);
+  }
+  if (/^o[A-Z_][A-Z0-9_]*=/.test(value)) {
+    return value.slice(1);
+  }
+  return value;
+}
+
+function looksLikeEnvAssignment(value: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*=/.test(value);
 }
 
 function clampLines(value: string, maxLines: number): string[] {

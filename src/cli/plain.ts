@@ -320,7 +320,27 @@ async function plainStart(cwd: string, target: string | undefined, options: Plai
 
 async function plainUpdate(cwd: string): Promise<void> {
   const scan = await scanProject(cwd);
-  const pm = scan.packageManager || "npm";
+  if (!hasProjectSignals(scan)) {
+    printPlainError(createSetuprError({
+      code: "NO_PROJECT_DETECTED",
+      command: "update",
+      cwd,
+      details: ["No package manifest, runtime, framework, dependency, or config files were detected."],
+      nextSteps: ["Run setupr update from a project directory."],
+    }));
+    return;
+  }
+  if (!scan.packageManager) {
+    printPlainError(createSetuprError({
+      code: "MISSING_PACKAGE_MANAGER",
+      command: "update",
+      cwd,
+      details: ["No supported package manager was detected for this project."],
+      nextSteps: ["Add a package manifest or run a dependency-specific command."],
+    }));
+    return;
+  }
+  const pm = scan.packageManager;
   console.log(chalk.blue(`Checking outdated packages (${pm})...`));
 
   const result = await runCommand(`${pm} outdated`, cwd);

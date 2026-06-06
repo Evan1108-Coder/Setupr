@@ -152,6 +152,18 @@ export async function run() {
     flags: cli.flags,
   });
   if (!validateCliRequest(command, subCommand, cwd)) return;
+  if (cli.flags.tui && !process.stdout.isTTY) {
+    printPlainError(createSetuprError({
+      code: "TUI_RENDER_FAILED",
+      command,
+      subcommand: subCommand,
+      cwd,
+      details: ["--tui was requested, but stdout is not an interactive terminal."],
+      nextSteps: ["Run in iTerm2, Ghostty, Terminal.app, or remove --tui/use --plain in CI and pipes."],
+    }));
+    process.exitCode = 1;
+    return;
+  }
   const isPlain = (cli.flags.noTui || cli.flags.plain || (command === "chat" && cli.flags.json) || !process.stdout.isTTY) && !cli.flags.tui;
   const isBareAuth = command === "auth" && !subCommand;
 

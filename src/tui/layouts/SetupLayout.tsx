@@ -87,17 +87,17 @@ export function SetupLayout({ store }: SetupLayoutProps) {
     }
   }, [store]);
 
-  const handleEnvSubmit = useCallback((value: string) => {
-    const key = store.getState().envPromptKey;
-    if (!key) return;
-    const vars = store.getState().envVars.map((v) =>
-      v.key === key ? { ...v, value, status: "filled" as const } : v
-    );
-    store.getState().setEnvVars(vars);
-    store.getState().addLog({ content: `✓ ${key} = ${value.slice(0, 3)}${"*".repeat(Math.max(0, value.length - 3))} (manual)`, type: "success" });
-    const nextPending = vars.find((v) => v.status === "pending");
-    store.getState().setEnvPrompt(nextPending?.key || null);
-  }, [store]);
+	  const handleEnvSubmit = useCallback((value: string) => {
+	    const key = store.getState().envPromptKey;
+	    if (!key) return;
+	    const vars = store.getState().envVars.map((v) =>
+	      v.key === key ? { ...v, value, status: "filled" as const } : v
+	    );
+	    store.getState().setEnvVars(vars);
+	    store.getState().addLog({ content: `✓ ${key} = ${formatManualEnvLogValue(key, value)} (manual)`, type: "success" });
+	    const nextPending = vars.find((v) => v.status === "pending");
+	    store.getState().setEnvPrompt(nextPending?.key || null);
+	  }, [store]);
 
   const handleEnvSkip = useCallback(() => {
     const key = store.getState().envPromptKey;
@@ -1019,6 +1019,17 @@ function vulnStr(v: { high: number; moderate: number; low: number }): string {
   if (v.moderate > 0) parts.push(`${v.moderate} moderate`);
   if (v.low > 0) parts.push(`${v.low} low`);
   return parts.join(", ");
+}
+
+export function formatManualEnvLogValue(key: string, value: string): string {
+  if (isSensitiveEnvKey(key)) return value.length > 0 ? "[hidden]" : "[empty]";
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (!clean) return "[empty]";
+  return clean.length > 28 ? `${clean.slice(0, 25)}...` : clean;
+}
+
+function isSensitiveEnvKey(key: string): boolean {
+  return /(?:SECRET|TOKEN|PASSWORD|PASS|PRIVATE|KEY|CREDENTIAL|AUTH|COOKIE|SESSION|JWT)/i.test(key);
 }
 
 function getOS(): string {

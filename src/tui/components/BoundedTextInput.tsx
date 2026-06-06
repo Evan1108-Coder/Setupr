@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { colors } from "../theme.js";
-import { parseSgrMouse, stripTerminalControlInput } from "../terminalInput.js";
+import { createTerminalControlInputStripper, parseSgrMouse } from "../terminalInput.js";
 import type { FocusBounds } from "../hooks/useFocusNavigation.js";
 
 interface BoundedTextInputProps {
@@ -29,6 +29,7 @@ export function BoundedTextInput({
 }: BoundedTextInputProps) {
   const [cursor, setCursor] = useState(value.length);
   const [scrollLine, setScrollLine] = useState(0);
+  const controlStripper = useMemo(() => createTerminalControlInputStripper(), []);
   const wrapWidth = Math.max(8, (width || 80) - 4);
 
   const displayValue = mask ? mask.repeat(value.length) : value;
@@ -82,9 +83,9 @@ export function BoundedTextInput({
       return;
     }
 
-    const cleanInput = stripTerminalControlInput(input).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const cleanInput = controlStripper.strip(input).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     const returnOnly = key.return || input === "\r" || input === "\n" || cleanInput === "\n";
-    if (!cleanInput && !returnOnly && !key.backspace && !key.delete && !key.leftArrow && !key.rightArrow) {
+    if (!cleanInput && !returnOnly && !key.backspace && !key.delete && !key.leftArrow && !key.rightArrow && !key.upArrow && !key.downArrow) {
       return;
     }
 
@@ -107,7 +108,27 @@ export function BoundedTextInput({
       return;
     }
 
-    if (key.tab || key.upArrow || key.downArrow || key.leftArrow || key.rightArrow || key.escape || (key.ctrl && input === "c")) {
+    if (key.leftArrow) {
+      setCursor((current) => Math.max(0, current - 1));
+      return;
+    }
+
+    if (key.rightArrow) {
+      setCursor((current) => Math.min(value.length, current + 1));
+      return;
+    }
+
+    if (key.upArrow) {
+      setScrollLine((current) => clamp(current - 1, 0, maxScroll));
+      return;
+    }
+
+    if (key.downArrow) {
+      setScrollLine((current) => clamp(current + 1, 0, maxScroll));
+      return;
+    }
+
+    if (key.tab || key.escape || (key.ctrl && input === "c")) {
       return;
     }
 

@@ -26,8 +26,8 @@ After installation, the `setup` command is available globally:
 
 ```bash
 setup
-setup doctor
-setup info
+setupr doctor
+setupr info
 ```
 
 ### Command Discovery
@@ -35,11 +35,11 @@ setup info
 Use the built-in help tree when you are not sure which workflow to run:
 
 ```bash
-setup help
-setup help chat
-setup help git
-setup help docker
-setup workspace --help
+setupr help
+setupr help chat
+setupr help git
+setupr help docker
+setupr workspace --help
 ```
 
 The rich help output lists the primary project-control surface, including setup, chat, auth, env, git, CI, Docker, secrets, templates, workspace, health, test, security, fix, release, perf, GitHub, registry, share, plugin, lint, and format commands. Advanced inspection/file-generation commands remain directly runnable for compatibility, but they are not advertised in the primary command index.
@@ -76,21 +76,21 @@ You can steer the agent from the persistent input at the bottom of the TUI. For 
 To enable AI-powered features, save at least one provider key in global Setupr auth storage:
 
 ```bash
-setup auth login
-# Or: setup auth set-key github
+setupr auth login
+# Or: setupr auth set-key github
 ```
 
 Project `.env` files are for the app being set up, not Setupr's own API keys. For model preference:
 
 ```bash
-setup auth use kimi-k2-turbo-preview
+setupr auth use kimi-k2-turbo-preview
 # Or temporarily: P_SETUP_AI_MODEL=openai/gpt-4.1 setup
 ```
 
 Supported model IDs are listed with:
 
 ```bash
-setup auth models
+setupr auth models
 ```
 
 Without an API key, Setupr works fully — it just uses pattern matching and heuristics instead of AI for step planning and chat responses.
@@ -162,7 +162,7 @@ setupr perf scan --json
 For non-interactive environments:
 
 ```bash
-setup --force --plain
+setupr --force --plain
 ```
 
 This skips safe prompts and outputs plain text (no TUI). Setupr still avoids inventing secrets and should stop for destructive or blocked actions.
@@ -173,15 +173,15 @@ If any setup step fails in plain mode, Setupr stops immediately and returns a no
 
 ```bash
 # Remove dependency/cache artifacts
-setup clean --deps
+setupr clean --deps
 
 # Remove local-only files before sharing a project
-setup clean --share
+setupr clean --share
 
 # Remove dependencies, build output, caches, and local env files
-setup clean --all
+setupr clean --all
 ```
 
-The positional forms also work: `setup clean deps`, `setup clean share`, and `setup clean all`.
+The positional forms also work: `setupr clean deps`, `setupr clean share`, and `setupr clean all`.
 
-In TUI mode, `setup clean` opens a safety review before deleting anything. Review the target list, protected-file notes, and risk summary, then type `CLEAN` to confirm. `--force` skips the review prompt and starts cleaning after the target scan, while still reporting exactly what was removed or failed.
+In TUI mode, `setupr clean` opens a safety review before deleting anything. Review the target list, protected-file notes, and risk summary, then type `CLEAN` to confirm. `--force` skips the review prompt and starts cleaning after the target scan, while still reporting exactly what was removed or failed.

@@ -8,6 +8,8 @@ import { buildEnvFocusItems, buildEnvLayout } from "../src/tui/layouts/EnvLayout
 import { buildStartFocusItems, buildStartLayout } from "../src/tui/layouts/StartLayout.js";
 import { buildUpdateFocusItems, buildUpdateLayout } from "../src/tui/layouts/UpdateLayout.js";
 import { buildCleanFocusItems, buildCleanLayout } from "../src/tui/layouts/CleanLayout.js";
+import { formatManualEnvLogValue } from "../src/tui/layouts/SetupLayout.js";
+import { stripCoalescedOtherShortcut } from "../src/tui/components/PromptCard.js";
 
 const wideSetupItems: FocusItem[] = [
   { id: "steps", row: 0, column: 0, bounds: { x: 1, y: 2, width: 20, height: 6 } },
@@ -222,5 +224,24 @@ describe("TUI terminal control input", () => {
     expect(parseSgrMouse("\u001b[<0;10;5M")).toMatchObject({ action: "press", x: 10, y: 5 });
     expect(parseSgrMouse("\u001b[<0;10;5m")).toMatchObject({ action: "release", x: 10, y: 5 });
     expect(parseSgrMouse("\u001b[<64;10;5M")).toMatchObject({ action: "scroll", x: 10, y: 5 });
+  });
+});
+
+describe("TUI env value display", () => {
+  it("does not expose sensitive env value prefixes in manual-entry logs", () => {
+    expect(formatManualEnvLogValue("OPENAI_API_KEY", "sk-live-secret-value")).toBe("[hidden]");
+    expect(formatManualEnvLogValue("DATABASE_PASSWORD", "postgres-secret")).toBe("[hidden]");
+    expect(formatManualEnvLogValue("NEXT_PUBLIC_BASE_URL", "http://localhost:3000")).toBe("http://localhost:3000");
+  });
+});
+
+describe("TUI prompt Other input", () => {
+  it("does not keep a coalesced Other shortcut in pasted KEY=value input", () => {
+    expect(stripCoalescedOtherShortcut("oAPI_KEY=abc123", 3)).toBe("API_KEY=abc123");
+    expect(stripCoalescedOtherShortcut("3DATABASE_URL=postgres://localhost/app", 3)).toBe(
+      "DATABASE_URL=postgres://localhost/app",
+    );
+    expect(stripCoalescedOtherShortcut("3000", 3)).toBe("3000");
+    expect(stripCoalescedOtherShortcut("Other normal answer", 3)).toBe("Other normal answer");
   });
 });

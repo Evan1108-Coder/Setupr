@@ -20,8 +20,8 @@ export function TuiHeader({ command, title, cwd, stack, status, statusColor, rig
     ? `${icons.diamond} ${command}${title ? ` · ${title}` : ""}`
     : `${icons.diamond} ${command}${title ? `  ${title}` : ""}${stack ? `  Stack: ${stack}` : ""}${pathText ? `  ${pathText}` : ""}`;
   const rightText = right || status || "";
-  const rightWidth = rightText ? Math.min(width - 8, Math.max(8, rightText.length + 2)) : 0;
-  const leftWidth = Math.max(8, width - rightWidth);
+  const rightWidth = rightText ? Math.min(Math.max(8, width - 10), Math.max(8, displayWidth(rightText) + 3)) : 0;
+  const leftWidth = Math.max(8, width - rightWidth - (rightWidth > 0 ? 1 : 0));
 
   return (
     <Box width="100%" height={1}>
@@ -49,13 +49,16 @@ export function TuiFooter({ width, left, right }: TuiFooterProps) {
     ? "Ctrl+C abort · Tab next · q quit"
     : shortcuts.map((shortcut) => `${shortcut.key} ${shortcut.desc}`).join(" · "));
 
+  const rightWidth = right ? Math.min(Math.max(8, width - 10), Math.max(8, displayWidth(right) + 2)) : 0;
+  const leftWidth = rightWidth > 0 ? Math.max(8, width - rightWidth - 1) : width;
+
   return (
-    <Box width="100%" height={1} justifyContent="space-between">
-      <Box minWidth={0} flexShrink={1}>
+    <Box width="100%" height={1}>
+      <Box width={leftWidth} minWidth={0} flexShrink={1}>
         <Text color={colors.textDim} wrap="truncate">{leftText}</Text>
       </Box>
       {right && (
-        <Box flexShrink={0} marginLeft={1}>
+        <Box width={rightWidth} flexShrink={0} justifyContent="flex-end">
           <Text color={colors.textDim} wrap="truncate">{right}</Text>
         </Box>
       )}
@@ -106,6 +109,34 @@ export function shortPath(cwd: string, max = 34): string {
   const path = home && cwd.startsWith(home) ? `~${cwd.slice(home.length)}` : cwd;
   if (path.length <= max) return path;
   return `…${path.slice(Math.max(0, path.length - max + 1))}`;
+}
+
+function displayWidth(value: string): number {
+  let width = 0;
+  for (const char of value) {
+    const code = char.codePointAt(0) || 0;
+    if (code === 0) continue;
+    if (code < 32 || (code >= 0x7f && code < 0xa0)) continue;
+    width += isWideCodePoint(code) ? 2 : 1;
+  }
+  return width;
+}
+
+function isWideCodePoint(code: number): boolean {
+  return (
+    code >= 0x1100 && (
+      code <= 0x115f ||
+      code === 0x2329 ||
+      code === 0x232a ||
+      (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f) ||
+      (code >= 0xac00 && code <= 0xd7a3) ||
+      (code >= 0xf900 && code <= 0xfaff) ||
+      (code >= 0xfe10 && code <= 0xfe19) ||
+      (code >= 0xfe30 && code <= 0xfe6f) ||
+      (code >= 0xff00 && code <= 0xff60) ||
+      (code >= 0xffe0 && code <= 0xffe6)
+    )
+  );
 }
 
 export function formatAge(timestamp: number): string {

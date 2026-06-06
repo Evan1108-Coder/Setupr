@@ -357,11 +357,12 @@ function DepsPanel({ status, compact = false }: { status: DashboardStatus; compa
 }
 
 function TestsPanel({ status }: { status: DashboardStatus }) {
+  const hasLastTest = Boolean(status.verification.lastCommand);
   return (
     <Box flexDirection="column">
       <KVRow label="Status" value={status.verification.status} color={statusColor(status.verification.status)} />
       <KVRow label="Last" value={status.verification.lastCommand || "none"} dim={!status.verification.lastCommand} />
-      <KVRow label="Coverage" value="see report" dim />
+      <KVRow label="Coverage" value={hasLastTest ? "report only" : "unknown"} dim />
     </Box>
   );
 }
@@ -477,7 +478,7 @@ function ProjectStatePanel({ status, limit }: { status: DashboardStatus; limit: 
         <Text key={`${event.timestamp}-${event.type}-${index}`} wrap="truncate">
           <Text color={colors.textDim}>{fitCell(formatTime(event.timestamp), 8)} </Text>
           <Text color={colors.text}>{fitCell(event.message || event.type, 42)} </Text>
-          <Text color={event.type.includes("error") ? colors.error : colors.success}>complete</Text>
+          <Text color={event.type.includes("error") ? colors.error : event.type.includes("warning") ? colors.warning : colors.success}>{event.type.includes("error") ? "error" : event.type.includes("warning") ? "warn" : "complete"}</Text>
         </Text>
       ))}
     </Box>

@@ -11,42 +11,56 @@ export interface SgrMouseReport {
 
 const SGR_MOUSE_PATTERN = "\\[<\\d+;\\d+;\\d+[mM]";
 const PARTIAL_SGR_MOUSE_PATTERN = "\\[<\\d*(?:;\\d*){0,2}$";
-let pendingMouseContinuation = false;
-let pendingControlContinuation = "";
+interface TerminalControlInputStripper {
+  strip: (value: string) => string;
+}
+
+const defaultStripper = createTerminalControlInputStripper();
+
+export function createTerminalControlInputStripper(): TerminalControlInputStripper {
+  let pendingMouseContinuation = false;
+  let pendingControlContinuation = "";
+
+  return {
+    strip(value: string): string {
+      let input = `${pendingControlContinuation}${value}`;
+      pendingControlContinuation = "";
+
+      if (pendingMouseContinuation) {
+        const continuation = input.match(/^\d*(?:;\d*){0,2}[mM]?/);
+        if (continuation?.[0]) {
+          input = input.slice(continuation[0].length);
+        }
+        pendingMouseContinuation = !/[mM]/.test(continuation?.[0] || "");
+      }
+
+      if (new RegExp(`${escapeRegExp(ESC)}?${PARTIAL_SGR_MOUSE_PATTERN}`).test(input)) {
+        pendingMouseContinuation = true;
+      }
+
+      const partial = findPartialTerminalControl(input);
+      if (partial) {
+        pendingControlContinuation = partial.sequence;
+        input = input.slice(0, partial.index);
+      }
+
+      const stripped = input
+        .replace(new RegExp(`${escapeRegExp(ESC)}${SGR_MOUSE_PATTERN}`, "g"), "")
+        .replace(new RegExp(SGR_MOUSE_PATTERN, "g"), "")
+        .replace(new RegExp(`${escapeRegExp(ESC)}\\[200~|${escapeRegExp(ESC)}\\[201~`, "g"), "")
+        .replace(new RegExp(`${escapeRegExp(ESC)}\\[[0-?]*[ -/]*[@-~]`, "g"), "")
+        .replace(new RegExp(`${escapeRegExp(ESC)}\\][^${escapeRegExp(BEL)}]*(?:${escapeRegExp(BEL)}|${escapeRegExp(ESC)}\\\\)`, "g"), "")
+        .replace(new RegExp(`${escapeRegExp(ESC)}\\[M.{0,3}`, "g"), "")
+        .replace(new RegExp(`${escapeRegExp(ESC)}.`, "g"), "")
+        .replace(new RegExp(PARTIAL_SGR_MOUSE_PATTERN), "")
+        .split(ESC).join("");
+      return stripC0Controls(stripped);
+    },
+  };
+}
 
 export function stripTerminalControlInput(value: string): string {
-  let input = `${pendingControlContinuation}${value}`;
-  pendingControlContinuation = "";
-
-  if (pendingMouseContinuation) {
-    const continuation = input.match(/^\d*(?:;\d*){0,2}[mM]?/);
-    if (continuation?.[0]) {
-      input = input.slice(continuation[0].length);
-    }
-    pendingMouseContinuation = !/[mM]/.test(continuation?.[0] || "");
-  }
-
-  if (new RegExp(`${escapeRegExp(ESC)}?${PARTIAL_SGR_MOUSE_PATTERN}`).test(input)) {
-    pendingMouseContinuation = true;
-  }
-
-  const partial = findPartialTerminalControl(input);
-  if (partial) {
-    pendingControlContinuation = partial.sequence;
-    input = input.slice(0, partial.index);
-  }
-
-  const stripped = input
-    .replace(new RegExp(`${escapeRegExp(ESC)}${SGR_MOUSE_PATTERN}`, "g"), "")
-    .replace(new RegExp(SGR_MOUSE_PATTERN, "g"), "")
-    .replace(new RegExp(`${escapeRegExp(ESC)}\\[200~|${escapeRegExp(ESC)}\\[201~`, "g"), "")
-    .replace(new RegExp(`${escapeRegExp(ESC)}\\[[0-?]*[ -/]*[@-~]`, "g"), "")
-    .replace(new RegExp(`${escapeRegExp(ESC)}\\][^${escapeRegExp(BEL)}]*(?:${escapeRegExp(BEL)}|${escapeRegExp(ESC)}\\\\)`, "g"), "")
-    .replace(new RegExp(`${escapeRegExp(ESC)}\\[M.{0,3}`, "g"), "")
-    .replace(new RegExp(`${escapeRegExp(ESC)}.`, "g"), "")
-    .replace(new RegExp(PARTIAL_SGR_MOUSE_PATTERN), "")
-    .split(ESC).join("");
-  return stripC0Controls(stripped);
+  return defaultStripper.strip(value);
 }
 
 export function parseSgrMouse(input: string): SgrMouseReport | null {
