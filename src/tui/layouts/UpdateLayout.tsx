@@ -12,7 +12,7 @@ import { KVRow, MetricText, TuiFooter, TuiHeader, statusColor } from "../compone
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { hasProjectSignals } from "../projectSignals.js";
-import { colors, icons } from "../theme.js";
+import { colors, icons, layout as tuiLayout } from "../theme.js";
 
 interface OutdatedPkg {
   name: string;
@@ -141,9 +141,11 @@ export function UpdateLayout({ scan, cwd }: UpdateLayoutProps) {
 }
 
 function WideUpdate(props: UpdateViewProps) {
+  const sideUsableHeight = Math.max(8, props.layout.mainHeight - tuiLayout.panelGap);
+  const riskHeight = Math.max(8, Math.floor(sideUsableHeight * 0.54));
   return (
-    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
-      <Box flexDirection="row" width="100%" height={props.layout.summaryHeight}>
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
+      <Box flexDirection="row" width="100%" height={props.layout.summaryHeight} gap={tuiLayout.panelGap}>
         <Panel title="Major" focusState={props.focus("major")} width={props.layout.summaryWidths[0]} height="100%">
           <MetricText value={props.counts.major} label="packages" color={props.counts.major ? colors.error : colors.success} />
         </Panel>
@@ -157,10 +159,10 @@ function WideUpdate(props: UpdateViewProps) {
           <MetricText value={props.counts.major > 0 ? "review" : "ok"} label="risk gate" color={props.counts.major > 0 ? colors.error : colors.success} />
         </Panel>
       </Box>
-      <Box flexDirection="row" width="100%" flexGrow={1} minHeight={8}>
+      <Box flexDirection="row" width="100%" flexGrow={1} minHeight={8} gap={tuiLayout.panelGap}>
         <PackagesPanel {...props} width={props.layout.mainWidth} height="100%" />
-        <Box flexDirection="column" width={props.layout.sideWidth} height="100%">
-          <Panel title="Breaking Risks" focusState={props.focus("risks")} width="100%" height={Math.max(8, Math.floor(props.layout.mainHeight * 0.54))}>
+        <Box flexDirection="column" width={props.layout.sideWidth} height="100%" gap={tuiLayout.panelGap}>
+          <Panel title="Breaking Risks" focusState={props.focus("risks")} width="100%" height={riskHeight}>
             <RiskPanel {...props} />
           </Panel>
           <Panel title="Notices" focusState={props.focus("notices")} width="100%" flexGrow={1} minHeight={6}>
@@ -175,17 +177,18 @@ function WideUpdate(props: UpdateViewProps) {
 function StackedUpdate(props: UpdateViewProps) {
   const summaryHeight = Math.max(6, Math.floor(props.layout.bodyHeight * 0.24));
   const sideHeight = Math.max(7, Math.floor(props.layout.bodyHeight * 0.25));
-  const packageHeight = Math.max(8, props.layout.bodyHeight - summaryHeight - sideHeight);
+  const third = Math.floor((props.layout.width - tuiLayout.panelGap * 2) / 3);
+  const packageHeight = Math.max(8, props.layout.bodyHeight - summaryHeight - sideHeight - tuiLayout.panelGap * 2);
   return (
-    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
-      <Box flexDirection="row" width="100%" height={summaryHeight}>
-        <Panel title="Major" focusState={props.focus("major")} width={Math.floor(props.layout.width / 3)} height="100%">
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
+      <Box flexDirection="row" width="100%" height={summaryHeight} gap={tuiLayout.panelGap}>
+        <Panel title="Major" focusState={props.focus("major")} width={third} height="100%">
           <MetricText value={props.counts.major} label="major" color={props.counts.major ? colors.error : colors.success} />
         </Panel>
-        <Panel title="Minor" focusState={props.focus("minor")} width={Math.floor(props.layout.width / 3)} height="100%">
+        <Panel title="Minor" focusState={props.focus("minor")} width={third} height="100%">
           <MetricText value={props.counts.minor} label="minor" color={props.counts.minor ? colors.warning : colors.success} />
         </Panel>
-        <Panel title="Patch" focusState={props.focus("patch")} width={props.layout.width - Math.floor(props.layout.width / 3) * 2} height="100%">
+        <Panel title="Patch" focusState={props.focus("patch")} width={props.layout.width - third * 2 - tuiLayout.panelGap * 2} height="100%">
           <MetricText value={props.counts.patch} label="patch" color={props.counts.patch ? colors.accent : colors.success} />
         </Panel>
       </Box>
@@ -325,11 +328,12 @@ function ErrorBlock({ error }: { error: SetuprError }) {
 export function buildUpdateLayout(width: number, height: number): UpdateLayoutGeometry {
   const bodyHeight = Math.max(8, height - 2);
   const stacked = width < 108 || bodyHeight < 22;
+  const gap = tuiLayout.panelGap;
   const summaryHeight = stacked ? Math.max(6, Math.floor(bodyHeight * 0.24)) : clamp(Math.floor(bodyHeight * 0.22), 6, 8);
-  const mainHeight = Math.max(8, bodyHeight - summaryHeight);
+  const mainHeight = Math.max(8, bodyHeight - summaryHeight - (stacked ? gap * 2 : gap));
   const sideWidth = stacked ? width : clamp(Math.floor(width * 0.30), 34, 48);
-  const mainWidth = stacked ? width : width - sideWidth;
-  const summaryWidths = distributeWidths(width, [1, 1, 1, 1], [18, 18, 18, 18]);
+  const mainWidth = stacked ? width : Math.max(8, width - sideWidth - gap);
+  const summaryWidths = distributeWidths(Math.max(1, width - gap * 3), [1, 1, 1, 1], [18, 18, 18, 18]);
   const inputMaxLines = Math.max(1, Math.min(6, Math.floor(mainHeight / 4)));
   const inputHeight = inputMaxLines + 2;
   const inputBounds = { x: 3, y: Math.max(4, 2 + summaryHeight + mainHeight - inputHeight - 1), width: Math.max(8, mainWidth - 6), height: inputHeight };
@@ -339,28 +343,31 @@ export function buildUpdateLayout(width: number, height: number): UpdateLayoutGe
 export function buildUpdateFocusItems(layout: UpdateLayoutGeometry): FocusItem[] {
   if (layout.stacked) {
     const summaryHeight = Math.max(6, Math.floor(layout.bodyHeight * 0.24));
-    const sideHeight = Math.max(7, Math.floor(layout.bodyHeight * 0.25));
-    const packageHeight = Math.max(8, layout.bodyHeight - summaryHeight - sideHeight);
+    const sideHeight = Math.max(6, Math.floor(layout.bodyHeight * 0.25));
+    const packageHeight = Math.max(8, layout.bodyHeight - summaryHeight - sideHeight - tuiLayout.panelGap * 2);
+    const third = Math.floor((layout.width - tuiLayout.panelGap * 2) / 3);
     return [
-      { id: "major", row: 0, column: 0, bounds: { x: 1, y: 2, width: Math.floor(layout.width / 3), height: summaryHeight } },
-      { id: "minor", row: 0, column: 1, bounds: { x: Math.floor(layout.width / 3) + 1, y: 2, width: Math.floor(layout.width / 3), height: summaryHeight } },
-      { id: "patch", row: 0, column: 2, bounds: { x: Math.floor(layout.width / 3) * 2 + 1, y: 2, width: layout.width - Math.floor(layout.width / 3) * 2, height: summaryHeight } },
-      { id: "packages", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: 2 + summaryHeight, width: layout.width, height: packageHeight } },
+      { id: "major", row: 0, column: 0, bounds: { x: 1, y: 2, width: third, height: summaryHeight } },
+      { id: "minor", row: 0, column: 1, bounds: { x: third + tuiLayout.panelGap + 1, y: 2, width: third, height: summaryHeight } },
+      { id: "patch", row: 0, column: 2, bounds: { x: third * 2 + tuiLayout.panelGap * 2 + 1, y: 2, width: layout.width - third * 2 - tuiLayout.panelGap * 2, height: summaryHeight } },
+      { id: "packages", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: 2 + summaryHeight + tuiLayout.panelGap, width: layout.width, height: packageHeight } },
       { id: "input", row: 2, column: 0, parentIds: ["packages"], bounds: layout.inputBounds },
-      { id: "risks", row: 3, column: 0, bounds: { x: 1, y: 2 + summaryHeight + packageHeight, width: layout.width, height: sideHeight } },
+      { id: "risks", row: 3, column: 0, bounds: { x: 1, y: 2 + summaryHeight + packageHeight + tuiLayout.panelGap * 2, width: layout.width, height: sideHeight } },
     ];
   }
   let x = 1;
   const items: FocusItem[] = ["major", "minor", "patch", "security"].map((id, index) => {
     const item = { id, row: 0, column: index, bounds: { x, y: 2, width: layout.summaryWidths[index], height: layout.summaryHeight } };
-    x += layout.summaryWidths[index];
+    x += layout.summaryWidths[index] + tuiLayout.panelGap;
     return item;
   });
-  const mainY = 2 + layout.summaryHeight;
+  const mainY = 2 + layout.summaryHeight + tuiLayout.panelGap;
   items.push({ id: "packages", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: mainY, width: layout.mainWidth, height: layout.mainHeight } });
   items.push({ id: "input", row: 2, column: 0, parentIds: ["packages"], bounds: layout.inputBounds });
-  items.push({ id: "risks", row: 1, column: 1, bounds: { x: layout.mainWidth + 1, y: mainY, width: layout.sideWidth, height: Math.max(8, Math.floor(layout.mainHeight * 0.54)) } });
-  items.push({ id: "notices", row: 2, column: 1, bounds: { x: layout.mainWidth + 1, y: mainY + Math.max(8, Math.floor(layout.mainHeight * 0.54)), width: layout.sideWidth, height: Math.max(6, layout.mainHeight - Math.max(8, Math.floor(layout.mainHeight * 0.54))) } });
+  const sideUsableHeight = Math.max(8, layout.mainHeight - tuiLayout.panelGap);
+  const riskHeight = Math.max(8, Math.floor(sideUsableHeight * 0.54));
+  items.push({ id: "risks", row: 1, column: 1, bounds: { x: layout.mainWidth + tuiLayout.panelGap + 1, y: mainY, width: layout.sideWidth, height: riskHeight } });
+  items.push({ id: "notices", row: 2, column: 1, bounds: { x: layout.mainWidth + tuiLayout.panelGap + 1, y: mainY + riskHeight + tuiLayout.panelGap, width: layout.sideWidth, height: Math.max(6, sideUsableHeight - riskHeight) } });
   return items;
 }
 

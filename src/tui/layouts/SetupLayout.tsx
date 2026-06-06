@@ -9,7 +9,7 @@ import { Timeline, type TimelineEvent } from "../components/Timeline.js";
 import { useAppStore } from "../hooks/useStore.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
-import { colors, icons } from "../theme.js";
+import { colors, icons, layout as tuiLayout } from "../theme.js";
 import { hasProjectSignals } from "../projectSignals.js";
 import type { AgentPrompt, AppMessage, AppStore, LogEntry, NoticeInfo } from "../../state/store.js";
 import { handleDirectorInput } from "../../ai/director.js";
@@ -236,14 +236,16 @@ interface Layout {
 
 function buildLayout(width: number, height: number): Layout {
   const stacked = width < 118 || height < 24;
+  const gap = tuiLayout.panelGap;
   const infoHeight = stacked ? 0 : clamp(Math.floor(height * 0.27), 8, 12);
   const footerY = height;
-  const mainHeight = Math.max(8, height - infoHeight - 2);
+  const mainHeight = Math.max(8, height - infoHeight - 2 - (stacked ? 0 : gap));
+  const pairTotal = stacked ? width : Math.max(1, width - gap);
   const sideWidth = stacked ? width : clamp(Math.floor(width * 0.26), 28, 42);
-  const mainWidth = stacked ? width : width - sideWidth;
+  const mainWidth = stacked ? width : pairTotal - sideWidth;
   const infoWidths = stacked
     ? []
-    : distributeWidths(width, [1.1, 1.05, 1.15, 1, 1, 1.3], [20, 20, 22, 20, 20, 24]);
+    : distributeWidths(Math.max(1, width - gap * 5), [1.1, 1.05, 1.15, 1, 1, 1.3], [20, 20, 22, 20, 20, 24]);
 
   return { width, height, stacked, infoHeight, mainHeight, footerY, infoWidths, mainWidth, sideWidth };
 }
@@ -269,24 +271,24 @@ function buildFocusItems(layout: Layout): FocusItem[] {
 
   const [stepsW, projectW, depsW, envW, servicesW, currentW] = layout.infoWidths;
   const infoY = 2;
-  const mainY = 2 + layout.infoHeight;
+  const mainY = 2 + layout.infoHeight + tuiLayout.panelGap;
   const inputHeight = inputBoundsHeightForPanel(layout.mainHeight);
   const inputY = Math.max(mainY + 3, layout.height - inputHeight - 1);
-  const sideX = layout.mainWidth + 1;
+  const sideX = layout.mainWidth + tuiLayout.panelGap + 1;
 
   let x = 1;
   const items: FocusItem[] = [
     { id: "steps", row: 0, column: 0, bounds: { x, y: infoY, width: stepsW, height: layout.infoHeight } },
   ];
-  x += stepsW;
+  x += stepsW + tuiLayout.panelGap;
   items.push({ id: "project", row: 0, column: 1, bounds: { x, y: infoY, width: projectW, height: layout.infoHeight } });
-  x += projectW;
+  x += projectW + tuiLayout.panelGap;
   items.push({ id: "deps", row: 0, column: 2, bounds: { x, y: infoY, width: depsW, height: layout.infoHeight } });
-  x += depsW;
+  x += depsW + tuiLayout.panelGap;
   items.push({ id: "env", row: 0, column: 3, bounds: { x, y: infoY, width: envW, height: layout.infoHeight } });
-  x += envW;
+  x += envW + tuiLayout.panelGap;
   items.push({ id: "services", row: 0, column: 4, bounds: { x, y: infoY, width: servicesW, height: layout.infoHeight } });
-  x += servicesW;
+  x += servicesW + tuiLayout.panelGap;
   items.push({ id: "current", row: 0, column: 5, bounds: { x, y: infoY, width: currentW, height: layout.infoHeight } });
   items.push({ id: "diary", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: mainY, width: layout.mainWidth, height: layout.mainHeight } });
   items.push({ id: "input", row: 2, column: 0, parentIds: ["diary"], bounds: { x: 3, y: inputY, width: layout.mainWidth - 4, height: inputHeight } });
@@ -331,8 +333,8 @@ function Header({
 
 function WideSetup(props: WideSetupProps) {
   return (
-    <>
-      <Box flexDirection="row" width={props.layout.width} height={props.layout.infoHeight}>
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.infoHeight + props.layout.mainHeight + tuiLayout.panelGap} gap={tuiLayout.panelGap}>
+      <Box flexDirection="row" width={props.layout.width} height={props.layout.infoHeight} gap={tuiLayout.panelGap}>
         <Panel title="STEPS" focusState={props.focus("steps")} width={props.layout.infoWidths[0]} height="100%">
           <StepList steps={props.steps} noProject={props.noProject} limit={props.layout.infoHeight - 3} />
         </Panel>
@@ -368,7 +370,7 @@ function WideSetup(props: WideSetupProps) {
         </Panel>
       </Box>
 
-      <Box flexDirection="row" width={props.layout.width} flexGrow={1} minHeight={8}>
+      <Box flexDirection="row" width={props.layout.width} flexGrow={1} minHeight={8} gap={tuiLayout.panelGap}>
         <DiaryPanel
           width={props.layout.mainWidth}
           focus={props.focus}
@@ -400,7 +402,7 @@ function WideSetup(props: WideSetupProps) {
           noProject={props.noProject}
         />
       </Box>
-    </>
+    </Box>
   );
 }
 
@@ -749,9 +751,11 @@ function SetupSideRail({
   notices: Array<{ type: "warning" | "error" | "info"; message: string }>;
   noProject: boolean;
 }) {
-  const portHeight = clamp(Math.floor(height * 0.30), 7, Math.max(7, height - 12));
-  const depsHeight = clamp(Math.floor(height * 0.34), 8, Math.max(8, height - portHeight - 5));
-  const noticesHeight = Math.max(5, height - portHeight - depsHeight);
+  const gap = tuiLayout.panelGap;
+  const availableHeight = Math.max(5, height - gap * 2);
+  const portHeight = clamp(Math.floor(availableHeight * 0.30), 7, Math.max(7, availableHeight - 12));
+  const depsHeight = clamp(Math.floor(availableHeight * 0.34), 8, Math.max(8, availableHeight - portHeight - 5));
+  const noticesHeight = Math.max(5, availableHeight - portHeight - depsHeight);
 
   if (noProject) {
     return (
@@ -763,7 +767,7 @@ function SetupSideRail({
   }
 
   return (
-    <Box flexDirection="column" width={width} height="100%">
+    <Box flexDirection="column" width={width} height="100%" gap={gap}>
       <Panel title="Port Map" focusState={focusState} width="100%" height={portHeight}>
         <PortRows ports={ports} limit={portHeight - 3} />
       </Panel>

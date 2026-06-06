@@ -7,7 +7,7 @@ import { BoundedTextInput } from "../components/BoundedTextInput.js";
 import { MetricText, TuiFooter, TuiHeader } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem, type FocusState } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
-import { colors, icons } from "../theme.js";
+import { colors, icons, layout as tuiLayout } from "../theme.js";
 import { parseSgrMouse, stripTerminalControlInput } from "../terminalInput.js";
 
 interface EnvLayoutProps {
@@ -169,9 +169,9 @@ export function EnvLayout({ cwd }: EnvLayoutProps) {
       )}
 
       {state && (
-        <Box flexDirection="column" height={layout.bodyHeight} width="100%" flexGrow={1} overflow="hidden">
+        <Box flexDirection="column" height={layout.bodyHeight} width="100%" flexGrow={1} overflow="hidden" gap={layout.stacked ? 0 : tuiLayout.panelGap}>
           {!layout.stacked && (
-            <Box flexDirection="row" width="100%" height={layout.summaryHeight}>
+            <Box flexDirection="row" width="100%" height={layout.summaryHeight} gap={tuiLayout.panelGap}>
               <Panel title="Env File" focusState={focus.focusState("envfile")} width={layout.summaryWidths[0]} height="100%">
                 <MetricText value={state.hasEnv ? ".env" : "none"} label={`${entries.length} vars loaded`} color={state.hasEnv ? colors.success : colors.warning} />
               </Panel>
@@ -186,12 +186,12 @@ export function EnvLayout({ cwd }: EnvLayoutProps) {
               </Panel>
             </Box>
           )}
-          <Box flexDirection={layout.stacked ? "column" : "row"} height={layout.contentHeight} width="100%" flexGrow={1} overflow="hidden">
+          <Box flexDirection={layout.stacked ? "column" : "row"} height={layout.contentHeight} width="100%" flexGrow={1} overflow="hidden" gap={tuiLayout.panelGap}>
             <Panel title="Variables" focusState={focus.focusState("vars")} width={layout.stacked ? "100%" : layout.listWidth} height={layout.stacked ? Math.max(7, Math.floor(layout.contentHeight * 0.42)) : "100%"}>
               <VariableList entries={visibleEntries} offset={listOffset} selectedIndex={selectedIndex} />
             </Panel>
 
-            <Box flexDirection="column" width={layout.stacked ? "100%" : layout.sideWidth} height={layout.stacked ? Math.max(10, Math.ceil(layout.contentHeight * 0.58)) : "100%"}>
+            <Box flexDirection="column" width={layout.stacked ? "100%" : layout.sideWidth} height={layout.stacked ? Math.max(10, Math.ceil(layout.contentHeight * 0.58)) : "100%"} gap={tuiLayout.panelGap}>
               <Panel title="Details" focusState={focus.focusState("details")} width="100%" height={layout.detailsHeight}>
                 <DetailsPanel state={state} selected={selected} message={message} error={error} />
               </Panel>
@@ -214,7 +214,7 @@ export function EnvLayout({ cwd }: EnvLayoutProps) {
             </Box>
 
             {!layout.stacked && (
-              <Box flexDirection="column" width={layout.helperWidth} height="100%">
+              <Box flexDirection="column" width={layout.helperWidth} height="100%" gap={tuiLayout.panelGap}>
                 <Panel title="Explanation" focusState={focus.focusState("explanation")} width="100%" height={layout.explanationHeight}>
                   <ExplanationPanel selected={selected} state={state} />
                 </Panel>
@@ -385,14 +385,15 @@ function EditorPanel({
 export function buildEnvLayout(width: number, height: number): EnvLayoutGeometry {
   const bodyHeight = Math.max(8, height - 2);
   const stacked = width < 96 || bodyHeight < 20;
+  const gap = tuiLayout.panelGap;
   const summaryHeight = stacked ? 0 : clamp(Math.floor(bodyHeight * 0.18), 5, 6);
-  const contentHeight = Math.max(8, bodyHeight - summaryHeight);
+  const contentHeight = Math.max(8, bodyHeight - summaryHeight - (stacked ? 0 : gap));
   const baseInputMaxLines = Math.max(1, Math.min(6, Math.floor(bodyHeight / 4)));
   if (stacked) {
     const editorHeight = clamp(baseInputMaxLines + 5, 6, Math.max(6, Math.floor(bodyHeight * 0.42)));
     const inputMaxLines = Math.max(1, Math.min(baseInputMaxLines, editorHeight - 4));
     const detailsHeight = clamp(Math.floor(bodyHeight * 0.28), 6, Math.max(6, bodyHeight - editorHeight - 5));
-    const listHeight = Math.max(5, bodyHeight - detailsHeight - editorHeight);
+    const listHeight = Math.max(5, bodyHeight - detailsHeight - editorHeight - gap * 2);
     const inputY = Math.max(4, height - inputMaxLines - 2);
     return {
       width,
@@ -411,8 +412,8 @@ export function buildEnvLayout(width: number, height: number): EnvLayoutGeometry
       inputMaxLines,
       inputBounds: { x: 4, y: inputY, width: Math.max(8, width - 10), height: inputMaxLines + 2 },
       listBounds: { x: 1, y: 2, width, height: listHeight },
-      detailsBounds: { x: 1, y: 2 + listHeight, width, height: detailsHeight },
-      editorBounds: { x: 1, y: 2 + listHeight + detailsHeight, width, height: editorHeight },
+      detailsBounds: { x: 1, y: 2 + listHeight + gap, width, height: detailsHeight },
+      editorBounds: { x: 1, y: 2 + listHeight + detailsHeight + gap * 2, width, height: editorHeight },
       explanationBounds: { x: 1, y: 2, width: 0, height: 0 },
       warningsBounds: { x: 1, y: 2, width: 0, height: 0 },
       summaryWidths: [],
@@ -423,10 +424,11 @@ export function buildEnvLayout(width: number, height: number): EnvLayoutGeometry
   const editorHeight = Math.max(7, inputMaxLines + 5);
   const listWidth = Math.max(30, Math.floor(width * 0.30));
   const helperWidth = clamp(Math.floor(width * 0.26), 28, 40);
-  const sideWidth = width - listWidth - helperWidth;
-  const detailsHeight = Math.max(8, contentHeight - editorHeight);
-  const explanationHeight = clamp(Math.floor(contentHeight * 0.56), 8, Math.max(8, contentHeight - 5));
-  const warningsHeight = Math.max(5, contentHeight - explanationHeight);
+  const sideWidth = Math.max(24, width - listWidth - helperWidth - gap * 2);
+  const detailsHeight = Math.max(8, contentHeight - editorHeight - gap);
+  const helperContentHeight = Math.max(8, contentHeight - gap);
+  const explanationHeight = clamp(Math.floor(helperContentHeight * 0.56), 8, Math.max(8, helperContentHeight - 5));
+  const warningsHeight = Math.max(5, helperContentHeight - explanationHeight);
   const inputY = Math.max(4, 2 + summaryHeight + detailsHeight + editorHeight - inputMaxLines - 2);
   return {
     width,
@@ -445,11 +447,11 @@ export function buildEnvLayout(width: number, height: number): EnvLayoutGeometry
     inputMaxLines,
     inputBounds: { x: listWidth + 4, y: inputY, width: Math.max(8, sideWidth - 10), height: inputMaxLines + 2 },
     listBounds: { x: 1, y: 2 + summaryHeight, width: listWidth, height: contentHeight },
-    detailsBounds: { x: listWidth + 1, y: 2 + summaryHeight, width: sideWidth, height: detailsHeight },
-    editorBounds: { x: listWidth + 1, y: 2 + summaryHeight + detailsHeight, width: sideWidth, height: editorHeight },
-    explanationBounds: { x: listWidth + sideWidth + 1, y: 2 + summaryHeight, width: helperWidth, height: explanationHeight },
-    warningsBounds: { x: listWidth + sideWidth + 1, y: 2 + summaryHeight + explanationHeight, width: helperWidth, height: warningsHeight },
-    summaryWidths: distributeWidths(width, [1, 1, 1, 1], [20, 20, 18, 18]),
+    detailsBounds: { x: listWidth + gap + 1, y: 2 + summaryHeight + gap, width: sideWidth, height: detailsHeight },
+    editorBounds: { x: listWidth + gap + 1, y: 2 + summaryHeight + detailsHeight + gap * 2, width: sideWidth, height: editorHeight },
+    explanationBounds: { x: listWidth + sideWidth + gap * 2 + 1, y: 2 + summaryHeight + gap, width: helperWidth, height: explanationHeight },
+    warningsBounds: { x: listWidth + sideWidth + gap * 2 + 1, y: 2 + summaryHeight + explanationHeight + gap * 2, width: helperWidth, height: warningsHeight },
+    summaryWidths: distributeWidths(Math.max(1, width - gap * 3), [1, 1, 1, 1], [20, 20, 18, 18]),
     visibleRows: Math.max(1, contentHeight - 3),
   };
 }
@@ -465,9 +467,9 @@ export function buildEnvFocusItems(layout: EnvLayoutGeometry): FocusItem[] {
   }
   return [
     { id: "envfile", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.summaryWidths[0], height: layout.summaryHeight } },
-    { id: "template", row: 0, column: 1, bounds: { x: layout.summaryWidths[0] + 1, y: 2, width: layout.summaryWidths[1], height: layout.summaryHeight } },
-    { id: "missing", row: 0, column: 2, bounds: { x: layout.summaryWidths[0] + layout.summaryWidths[1] + 1, y: 2, width: layout.summaryWidths[2], height: layout.summaryHeight } },
-    { id: "sensitive", row: 0, column: 3, bounds: { x: layout.summaryWidths[0] + layout.summaryWidths[1] + layout.summaryWidths[2] + 1, y: 2, width: layout.summaryWidths[3], height: layout.summaryHeight } },
+    { id: "template", row: 0, column: 1, bounds: { x: layout.summaryWidths[0] + tuiLayout.panelGap + 1, y: 2, width: layout.summaryWidths[1], height: layout.summaryHeight } },
+    { id: "missing", row: 0, column: 2, bounds: { x: layout.summaryWidths[0] + layout.summaryWidths[1] + tuiLayout.panelGap * 2 + 1, y: 2, width: layout.summaryWidths[2], height: layout.summaryHeight } },
+    { id: "sensitive", row: 0, column: 3, bounds: { x: layout.summaryWidths[0] + layout.summaryWidths[1] + layout.summaryWidths[2] + tuiLayout.panelGap * 3 + 1, y: 2, width: layout.summaryWidths[3], height: layout.summaryHeight } },
     { id: "vars", row: 1, column: 0, bounds: layout.listBounds },
     { id: "details", row: 1, column: 1, bounds: layout.detailsBounds },
     { id: "editor", row: 2, column: 1, redirectTo: "input", bounds: layout.editorBounds },

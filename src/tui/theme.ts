@@ -69,6 +69,10 @@ export const borders = {
   cross: "┼",
 };
 
+export const layout = {
+  panelGap: 1,
+};
+
 export const shortcuts = [
   { key: "Ctrl+C", desc: "abort" },
   { key: "Tab", desc: "next panel" },

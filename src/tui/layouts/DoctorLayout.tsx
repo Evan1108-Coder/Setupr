@@ -14,7 +14,7 @@ import { KVRow, TuiFooter, TuiHeader, statusColor } from "../components/TuiFrame
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { hasProjectSignals } from "../projectSignals.js";
-import { colors, icons } from "../theme.js";
+import { colors, icons, layout as tuiLayout } from "../theme.js";
 
 interface Check {
   label: string;
@@ -133,14 +133,16 @@ export function DoctorLayout({ scan, cwd }: DoctorLayoutProps) {
 }
 
 function WideDoctor(props: DoctorViewProps) {
+  const sideUsableHeight = Math.max(8, props.layout.bodyHeight - tuiLayout.panelGap);
+  const envHeight = Math.max(8, Math.floor(sideUsableHeight * 0.45));
   return (
-    <Box flexDirection="row" width={props.layout.width} height={props.layout.bodyHeight}>
+    <Box flexDirection="row" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
       <Panel title="Check Groups" focusState={props.focus("groups")} width={props.layout.groupWidth} height="100%">
         <CheckGroups checks={props.checks} done={props.done} />
       </Panel>
       <DiagnosticsPanel {...props} width={props.layout.diagWidth} height="100%" />
-      <Box flexDirection="column" width={props.layout.sideWidth} height="100%">
-        <Panel title="Environment" focusState={props.focus("environment")} width="100%" height={Math.max(8, Math.floor(props.layout.bodyHeight * 0.45))}>
+      <Box flexDirection="column" width={props.layout.sideWidth} height="100%" gap={tuiLayout.panelGap}>
+        <Panel title="Environment" focusState={props.focus("environment")} width="100%" height={envHeight}>
           <EnvironmentPanel scan={props.scan} />
         </Panel>
         <Panel title="AI Diagnosis" focusState={props.focus("ai")} width="100%" flexGrow={1} minHeight={7}>
@@ -154,9 +156,9 @@ function WideDoctor(props: DoctorViewProps) {
 function StackedDoctor(props: DoctorViewProps) {
   const groupHeight = stackedGroupHeight(props.layout);
   const envHeight = stackedEnvironmentHeight(props.layout);
-  const aiHeight = Math.max(3, props.layout.bodyHeight - groupHeight - props.layout.diagHeight - envHeight);
+  const aiHeight = Math.max(3, props.layout.bodyHeight - groupHeight - props.layout.diagHeight - envHeight - tuiLayout.panelGap * 3);
   return (
-    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
       <Panel title="Check Groups" focusState={props.focus("groups")} width="100%" height={groupHeight}>
         <CheckGroups checks={props.checks} done={props.done} compact />
       </Panel>
@@ -281,14 +283,15 @@ function AIDiagnosis({ insights, risk, chatMessages }: { insights: DoctorInsight
 export function buildDoctorLayout(width: number, height: number): DoctorLayoutGeometry {
   const bodyHeight = Math.max(8, height - 2);
   const stacked = width < 112 || bodyHeight < 22;
+  const gap = tuiLayout.panelGap;
   const groupWidth = stacked ? width : clamp(Math.floor(width * 0.18), 20, 30);
   const sideWidth = stacked ? width : clamp(Math.floor(width * 0.25), 30, 42);
-  const diagWidth = stacked ? width : width - groupWidth - sideWidth;
-  const diagHeight = stacked ? Math.max(8, bodyHeight - 13) : bodyHeight;
+  const diagWidth = stacked ? width : Math.max(8, width - groupWidth - sideWidth - gap * 2);
+  const diagHeight = stacked ? Math.max(8, bodyHeight - 13 - gap * 3) : bodyHeight;
   const inputMaxLines = Math.max(1, Math.min(6, Math.floor(diagHeight / 4)));
   const inputHeight = inputMaxLines + 2;
   const stackedGroups = stacked ? Math.max(5, Math.min(6, Math.floor(bodyHeight * 0.22))) : 0;
-  const inputBounds = { x: stacked ? 3 : groupWidth + 3, y: Math.max(4, 2 + stackedGroups + diagHeight - inputHeight - 1), width: Math.max(8, diagWidth - 6), height: inputHeight };
+  const inputBounds = { x: stacked ? 3 : groupWidth + gap + 3, y: Math.max(4, 2 + stackedGroups + diagHeight - inputHeight - 1), width: Math.max(8, diagWidth - 6), height: inputHeight };
   return { width, height, stacked, bodyHeight, groupWidth, diagWidth, sideWidth, diagHeight, inputMaxLines, inputHeight, inputBounds };
 }
 
@@ -296,25 +299,26 @@ export function buildDoctorFocusItems(layout: DoctorLayoutGeometry): FocusItem[]
   if (layout.stacked) {
     const groupHeight = stackedGroupHeight(layout);
     const envHeight = stackedEnvironmentHeight(layout);
-    const aiHeight = Math.max(3, layout.bodyHeight - groupHeight - layout.diagHeight - envHeight);
-    const diagY = 2 + groupHeight;
-    const envY = diagY + layout.diagHeight;
+    const aiHeight = Math.max(2, layout.bodyHeight - groupHeight - layout.diagHeight - envHeight - tuiLayout.panelGap * 3);
+    const diagY = 2 + groupHeight + tuiLayout.panelGap;
+    const envY = diagY + layout.diagHeight + tuiLayout.panelGap;
     return [
       { id: "groups", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.width, height: groupHeight } },
       { id: "diagnostics", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: diagY, width: layout.width, height: layout.diagHeight } },
       { id: "input", row: 2, column: 0, parentIds: ["diagnostics"], bounds: layout.inputBounds },
       { id: "environment", row: 3, column: 0, bounds: { x: 1, y: envY, width: layout.width, height: envHeight } },
-      { id: "ai", row: 4, column: 0, bounds: { x: 1, y: envY + envHeight, width: layout.width, height: aiHeight } },
+      { id: "ai", row: 4, column: 0, bounds: { x: 1, y: envY + envHeight + tuiLayout.panelGap, width: layout.width, height: aiHeight } },
     ];
   }
-  const sideX = layout.groupWidth + layout.diagWidth + 1;
-  const envHeight = Math.max(8, Math.floor(layout.bodyHeight * 0.45));
+  const sideX = layout.groupWidth + layout.diagWidth + tuiLayout.panelGap * 2 + 1;
+  const sideUsableHeight = Math.max(8, layout.bodyHeight - tuiLayout.panelGap);
+  const envHeight = Math.max(8, Math.floor(sideUsableHeight * 0.45));
   return [
     { id: "groups", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.groupWidth, height: layout.bodyHeight } },
-    { id: "diagnostics", row: 0, column: 1, redirectTo: "input", bounds: { x: layout.groupWidth + 1, y: 2, width: layout.diagWidth, height: layout.bodyHeight } },
+    { id: "diagnostics", row: 0, column: 1, redirectTo: "input", bounds: { x: layout.groupWidth + tuiLayout.panelGap + 1, y: 2, width: layout.diagWidth, height: layout.bodyHeight } },
     { id: "input", row: 1, column: 1, parentIds: ["diagnostics"], bounds: layout.inputBounds },
     { id: "environment", row: 0, column: 2, bounds: { x: sideX, y: 2, width: layout.sideWidth, height: envHeight } },
-    { id: "ai", row: 1, column: 2, bounds: { x: sideX, y: 2 + envHeight, width: layout.sideWidth, height: layout.bodyHeight - envHeight } },
+    { id: "ai", row: 1, column: 2, bounds: { x: sideX, y: 2 + envHeight + tuiLayout.panelGap, width: layout.sideWidth, height: sideUsableHeight - envHeight } },
   ];
 }
 

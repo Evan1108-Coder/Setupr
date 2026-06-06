@@ -10,7 +10,7 @@ import { Spinner } from "../components/Spinner.js";
 import { KVRow, MetricText, TuiFooter, TuiHeader, statusColor } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
-import { colors, icons } from "../theme.js";
+import { colors, icons, layout as tuiLayout } from "../theme.js";
 
 interface CleanTarget {
   path: string;
@@ -152,10 +152,10 @@ export function CleanLayout({ cwd, mode, force = false }: CleanLayoutProps) {
 }
 
 function WideClean(props: CleanViewProps) {
-  const panelHeight = Math.max(6, props.layout.bodyHeight - props.layout.inputHeight);
+  const panelHeight = Math.max(6, props.layout.bodyHeight - props.layout.inputHeight - tuiLayout.panelGap);
   return (
-    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
-      <Box flexDirection="row" width="100%" height={panelHeight}>
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
+      <Box flexDirection="row" width="100%" height={panelHeight} gap={tuiLayout.panelGap}>
         <Panel title="Targets" focusState={props.focus("targets")} width={props.layout.targetsWidth} height="100%">
           <TargetsPanel {...props} limit={panelHeight - 3} />
         </Panel>
@@ -172,12 +172,12 @@ function WideClean(props: CleanViewProps) {
 }
 
 function StackedClean(props: CleanViewProps) {
-  const panelHeight = Math.max(8, props.layout.bodyHeight - props.layout.inputHeight);
+  const panelHeight = Math.max(8, props.layout.bodyHeight - props.layout.inputHeight - tuiLayout.panelGap * 3);
   const targetsHeight = Math.max(8, Math.floor(panelHeight * 0.45));
   const reviewHeight = Math.max(7, Math.floor(panelHeight * 0.32));
   const riskHeight = Math.max(5, panelHeight - targetsHeight - reviewHeight);
   return (
-    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
       <Panel title="Targets" focusState={props.focus("targets")} width="100%" height={targetsHeight}>
         <TargetsPanel {...props} limit={targetsHeight - 3} />
       </Panel>
@@ -271,9 +271,10 @@ function RiskPanel({ phase, risk, failed, totalBytes, targets, compact = false }
 export function buildCleanLayout(width: number, height: number): CleanLayoutGeometry {
   const bodyHeight = Math.max(8, height - 2);
   const stacked = width < 106 || bodyHeight < 22;
+  const gap = tuiLayout.panelGap;
   const targetsWidth = stacked ? width : clamp(Math.floor(width * 0.30), 28, 42);
   const riskWidth = stacked ? width : clamp(Math.floor(width * 0.27), 28, 40);
-  const reviewWidth = stacked ? width : width - targetsWidth - riskWidth;
+  const reviewWidth = stacked ? width : Math.max(8, width - targetsWidth - riskWidth - gap * 2);
   const inputMaxLines = Math.max(1, Math.min(4, Math.floor(bodyHeight / 6)));
   const inputHeight = inputMaxLines + 2;
   const inputBounds = {
@@ -287,22 +288,22 @@ export function buildCleanLayout(width: number, height: number): CleanLayoutGeom
 
 export function buildCleanFocusItems(layout: CleanLayoutGeometry): FocusItem[] {
   if (layout.stacked) {
-    const panelHeight = Math.max(8, layout.bodyHeight - layout.inputHeight);
+    const panelHeight = Math.max(8, layout.bodyHeight - layout.inputHeight - tuiLayout.panelGap * 3);
     const targetsHeight = Math.max(8, Math.floor(panelHeight * 0.45));
     const reviewHeight = Math.max(7, Math.floor(panelHeight * 0.32));
     const riskHeight = Math.max(5, panelHeight - targetsHeight - reviewHeight);
     return [
       { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.width, height: targetsHeight } },
-      { id: "review", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: 2 + targetsHeight, width: layout.width, height: reviewHeight } },
+      { id: "review", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: 2 + targetsHeight + tuiLayout.panelGap, width: layout.width, height: reviewHeight } },
       { id: "input", row: 2, column: 0, parentIds: ["review"], bounds: layout.inputBounds },
-      { id: "risk", row: 3, column: 0, bounds: { x: 1, y: 2 + targetsHeight + reviewHeight, width: layout.width, height: riskHeight } },
+      { id: "risk", row: 3, column: 0, bounds: { x: 1, y: 2 + targetsHeight + reviewHeight + tuiLayout.panelGap * 2, width: layout.width, height: riskHeight } },
     ];
   }
   return [
-    { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.targetsWidth, height: layout.bodyHeight - layout.inputHeight } },
-    { id: "review", row: 0, column: 1, redirectTo: "input", bounds: { x: layout.targetsWidth + 1, y: 2, width: layout.reviewWidth, height: layout.bodyHeight - layout.inputHeight } },
+    { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.targetsWidth, height: layout.bodyHeight - layout.inputHeight - tuiLayout.panelGap } },
+    { id: "review", row: 0, column: 1, redirectTo: "input", bounds: { x: layout.targetsWidth + tuiLayout.panelGap + 1, y: 2, width: layout.reviewWidth, height: layout.bodyHeight - layout.inputHeight - tuiLayout.panelGap } },
     { id: "input", row: 1, column: 1, parentIds: ["review"], bounds: layout.inputBounds },
-    { id: "risk", row: 0, column: 2, bounds: { x: layout.targetsWidth + layout.reviewWidth + 1, y: 2, width: layout.riskWidth, height: layout.bodyHeight - layout.inputHeight } },
+    { id: "risk", row: 0, column: 2, bounds: { x: layout.targetsWidth + layout.reviewWidth + tuiLayout.panelGap * 2 + 1, y: 2, width: layout.riskWidth, height: layout.bodyHeight - layout.inputHeight - tuiLayout.panelGap } },
   ];
 }
 

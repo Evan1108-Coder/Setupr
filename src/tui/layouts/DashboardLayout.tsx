@@ -6,7 +6,7 @@ import { Spinner } from "../components/Spinner.js";
 import { KVRow, TuiFooter, TuiHeader, formatAge, shortPath, statusColor } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
-import { colors, icons } from "../theme.js";
+import { colors, icons, layout as tuiLayout } from "../theme.js";
 
 interface DashboardLayoutProps {
   cwd: string;
@@ -115,8 +115,8 @@ function DashboardScreen({ layout, status, focus }: ScreenProps) {
       const topHeight = clamp(Math.floor(layout.bodyHeight * 0.4), 8, Math.max(8, layout.bodyHeight - 8));
       const bottomHeight = Math.max(8, layout.bodyHeight - topHeight);
       return (
-        <Box flexDirection="column" width={layout.width} height={layout.bodyHeight} overflow="hidden">
-          <Box flexDirection="row" width="100%" height={topHeight}>
+        <Box flexDirection="column" width={layout.width} height={layout.bodyHeight} overflow="hidden" gap={tuiLayout.panelGap}>
+          <Box flexDirection="row" width="100%" height={topHeight} gap={tuiLayout.panelGap}>
             <Panel title="Project" focusState={focus("project")} width={layout.leftWidth} height="100%">
               <ProjectPanel status={status} compact />
             </Panel>
@@ -124,7 +124,7 @@ function DashboardScreen({ layout, status, focus }: ScreenProps) {
               <CompactDashboardOverview status={status} />
             </Panel>
           </Box>
-          <Box flexDirection="row" width="100%" height={bottomHeight}>
+          <Box flexDirection="row" width="100%" height={bottomHeight} gap={tuiLayout.panelGap}>
             <Panel title="Actions + History" focusState={focus("actions")} width={layout.leftWidth} height="100%">
               <ActionsHistoryPanel status={status} limit={bottomHeight - 3} />
             </Panel>
@@ -163,8 +163,8 @@ function DashboardScreen({ layout, status, focus }: ScreenProps) {
   }
 
   return (
-    <Box flexDirection="column" width={layout.width} height={layout.bodyHeight}>
-      <Box flexDirection="row" width="100%" height={layout.topHeight}>
+    <Box flexDirection="column" width={layout.width} height={layout.bodyHeight} gap={tuiLayout.panelGap}>
+      <Box flexDirection="row" width="100%" height={layout.topHeight} gap={tuiLayout.panelGap}>
         <Panel title="Project" focusState={focus("project")} width={layout.topWidths[0]} height="100%">
           <ProjectPanel status={status} />
         </Panel>
@@ -181,7 +181,7 @@ function DashboardScreen({ layout, status, focus }: ScreenProps) {
           <ProcessPanel status={status} />
         </Panel>
       </Box>
-      <Box flexDirection="row" width="100%" flexGrow={1} minHeight={8}>
+      <Box flexDirection="row" width="100%" flexGrow={1} minHeight={8} gap={tuiLayout.panelGap}>
         <Panel title="Actions + History" focusState={focus("actions")} width={layout.leftWidth} height="100%">
           <ActionsHistoryPanel status={status} limit={layout.bottomHeight - 3} />
         </Panel>
@@ -199,8 +199,8 @@ function StatusScreen({ layout, status, focus }: ScreenProps) {
       const topHeight = clamp(Math.floor(layout.bodyHeight * 0.4), 8, Math.max(8, layout.bodyHeight - 8));
       const bottomHeight = Math.max(8, layout.bodyHeight - topHeight);
       return (
-        <Box flexDirection="column" width={layout.width} height={layout.bodyHeight} overflow="hidden">
-          <Box flexDirection="row" width="100%" height={topHeight}>
+        <Box flexDirection="column" width={layout.width} height={layout.bodyHeight} overflow="hidden" gap={tuiLayout.panelGap}>
+          <Box flexDirection="row" width="100%" height={topHeight} gap={tuiLayout.panelGap}>
             <Panel title="Health" focusState={focus("health")} width={layout.leftWidth} height="100%">
               <HealthPanel status={status} compact />
             </Panel>
@@ -208,7 +208,7 @@ function StatusScreen({ layout, status, focus }: ScreenProps) {
               <CompactStatusOverview status={status} />
             </Panel>
           </Box>
-          <Box flexDirection="row" width="100%" height={bottomHeight}>
+          <Box flexDirection="row" width="100%" height={bottomHeight} gap={tuiLayout.panelGap}>
             <Panel title="Project State" focusState={focus("state")} width={layout.leftWidth} height="100%">
               <ProjectStatePanel status={status} limit={bottomHeight - 3} />
             </Panel>
@@ -247,8 +247,8 @@ function StatusScreen({ layout, status, focus }: ScreenProps) {
   }
 
   return (
-    <Box flexDirection="column" width={layout.width} height={layout.bodyHeight}>
-      <Box flexDirection="row" width="100%" height={layout.topHeight}>
+    <Box flexDirection="column" width={layout.width} height={layout.bodyHeight} gap={tuiLayout.panelGap}>
+      <Box flexDirection="row" width="100%" height={layout.topHeight} gap={tuiLayout.panelGap}>
         <Panel title="Health" focusState={focus("health")} width={layout.topWidths[0]} height="100%">
           <HealthPanel status={status} />
         </Panel>
@@ -265,7 +265,7 @@ function StatusScreen({ layout, status, focus }: ScreenProps) {
           <SecurityPanel status={status} />
         </Panel>
       </Box>
-      <Box flexDirection="row" width="100%" height={layout.middleHeight}>
+      <Box flexDirection="row" width="100%" height={layout.middleHeight} gap={tuiLayout.panelGap}>
         <Panel title="Project State" focusState={focus("state")} width={layout.leftWidth} height="100%">
           <ProjectStatePanel status={status} limit={layout.middleHeight - 3} />
         </Panel>
@@ -273,7 +273,7 @@ function StatusScreen({ layout, status, focus }: ScreenProps) {
           <ProcessPanel status={status} limit={layout.middleHeight - 3} />
         </Panel>
       </Box>
-      <Box flexDirection="row" width="100%" flexGrow={1} minHeight={6}>
+      <Box flexDirection="row" width="100%" flexGrow={1} minHeight={6} gap={tuiLayout.panelGap}>
         <Panel title={`Env Vars (${status.env.defined} loaded)`} focusState={focus("envvars")} width={layout.leftWidth} height="100%">
           <EnvVarsPanel status={status} limit={layout.bottomHeight - 3} />
         </Panel>
@@ -515,12 +515,22 @@ export function buildDashboardLayout(width: number, height: number, variant: "da
   const bodyHeight = Math.max(8, height - 2);
   const stacked = width < 104 || bodyHeight < 22;
   const compactStacked = stacked && bodyHeight < 40;
+  const gap = tuiLayout.panelGap;
+  const rowGaps = stacked ? (compactStacked ? gap : 0) : (variant === "status" ? gap * 2 : gap);
   const topHeight = stacked ? 5 : clamp(Math.floor(bodyHeight * 0.28), 7, 10);
   const middleHeight = stacked ? 0 : variant === "status" ? clamp(Math.floor(bodyHeight * 0.36), 8, Math.max(8, bodyHeight - topHeight - 6)) : 0;
-  const bottomHeight = Math.max(6, bodyHeight - topHeight - middleHeight);
-  const topWidths = distributeWidths(width, variant === "status" ? [0.9, 1, 1, 1, 1] : [1.25, 1, 1, 1, 1], [18, 16, 16, 16, 18]);
-  const leftWidth = stacked ? width : variant === "status" ? Math.floor(width * 0.62) : Math.floor(width * 0.63);
-  const rightWidth = stacked ? width : width - leftWidth;
+  const bottomHeight = Math.max(6, bodyHeight - topHeight - middleHeight - rowGaps);
+  const topTotal = stacked ? width : Math.max(1, width - gap * 4);
+  const topWidths = distributeWidths(topTotal, variant === "status" ? [0.9, 1, 1, 1, 1] : [1.25, 1, 1, 1, 1], [18, 16, 16, 16, 18]);
+  let leftWidth = width;
+  let rightWidth = width;
+  if (compactStacked) {
+    [leftWidth, rightWidth] = distributeWidths(Math.max(1, width - gap), [1, 1], [24, 24]);
+  } else if (!stacked) {
+    const pairTotal = Math.max(1, width - gap);
+    leftWidth = variant === "status" ? Math.floor(pairTotal * 0.62) : Math.floor(pairTotal * 0.63);
+    rightWidth = pairTotal - leftWidth;
+  }
   return { width, height, variant, stacked, compactStacked, bodyHeight, topHeight, middleHeight, bottomHeight, topWidths, leftWidth, rightWidth };
 }
 
@@ -532,9 +542,9 @@ export function buildDashboardFocusItems(layout: DashboardLayoutGeometry): Focus
       const bottomHeight = Math.max(8, layout.bodyHeight - topHeight);
       return [
         { id: ids[0], row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.leftWidth, height: topHeight } },
-        { id: ids[1], row: 0, column: 1, bounds: { x: layout.leftWidth + 1, y: 2, width: layout.rightWidth, height: topHeight } },
-        { id: ids[2], row: 1, column: 0, bounds: { x: 1, y: 2 + topHeight, width: layout.leftWidth, height: bottomHeight } },
-        { id: ids[3], row: 1, column: 1, bounds: { x: layout.leftWidth + 1, y: 2 + topHeight, width: layout.rightWidth, height: bottomHeight } },
+        { id: ids[1], row: 0, column: 1, bounds: { x: layout.leftWidth + tuiLayout.panelGap + 1, y: 2, width: layout.rightWidth, height: topHeight } },
+        { id: ids[2], row: 1, column: 0, bounds: { x: 1, y: 2 + topHeight + tuiLayout.panelGap, width: layout.leftWidth, height: bottomHeight } },
+        { id: ids[3], row: 1, column: 1, bounds: { x: layout.leftWidth + tuiLayout.panelGap + 1, y: 2 + topHeight + tuiLayout.panelGap, width: layout.rightWidth, height: bottomHeight } },
       ];
     }
     const common = layout.variant === "status"
@@ -554,17 +564,17 @@ export function buildDashboardFocusItems(layout: DashboardLayoutGeometry): Focus
   const topIds = layout.variant === "status" ? ["health", "git", "env", "tests", "security"] : ["project", "git", "env", "deps", "processes"];
   topIds.forEach((id, index) => {
     items.push({ id, row: 0, column: index, bounds: { x, y: 2, width: layout.topWidths[index], height: layout.topHeight } });
-    x += layout.topWidths[index];
+    x += layout.topWidths[index] + tuiLayout.panelGap;
   });
-  const mainY = 2 + layout.topHeight;
+  const mainY = 2 + layout.topHeight + tuiLayout.panelGap;
   if (layout.variant === "status") {
     items.push({ id: "state", row: 1, column: 0, bounds: { x: 1, y: mainY, width: layout.leftWidth, height: layout.middleHeight } });
-    items.push({ id: "processes", row: 1, column: 1, bounds: { x: layout.leftWidth + 1, y: mainY, width: layout.rightWidth, height: layout.middleHeight } });
-    items.push({ id: "envvars", row: 2, column: 0, bounds: { x: 1, y: mainY + layout.middleHeight, width: layout.leftWidth, height: layout.bottomHeight } });
-    items.push({ id: "actions", row: 2, column: 1, bounds: { x: layout.leftWidth + 1, y: mainY + layout.middleHeight, width: layout.rightWidth, height: layout.bottomHeight } });
+    items.push({ id: "processes", row: 1, column: 1, bounds: { x: layout.leftWidth + tuiLayout.panelGap + 1, y: mainY, width: layout.rightWidth, height: layout.middleHeight } });
+    items.push({ id: "envvars", row: 2, column: 0, bounds: { x: 1, y: mainY + layout.middleHeight + tuiLayout.panelGap, width: layout.leftWidth, height: layout.bottomHeight } });
+    items.push({ id: "actions", row: 2, column: 1, bounds: { x: layout.leftWidth + tuiLayout.panelGap + 1, y: mainY + layout.middleHeight + tuiLayout.panelGap, width: layout.rightWidth, height: layout.bottomHeight } });
   } else {
     items.push({ id: "actions", row: 1, column: 0, bounds: { x: 1, y: mainY, width: layout.leftWidth, height: layout.bottomHeight } });
-    items.push({ id: "notices", row: 1, column: 1, bounds: { x: layout.leftWidth + 1, y: mainY, width: layout.rightWidth, height: layout.bottomHeight } });
+    items.push({ id: "notices", row: 1, column: 1, bounds: { x: layout.leftWidth + tuiLayout.panelGap + 1, y: mainY, width: layout.rightWidth, height: layout.bottomHeight } });
   }
   return items;
 }

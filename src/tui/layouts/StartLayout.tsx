@@ -12,7 +12,7 @@ import { KVRow, TuiFooter, TuiHeader, statusColor } from "../components/TuiFrame
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { hasProjectSignals } from "../projectSignals.js";
-import { colors, icons } from "../theme.js";
+import { colors, icons, layout as tuiLayout } from "../theme.js";
 
 interface StartLayoutProps {
   scan: ScanResult;
@@ -157,17 +157,20 @@ export function StartLayout({ scan, cwd }: StartLayoutProps) {
 }
 
 function WideStart(props: StartViewProps) {
+  const sideUsableHeight = Math.max(8, props.layout.bodyHeight - tuiLayout.panelGap * 2);
+  const currentHeight = Math.max(8, Math.floor(sideUsableHeight * 0.38));
+  const policyHeight = Math.max(7, Math.floor(sideUsableHeight * 0.28));
   return (
-    <Box flexDirection="row" width={props.layout.width} height={props.layout.bodyHeight}>
+    <Box flexDirection="row" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
       <Panel title="Processes" focusState={props.focus("processes")} width={props.layout.processWidth} height="100%">
         <ProcessRail scan={props.scan} command={props.command} status={props.status} />
       </Panel>
       <LogPanel {...props} width={props.layout.logWidth} height="100%" />
-      <Box flexDirection="column" width={props.layout.sideWidth} height="100%">
-        <Panel title="Current Process" focusState={props.focus("current")} width="100%" height={Math.max(8, Math.floor(props.layout.bodyHeight * 0.38))}>
+      <Box flexDirection="column" width={props.layout.sideWidth} height="100%" gap={tuiLayout.panelGap}>
+        <Panel title="Current Process" focusState={props.focus("current")} width="100%" height={currentHeight}>
           <CurrentProcessPanel {...props} />
         </Panel>
-        <Panel title="Restart Policy" focusState={props.focus("policy")} width="100%" height={Math.max(7, Math.floor(props.layout.bodyHeight * 0.28))}>
+        <Panel title="Restart Policy" focusState={props.focus("policy")} width="100%" height={policyHeight}>
           <RestartPolicyPanel status={props.status} />
         </Panel>
         <Panel title="Crash Info" focusState={props.focus("crash")} width="100%" flexGrow={1} minHeight={6}>
@@ -179,15 +182,16 @@ function WideStart(props: StartViewProps) {
 }
 
 function StackedStart(props: StartViewProps) {
-  const sideHeight = Math.max(7, props.layout.bodyHeight - props.layout.logHeight);
+  const sideHeight = Math.max(7, props.layout.bodyHeight - props.layout.logHeight - tuiLayout.panelGap);
+  const processWidth = Math.floor((props.layout.width - tuiLayout.panelGap) * 0.45);
   return (
-    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight}>
+    <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
       <LogPanel {...props} width={props.layout.width} height={props.layout.logHeight} />
-      <Box flexDirection="row" width="100%" height={sideHeight}>
-        <Panel title="Processes" focusState={props.focus("processes")} width={Math.floor(props.layout.width * 0.45)} height="100%">
+      <Box flexDirection="row" width="100%" height={sideHeight} gap={tuiLayout.panelGap}>
+        <Panel title="Processes" focusState={props.focus("processes")} width={processWidth} height="100%">
           <ProcessRail scan={props.scan} command={props.command} status={props.status} compact />
         </Panel>
-        <Panel title="Current" focusState={props.focus("current")} width={props.layout.width - Math.floor(props.layout.width * 0.45)} height="100%">
+        <Panel title="Current" focusState={props.focus("current")} width={props.layout.width - processWidth - tuiLayout.panelGap} height="100%">
           <CurrentProcessPanel {...props} compact />
         </Panel>
       </Box>
@@ -329,37 +333,39 @@ function CrashPanel({ error, status }: { error: SetuprError | null; status: Star
 export function buildStartLayout(width: number, height: number): StartLayoutGeometry {
   const bodyHeight = Math.max(8, height - 2);
   const stacked = width < 110 || bodyHeight < 20;
+  const gap = tuiLayout.panelGap;
   const processWidth = stacked ? width : clamp(Math.floor(width * 0.18), 20, 32);
   const sideWidth = stacked ? width : clamp(Math.floor(width * 0.24), 28, 40);
-  const logWidth = stacked ? width : width - processWidth - sideWidth;
-  const logHeight = stacked ? Math.max(8, bodyHeight - 8) : bodyHeight;
+  const logWidth = stacked ? width : Math.max(8, width - processWidth - sideWidth - gap * 2);
+  const logHeight = stacked ? Math.max(8, bodyHeight - 8 - gap) : bodyHeight;
   const inputMaxLines = Math.max(1, Math.min(6, Math.floor(logHeight / 4)));
   const inputHeight = inputMaxLines + 2;
-  const inputBounds = { x: stacked ? 3 : processWidth + 3, y: Math.max(4, 2 + logHeight - inputHeight - 1), width: Math.max(8, logWidth - 6), height: inputHeight };
+  const inputBounds = { x: stacked ? 3 : processWidth + gap + 3, y: Math.max(4, 2 + logHeight - inputHeight - 1), width: Math.max(8, logWidth - 6), height: inputHeight };
   return { width, height, stacked, bodyHeight, processWidth, logWidth, sideWidth, logHeight, inputMaxLines, inputHeight, inputBounds };
 }
 
 export function buildStartFocusItems(layout: StartLayoutGeometry): FocusItem[] {
   if (layout.stacked) {
-    const sideHeight = Math.max(7, layout.bodyHeight - layout.logHeight);
-    const procWidth = Math.floor(layout.width * 0.45);
+    const sideHeight = Math.max(7, layout.bodyHeight - layout.logHeight - tuiLayout.panelGap);
+    const procWidth = Math.floor((layout.width - tuiLayout.panelGap) * 0.45);
     return [
       { id: "logs", row: 0, column: 0, redirectTo: "input", bounds: { x: 1, y: 2, width: layout.width, height: layout.logHeight } },
       { id: "input", row: 1, column: 0, parentIds: ["logs"], bounds: layout.inputBounds },
-      { id: "processes", row: 2, column: 0, bounds: { x: 1, y: 2 + layout.logHeight, width: procWidth, height: sideHeight } },
-      { id: "current", row: 2, column: 1, bounds: { x: procWidth + 1, y: 2 + layout.logHeight, width: layout.width - procWidth, height: sideHeight } },
+      { id: "processes", row: 2, column: 0, bounds: { x: 1, y: 2 + layout.logHeight + tuiLayout.panelGap, width: procWidth, height: sideHeight } },
+      { id: "current", row: 2, column: 1, bounds: { x: procWidth + tuiLayout.panelGap + 1, y: 2 + layout.logHeight + tuiLayout.panelGap, width: layout.width - procWidth - tuiLayout.panelGap, height: sideHeight } },
     ];
   }
-  const sideX = layout.processWidth + layout.logWidth + 1;
-  const currentHeight = Math.max(8, Math.floor(layout.bodyHeight * 0.38));
-  const policyHeight = Math.max(7, Math.floor(layout.bodyHeight * 0.28));
+  const sideX = layout.processWidth + layout.logWidth + tuiLayout.panelGap * 2 + 1;
+  const sideUsableHeight = Math.max(8, layout.bodyHeight - tuiLayout.panelGap * 2);
+  const currentHeight = Math.max(8, Math.floor(sideUsableHeight * 0.38));
+  const policyHeight = Math.max(7, Math.floor(sideUsableHeight * 0.28));
   return [
     { id: "processes", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.processWidth, height: layout.bodyHeight } },
-    { id: "logs", row: 0, column: 1, redirectTo: "input", bounds: { x: layout.processWidth + 1, y: 2, width: layout.logWidth, height: layout.bodyHeight } },
+    { id: "logs", row: 0, column: 1, redirectTo: "input", bounds: { x: layout.processWidth + tuiLayout.panelGap + 1, y: 2, width: layout.logWidth, height: layout.bodyHeight } },
     { id: "input", row: 1, column: 1, parentIds: ["logs"], bounds: layout.inputBounds },
     { id: "current", row: 0, column: 2, bounds: { x: sideX, y: 2, width: layout.sideWidth, height: currentHeight } },
-    { id: "policy", row: 1, column: 2, bounds: { x: sideX, y: 2 + currentHeight, width: layout.sideWidth, height: policyHeight } },
-    { id: "crash", row: 2, column: 2, bounds: { x: sideX, y: 2 + currentHeight + policyHeight, width: layout.sideWidth, height: layout.bodyHeight - currentHeight - policyHeight } },
+    { id: "policy", row: 1, column: 2, bounds: { x: sideX, y: 2 + currentHeight + tuiLayout.panelGap, width: layout.sideWidth, height: policyHeight } },
+    { id: "crash", row: 2, column: 2, bounds: { x: sideX, y: 2 + currentHeight + policyHeight + tuiLayout.panelGap * 2, width: layout.sideWidth, height: layout.bodyHeight - currentHeight - policyHeight - tuiLayout.panelGap * 2 } },
   ];
 }
 

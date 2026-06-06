@@ -17,7 +17,7 @@ import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/u
 import { useAppStore } from "../hooks/useStore.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { parseSgrMouse } from "../terminalInput.js";
-import { colors, icons } from "../theme.js";
+import { colors, icons, layout as tuiLayout } from "../theme.js";
 
 interface ChatLayoutProps {
   cwd: string;
@@ -287,10 +287,13 @@ export function ChatLayout({ cwd, store, initialMessage, startNew = false }: Cha
 export function buildChatLayout(width: number, height: number): ChatLayoutModel {
   const stacked = width < 96 || height < 22;
   const bodyHeight = Math.max(8, height - 2);
+  const gap = tuiLayout.panelGap;
+  const pairTotal = stacked ? width : Math.max(1, width - gap);
   const rightWidth = stacked ? width : clamp(Math.floor(width * 0.26), 28, 42);
-  const leftWidth = stacked ? width : width - rightWidth;
-  const planHeight = stacked ? clamp(Math.floor(bodyHeight * 0.24), 4, 8) : clamp(Math.floor(bodyHeight * 0.52), 8, bodyHeight - 6);
-  const statusHeight = stacked ? clamp(Math.floor(bodyHeight * 0.2), 4, 7) : bodyHeight - planHeight;
+  const leftWidth = stacked ? width : pairTotal - rightWidth;
+  const sideHeight = stacked ? bodyHeight : Math.max(8, bodyHeight - gap);
+  const planHeight = stacked ? clamp(Math.floor(bodyHeight * 0.24), 4, 8) : clamp(Math.floor(sideHeight * 0.52), 8, sideHeight - 6);
+  const statusHeight = stacked ? clamp(Math.floor(bodyHeight * 0.2), 4, 7) : sideHeight - planHeight;
   const inputMaxLines = Math.max(1, Math.min(6, Math.floor(bodyHeight / 5)));
   const inputHeight = inputMaxLines + 2;
   const transcriptHeight = stacked
@@ -327,8 +330,8 @@ export function buildChatFocusItems(layout: ChatLayoutModel): FocusItem[] {
   return [
     { id: "conversation", row: 0, column: 0, redirectTo: "input", bounds: { x: 1, y: 2, width: layout.leftWidth, height: layout.bodyHeight } },
     { id: "input", row: 1, column: 0, parentIds: ["conversation"], bounds: layout.inputBounds },
-    { id: "plan", row: 0, column: 1, bounds: { x: layout.leftWidth + 1, y: 2, width: layout.rightWidth, height: layout.planHeight } },
-    { id: "status", row: 1, column: 1, bounds: { x: layout.leftWidth + 1, y: 2 + layout.planHeight, width: layout.rightWidth, height: layout.statusHeight } },
+    { id: "plan", row: 0, column: 1, bounds: { x: layout.leftWidth + tuiLayout.panelGap + 1, y: 2, width: layout.rightWidth, height: layout.planHeight } },
+    { id: "status", row: 1, column: 1, bounds: { x: layout.leftWidth + tuiLayout.panelGap + 1, y: 2 + layout.planHeight + tuiLayout.panelGap, width: layout.rightWidth, height: layout.statusHeight } },
   ];
 }
 
@@ -349,9 +352,9 @@ function Header({ cwd, projectName, status, ready, width }: { cwd: string; proje
 
 function WideChat(props: ChatViewProps) {
   return (
-    <Box flexDirection="row" width={props.layout.width} height={props.layout.bodyHeight}>
+    <Box flexDirection="row" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
       <ConversationPanel {...props} width={props.layout.leftWidth} />
-      <Box flexDirection="column" width={props.layout.rightWidth} height="100%">
+      <Box flexDirection="column" width={props.layout.rightWidth} height="100%" gap={tuiLayout.panelGap}>
         <PlanPanel steps={props.steps} focusState={props.focus("plan")} height={props.layout.planHeight} />
         <StatusPanel {...props} height={props.layout.statusHeight} />
       </Box>
