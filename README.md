@@ -504,6 +504,16 @@ npm run smoke:fixtures:tui
 
 That does not replace manual iTerm2/Ghostty visual QA, but it catches obvious TUI launch regressions.
 
+For a local package/install smoke before publishing:
+
+```bash
+npm pack
+npm exec --yes --package ./setupr-1.0.0.tgz -- setupr --version
+npx --yes file:$(pwd)/setupr-1.0.0.tgz --version
+```
+
+Use `file:` or `--package` for tarball checks. A bare `npx ./setupr-1.0.0.tgz` is treated like an executable file path and will fail with a permission error.
+
 ## License
 
 MIT

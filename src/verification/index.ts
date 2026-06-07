@@ -116,7 +116,7 @@ export async function collectVerificationSummary(cwd: string): Promise<{ status:
 function bestTestCommand(scan: ScanResult): string | null {
   const pm = scan.packageManager || "npm";
   if (scan.scripts.test) return `${pm} run test`;
-  if (scan.language === "Python") return existsSync("pytest") ? "pytest" : "python -m pytest";
+  if (scan.language === "Python") return "python3 -m pytest";
   if (scan.language === "Rust") return "cargo test";
   if (scan.language === "Go") return "go test ./...";
   return scan.scripts.build ? `${pm} run build` : null;
@@ -203,11 +203,15 @@ async function rerunFailed(cwd: string, options: VerificationOptions): Promise<V
 async function doctor(cwd: string, scan: ScanResult, options: VerificationOptions, extra?: string): Promise<VerificationReport> {
   const checks: VerificationCheck[] = [];
   const testFiles = await findTestFiles(cwd);
+  const testCommand = bestTestCommand(scan);
+  const availability = testCommand ? await checkVerificationCommandAvailable(cwd, testCommand) : null;
   checks.push({
     id: "scripts",
     label: "Test script",
-    status: bestTestCommand(scan) ? "pass" : "warn",
-    detail: bestTestCommand(scan) || "No default test/build verification command detected.",
+    status: testCommand ? availability?.status || "pass" : "warn",
+    detail: testCommand
+      ? availability?.detail || testCommand
+      : "No default test/build verification command detected.",
   });
   checks.push({
     id: "files",
@@ -223,6 +227,31 @@ async function doctor(cwd: string, scan: ScanResult, options: VerificationOption
   });
   if (extra) checks.unshift({ id: "message", label: "Notice", status: "warn", detail: extra });
   return finalizeReport(cwd, { type: "verification", command: "doctor", cwd, createdAt: Date.now(), status: statusFromChecks(checks), checks }, options);
+}
+
+async function checkVerificationCommandAvailable(cwd: string, command: string): Promise<{ status: VerificationStatus; detail: string }> {
+  const probe = availabilityProbeCommand(command);
+  if (!probe) return { status: "pass", detail: command };
+  const result = await runCommand(probe, cwd);
+  if (result.exitCode === 0) return { status: "pass", detail: command };
+  return {
+    status: "warn",
+    detail: `${command} (tool unavailable: ${firstLine(result.stderr || result.stdout) || probe})`,
+  };
+}
+
+function availabilityProbeCommand(command: string): string | null {
+  if (/^npm run |^yarn run |^pnpm run |^bun run /.test(command)) return null;
+  if (command.startsWith("python3 -m pytest")) return "python3 -m pytest --version";
+  if (command.startsWith("python -m pytest")) return "python -m pytest --version";
+  if (command.startsWith("pytest")) return "pytest --version";
+  if (command.startsWith("cargo test")) return "cargo --version";
+  if (command.startsWith("go test")) return "go version";
+  return null;
+}
+
+function firstLine(value: string): string {
+  return value.trim().split(/\r?\n/)[0] || "";
 }
 
 async function listTests(cwd: string, options: VerificationOptions): Promise<VerificationReport> {

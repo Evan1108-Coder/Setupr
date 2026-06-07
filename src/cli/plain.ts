@@ -196,38 +196,14 @@ async function plainDoctor(cwd: string, options: PlainOptions = {}): Promise<voi
 
   console.log(chalk.blue.bold("\n  Setupr Doctor\n"));
 
-  // Runtime
+  const checkedCommands = new Set<string>();
+
   if (scan.runtime) {
-    const result = await runCommand(`${scan.runtime.name} --version`, cwd);
-    if (result.exitCode === 0) {
-      console.log(chalk.green(`  ✓ ${scan.runtime.name}: ${result.stdout.trim()}`));
-    } else {
-      printPlainError(classifyCommandFailure({
-        command: `${scan.runtime.name} --version`,
-        cwd,
-        exitCode: result.exitCode,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        stepLabel: `${scan.runtime.name} runtime`,
-      }));
-    }
+    await printVersionCheck(`${scan.runtime.name} runtime`, runtimeVersionCommands(scan.runtime.name), cwd, checkedCommands);
   }
 
-  // PM
   if (scan.packageManager) {
-    const result = await runCommand(`${scan.packageManager} --version`, cwd);
-    if (result.exitCode === 0) {
-      console.log(chalk.green(`  ✓ ${scan.packageManager}: ${result.stdout.trim()}`));
-    } else {
-      printPlainError(classifyCommandFailure({
-        command: `${scan.packageManager} --version`,
-        cwd,
-        exitCode: result.exitCode,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        stepLabel: `${scan.packageManager} package manager`,
-      }));
-    }
+    await printVersionCheck(`${scan.packageManager} package manager`, packageManagerVersionCommands(scan.packageManager), cwd, checkedCommands);
   }
 
   console.log(chalk.dim(`\n  Language: ${scan.language || "unknown"}`));
@@ -293,6 +269,58 @@ async function plainDoctor(cwd: string, options: PlainOptions = {}): Promise<voi
     }
     console.log("");
   }
+}
+
+async function printVersionCheck(label: string, commands: string[], cwd: string, checkedCommands: Set<string>): Promise<void> {
+  const candidates = commands.filter((command) => !checkedCommands.has(command));
+  if (candidates.length === 0) return;
+
+  let lastResult: Awaited<ReturnType<typeof runCommand>> | null = null;
+  for (const command of candidates) {
+    checkedCommands.add(command);
+    const result = await runCommand(command, cwd);
+    lastResult = result;
+    if (result.exitCode === 0) {
+      console.log(chalk.green(`  ✓ ${label}: ${firstLine(result.stdout || result.stderr)}`));
+      return;
+    }
+  }
+
+  const command = candidates[0];
+  printPlainError(classifyCommandFailure({
+    command,
+    cwd,
+    exitCode: lastResult?.exitCode ?? 1,
+    stdout: lastResult?.stdout ?? "",
+    stderr: lastResult?.stderr ?? "",
+    stepLabel: label,
+  }));
+}
+
+function runtimeVersionCommands(runtime: string): string[] {
+  switch (runtime.toLowerCase()) {
+    case "python":
+      return ["python3 --version", "python --version"];
+    case "rust":
+      return ["rustc --version"];
+    case "go":
+      return ["go version"];
+    default:
+      return [`${runtime} --version`];
+  }
+}
+
+function packageManagerVersionCommands(packageManager: string): string[] {
+  switch (packageManager) {
+    case "go":
+      return ["go version"];
+    default:
+      return [`${packageManager} --version`];
+  }
+}
+
+function firstLine(value: string): string {
+  return value.trim().split(/\r?\n/)[0] || "available";
 }
 
 async function plainStart(cwd: string, target: string | undefined, options: PlainOptions): Promise<void> {

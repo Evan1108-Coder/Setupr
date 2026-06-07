@@ -700,6 +700,7 @@ interface LockPackageInfo {
 interface DependencySnapshot {
   packageJson?: PackageJsonInfo;
   lockfile?: any;
+  lockfileError?: string;
   packages: LockPackageInfo[];
 }
 
@@ -729,21 +730,149 @@ async function cmdDepsList(cwd: string) {
   const scan = await scanProject(cwd);
   const pm = scan.packageManager || "npm";
   console.log(chalk.blue(`Dependencies (${pm}):`));
-  const result = await runCommand(`${pm} list --depth=0`, cwd);
+
+  const listCommand = dependencyListCommand(pm);
+  if (!listCommand) {
+    await printDeclaredDependencies(cwd, scan, `No live dependency tree command is configured for ${pm}.`);
+    return;
+  }
+
+  const result = await runCommand(listCommand, cwd);
   if (result.exitCode !== 0) {
-    console.log(chalk.yellow("  Package manager dependency tree is unavailable; showing package.json declarations instead."));
-    const snapshot = await loadDependencySnapshot(cwd);
-    const declared = declaredDependencyRows(snapshot.packageJson);
-    if (declared.length === 0) {
-      printPlainError(classifyCommandFailure({ command: `${pm} list --depth=0`, cwd, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }));
+    const shown = await printDeclaredDependencies(cwd, scan, "Package manager dependency tree is unavailable; showing package.json declarations or ecosystem declarations instead.");
+    if (!shown) {
+      printPlainError(classifyCommandFailure({ command: listCommand, cwd, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }));
       return;
-    }
-    for (const row of declared) {
-      console.log(`  ${row.kind.padEnd(22)} ${row.name}@${row.range}`);
     }
   } else {
     console.log(result.stdout || result.stderr);
   }
+}
+
+function dependencyListCommand(packageManager: string): string | null {
+  switch (packageManager) {
+    case "npm":
+    case "yarn":
+    case "pnpm":
+    case "bun":
+      return `${packageManager} list --depth=0`;
+    case "pip":
+      return "python3 -m pip list || python -m pip list || pip list";
+    case "poetry":
+      return "poetry show --no-dev";
+    case "pipenv":
+      return "pipenv graph";
+    case "go":
+      return "go list -m all";
+    case "cargo":
+      return null;
+    default:
+      return null;
+  }
+}
+
+async function printDeclaredDependencies(cwd: string, scan: Awaited<ReturnType<typeof scanProject>>, reason: string): Promise<boolean> {
+  console.log(chalk.yellow(`  ${reason}`));
+  const rows = await declaredDependencyRowsForProject(cwd, scan);
+  if (rows.length === 0) return false;
+  for (const row of rows) {
+    console.log(`  ${row.kind.padEnd(22)} ${row.name}${row.range ? `@${row.range}` : ""}`);
+  }
+  return true;
+}
+
+async function declaredDependencyRowsForProject(
+  cwd: string,
+  scan: Awaited<ReturnType<typeof scanProject>>
+): Promise<Array<{ kind: string; name: string; range: string }>> {
+  const snapshot = await loadDependencySnapshot(cwd);
+  const nodeRows = declaredDependencyRows(snapshot.packageJson);
+  if (nodeRows.length > 0) return nodeRows;
+
+  if (scan.packageManager === "cargo" || scan.language === "Rust") {
+    return parseCargoDependencies(await readTextFile(join(cwd, "Cargo.toml")));
+  }
+  if (scan.packageManager === "go" || scan.language === "Go") {
+    return parseGoDependencies(await readTextFile(join(cwd, "go.mod")));
+  }
+  if (scan.language === "Python") {
+    return [
+      ...parseRequirementsDependencies(await readTextFile(join(cwd, "requirements.txt"))),
+      ...parsePyprojectDependencies(await readTextFile(join(cwd, "pyproject.toml"))),
+    ];
+  }
+  return [];
+}
+
+async function readTextFile(path: string): Promise<string> {
+  try {
+    return await readFile(path, "utf-8");
+  } catch {
+    return "";
+  }
+}
+
+function parseCargoDependencies(content: string): Array<{ kind: string; name: string; range: string }> {
+  const rows: Array<{ kind: string; name: string; range: string }> = [];
+  let section = "";
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    if (/^\[.+\]$/.test(trimmed)) {
+      section = trimmed;
+      continue;
+    }
+    if (section !== "[dependencies]" && section !== "[dev-dependencies]" && section !== "[build-dependencies]") continue;
+    const match = trimmed.match(/^([A-Za-z0-9_.-]+)\s*=\s*(.+)$/);
+    if (!match) continue;
+    rows.push({ kind: section.slice(1, -1), name: match[1], range: match[2].replace(/^"|"$/g, "") });
+  }
+  return rows.sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
+}
+
+function parseGoDependencies(content: string): Array<{ kind: string; name: string; range: string }> {
+  const rows: Array<{ kind: string; name: string; range: string }> = [];
+  let inRequireBlock = false;
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("//")) continue;
+    if (trimmed.startsWith("require (")) {
+      inRequireBlock = true;
+      continue;
+    }
+    if (inRequireBlock && trimmed === ")") {
+      inRequireBlock = false;
+      continue;
+    }
+    const depLine = inRequireBlock ? trimmed : trimmed.startsWith("require ") ? trimmed.slice("require ".length).trim() : "";
+    if (!depLine) continue;
+    const [name, range] = depLine.split(/\s+/, 2);
+    if (name && range) rows.push({ kind: "require", name, range });
+  }
+  return rows.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function parseRequirementsDependencies(content: string): Array<{ kind: string; name: string; range: string }> {
+  return content.split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && !line.startsWith("-"))
+    .map((line) => {
+      const match = line.match(/^([A-Za-z0-9_.-]+)\s*([<>=!~].*)?$/);
+      return { kind: "requirements", name: match?.[1] || line, range: match?.[2] || "" };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function parsePyprojectDependencies(content: string): Array<{ kind: string; name: string; range: string }> {
+  const rows: Array<{ kind: string; name: string; range: string }> = [];
+  const dependenciesBlock = content.match(/dependencies\s*=\s*\[([\s\S]*?)\]/m)?.[1] || "";
+  for (const raw of dependenciesBlock.split(",")) {
+    const value = raw.trim().replace(/^["']|["']$/g, "");
+    if (!value) continue;
+    const match = value.match(/^([A-Za-z0-9_.-]+)\s*(.*)$/);
+    rows.push({ kind: "pyproject", name: match?.[1] || value, range: match?.[2] || "" });
+  }
+  return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function cmdDepsAudit(cwd: string): Promise<void> {
@@ -758,6 +887,13 @@ async function cmdDepsAudit(cwd: string): Promise<void> {
     } else {
       console.log(chalk.dim("  npm audit did not return JSON. This can happen offline or during registry errors."));
     }
+    return;
+  }
+  if (audit.error) {
+    console.log(chalk.yellow("  Audit unavailable."));
+    console.log(chalk.dim(`  npm audit returned ${audit.error.code || "an error"}${audit.error.summary ? `: ${audit.error.summary}` : ""}`));
+    if (audit.error.detail) console.log(chalk.dim(`  ${audit.error.detail}`));
+    process.exitCode = result.exitCode || 1;
     return;
   }
 
@@ -824,6 +960,8 @@ async function cmdDepsWhy(cwd: string, packageName: string | undefined): Promise
     for (const pkg of locked) {
       console.log(`  - ${pkg.name}${pkg.version ? `@${pkg.version}` : ""} (${pkg.path || "root"})`);
     }
+  } else if (snapshot.lockfileError) {
+    console.log(chalk.yellow(`\n  package-lock.json could not be parsed; transitive signal is limited. ${snapshot.lockfileError}`));
   } else if (!snapshot.lockfile) {
     console.log(chalk.yellow("\n  No package-lock.json found; transitive signal is limited."));
   } else {
@@ -845,7 +983,9 @@ async function cmdDepsLicenses(cwd: string): Promise<void> {
   const snapshot = await loadDependencySnapshot(cwd);
   console.log(chalk.blue.bold("\n  Dependency Licenses\n"));
 
-  if (!snapshot.lockfile && snapshot.packages.length === 0) {
+  if (snapshot.lockfileError) {
+    console.log(chalk.yellow(`  package-lock.json could not be parsed; license signal is limited. ${snapshot.lockfileError}`));
+  } else if (!snapshot.lockfile && snapshot.packages.length === 0) {
     console.log(chalk.yellow("  No package-lock.json found; license signal is limited."));
   }
 
@@ -872,10 +1012,12 @@ async function cmdDepsLicenses(cwd: string): Promise<void> {
 
 async function loadDependencySnapshot(cwd: string): Promise<DependencySnapshot> {
   const packageJson = await readJsonFile<PackageJsonInfo>(join(cwd, "package.json"));
-  const lockfile = await readJsonFile<any>(join(cwd, "package-lock.json"));
+  const lockfileResult = await readJsonFileWithError<any>(join(cwd, "package-lock.json"));
+  const lockfile = lockfileResult.value;
   return {
     packageJson,
     lockfile,
+    lockfileError: lockfileResult.exists && !lockfileResult.ok ? lockfileResult.error : undefined,
     packages: collectLockPackages(lockfile),
   };
 }
@@ -885,6 +1027,20 @@ async function readJsonFile<T>(path: string): Promise<T | undefined> {
     return JSON.parse(await readFile(path, "utf-8")) as T;
   } catch {
     return undefined;
+  }
+}
+
+async function readJsonFileWithError<T>(path: string): Promise<{ ok: boolean; exists: boolean; value?: T; error?: string }> {
+  try {
+    return { ok: true, exists: true, value: JSON.parse(await readFile(path, "utf-8")) as T };
+  } catch (err) {
+    const code = (err as { code?: string } | undefined)?.code;
+    if (code === "ENOENT") return { ok: false, exists: false };
+    return {
+      ok: false,
+      exists: true,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
