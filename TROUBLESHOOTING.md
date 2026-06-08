@@ -101,7 +101,7 @@ Raw API keys and token-like values are masked in error output and AI context.
 
 **Fix**: Use npx instead:
 ```bash
-npx setupr
+npx @evan-coder/setupr
 ```
 
 Or fix npm permissions: https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally

@@ -11,7 +11,7 @@
 ### Via npx (recommended)
 
 ```bash
-npx setupr
+npx @evan-coder/setupr
 ```
 
 This runs Setupr without installing it globally.
@@ -19,10 +19,10 @@ This runs Setupr without installing it globally.
 ### Global Installation
 
 ```bash
-npm install -g setupr
+npm install -g @evan-coder/setupr
 ```
 
-After installation, the `setup` command is available globally:
+After installation, the `setupr` and legacy `setup` commands are available globally:
 
 ```bash
 setup
@@ -57,7 +57,7 @@ node dist/setup.js --help
 ## First Run
 
 1. Navigate to any project directory
-2. Run `setup` (or `npx setupr`)
+2. Run `setupr` (or `npx @evan-coder/setupr`)
 3. Setupr will:
    - Display a pre-execution warning
    - Ask you to confirm (press Enter)

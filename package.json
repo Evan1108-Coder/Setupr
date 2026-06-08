@@ -1,5 +1,5 @@
 {
-  "name": "setupr",
+  "name": "@evan-coder/setupr",
   "version": "1.0.0",
   "description": "Intelligent project setup & management CLI. Auto-detects your stack, installs dependencies, configures environments, and keeps projects healthy.",
   "type": "module",
@@ -12,8 +12,11 @@
   },
   "homepage": "https://github.com/Evan1108-Coder/Setupr#readme",
   "bin": {
-    "setupr": "./dist/setup.js",
-    "setup": "./dist/setup.js"
+    "setupr": "dist/setup.js",
+    "setup": "dist/setup.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist/",

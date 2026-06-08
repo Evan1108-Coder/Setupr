@@ -5,14 +5,16 @@ Intelligent project setup & management CLI. Auto-detects your stack, installs de
 ## Installation
 
 ```bash
-npx setupr
+npx @evan-coder/setupr
 ```
 
 Or install globally:
 
 ```bash
-npm install -g setupr
+npm install -g @evan-coder/setupr
 ```
+
+The npm package is published under the owned scope `@evan-coder/setupr`, but the installed terminal command is still `setupr`.
 
 ## Quick Start
 
@@ -507,12 +509,13 @@ That does not replace manual iTerm2/Ghostty visual QA, but it catches obvious TU
 For a local package/install smoke before publishing:
 
 ```bash
-npm pack
-npm exec --yes --package ./setupr-1.0.0.tgz -- setupr --version
-npx --yes file:$(pwd)/setupr-1.0.0.tgz --version
+pkg=$(npm pack --silent)
+npm exec --yes --package "./$pkg" -- setupr --version
+npx --yes "file:$(pwd)/$pkg" --version
+npm publish --dry-run
 ```
 
-Use `file:` or `--package` for tarball checks. A bare `npx ./setupr-1.0.0.tgz` is treated like an executable file path and will fail with a permission error.
+Use `file:` or `--package` for tarball checks. A bare `npx ./$pkg` is treated like an executable file path and will fail with a permission error. Scoped packages must be public when published, so `package.json` includes `publishConfig.access = "public"`.
 
 ## License
 
