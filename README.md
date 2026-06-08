@@ -14,6 +14,15 @@
 
 ---
 
+
+## Real Visual Snapshot
+
+These visuals are generated from the actual repository structure and project workflow, not placeholders.
+
+![Repository file mix](docs/assets/repo-file-mix.svg)
+
+![Project workflow](docs/assets/workflow.svg)
+
 > Status: beta. Setupr is usable as a CLI today, but some stack-specific setup paths still need more real-world testing.
 
 Setupr is for developers who clone projects often and do not want to manually guess install commands, runtime versions, environment files, ports, or verification steps.
