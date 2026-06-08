@@ -1,5 +1,19 @@
 # Setupr
 
+> AI-powered CLI that detects project stacks, plans setup, installs dependencies, configures environments, and verifies local health.
+
+![Status](https://img.shields.io/badge/status-beta-6b7280) ![License](https://img.shields.io/github/license/Evan1108-Coder/Setupr) ![CI](https://img.shields.io/github/actions/workflow/status/Evan1108-Coder/Setupr/ci.yml?branch=main&label=CI)
+
+**TypeScript CLI • stack detection • setup automation • project doctor**
+
+## At a Glance
+
+- Real project documentation now includes security, contribution, changelog, CI, and issue/PR workflows.
+- Maintenance snapshot: see [docs/project-snapshot.md](docs/project-snapshot.md) for a generated file-mix chart and repository checklist.
+- Public repo: https://github.com/Evan1108-Coder/Setupr
+
+---
+
 > Status: beta. Setupr is usable as a CLI today, but some stack-specific setup paths still need more real-world testing.
 
 Setupr is for developers who clone projects often and do not want to manually guess install commands, runtime versions, environment files, ports, or verification steps.
