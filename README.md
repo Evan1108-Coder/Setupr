@@ -2,13 +2,13 @@
 
 > AI-powered CLI that detects project stacks, plans setup, installs dependencies, configures environments, and verifies local health.
 
-![Status](https://img.shields.io/badge/status-beta-6b7280) ![License](https://img.shields.io/github/license/Evan1108-Coder/Setupr) ![CI](https://img.shields.io/github/actions/workflow/status/Evan1108-Coder/Setupr/ci.yml?branch=main&label=CI)
+![Status](https://img.shields.io/badge/status-beta-6b7280) ![License](https://img.shields.io/github/license/Evan1108-Coder/Setupr)
 
 **TypeScript CLI • stack detection • setup automation • project doctor**
 
 ## At a Glance
 
-- Real project documentation now includes security, contribution, changelog, CI, and issue/PR workflows.
+- Real project documentation now includes security guidance, contribution notes, issue/PR templates, and real visual snapshots.
 - Maintenance snapshot: see [docs/project-snapshot.md](docs/project-snapshot.md) for a generated file-mix chart and repository checklist.
 - Public repo: https://github.com/Evan1108-Coder/Setupr
 

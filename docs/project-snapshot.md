@@ -22,9 +22,8 @@ pie title Source/documentation file mix
 ## Maintenance Checklist
 
 - README describes purpose, setup, and limitations.
-- CI runs baseline install/test/build checks where applicable.
 - SECURITY.md explains vulnerability and secret handling.
-- CHANGELOG.md tracks public changes.
+- CHANGELOG.md is maintained for this versioned tool.
 - Issue and PR templates are available.
 
 ## Real Test Snapshot
