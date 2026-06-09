@@ -18,7 +18,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ["18", "20", "22"]
+        # The dev/test toolchain (vitest 4 via rolldown) requires Node 20+
+        # (it imports `styleText` from node:util, added in Node 20). The published
+        # CLI bundle still targets Node 18, but CI builds and tests on 20/22.
+        node: ["20", "22"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
