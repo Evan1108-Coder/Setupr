@@ -5,6 +5,7 @@ import { runCommand } from "../executor/index.js";
 import { parseEnvKeys, parseEnvPairs } from "../env/index.js";
 import { scanProject } from "../scanner/index.js";
 import { appendHistoryEvent, readProjectJson, writeProjectJson } from "../state/project.js";
+import { shellQuote } from "../util/shell.js";
 
 export type SecuritySeverity = "info" | "low" | "medium" | "high" | "critical";
 export type SecurityCategory = "deps" | "secrets" | "env" | "docker" | "ci" | "code" | "routes" | "auth" | "headers" | "config";
@@ -421,8 +422,4 @@ function score(findings: SecurityFinding[]): number {
 
 function redact(text: string): string {
   return text.replace(/[A-Za-z0-9_/-]{16,}/g, "****").slice(0, 180);
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
 }
