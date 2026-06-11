@@ -17,6 +17,24 @@ export interface ExecutionResult {
   duration: number;
 }
 
+// Per-step wall-clock limits so a hung command (stuck install, prompt waiting on stdin,
+// unreachable registry) can never block the setup run forever. Override with the
+// SETUPR_STEP_TIMEOUT_MS env var (applies to every command step).
+const DEFAULT_STEP_TIMEOUT_MS: Record<SetupStep["type"], number> = {
+  runtime: 600_000, // installing/switching runtimes can be slow
+  deps: 600_000, // package installs on large projects
+  script: 600_000, // build/postinstall scripts
+  config: 120_000,
+  env: 120_000,
+  verify: 120_000,
+};
+
+export function stepTimeoutMs(step: SetupStep): number {
+  const override = Number(process.env.SETUPR_STEP_TIMEOUT_MS);
+  if (Number.isFinite(override) && override > 0) return override;
+  return DEFAULT_STEP_TIMEOUT_MS[step.type] ?? 300_000;
+}
+
 export async function executeStep(
   step: SetupStep,
   cwd: string,
@@ -64,6 +82,8 @@ export async function executeStep(
 
   store.getState().addLog({ content: step.command, type: "command" });
 
+  const timeoutMs = stepTimeoutMs(step);
+
   try {
     const result = await runCommand(step.command, cwd, (line) => {
       store.getState().addLog({ content: line, type: "progress" });
@@ -71,7 +91,7 @@ export async function executeStep(
         role: "system",
         content: `[${step.label}] ${line}`,
       });
-    });
+    }, undefined, { timeoutMs });
 
     const duration = Date.now() - start;
     const durationStr = duration < 1000 ? `${duration}ms` : `${(duration / 1000).toFixed(1)}s`;
@@ -81,19 +101,28 @@ export async function executeStep(
       store.getState().addLog({ content: `✓ ${step.label} — OK (${durationStr})`, type: "success" });
       return { success: true, output: result.stdout, duration };
     } else {
+      if (result.timedOut) {
+        store.getState().addLog({
+          content: `✗ ${step.label} — timed out after ${Math.round(timeoutMs / 1000)}s and was terminated`,
+          type: "error",
+        });
+      }
+      const stderr = result.timedOut
+        ? `Command timed out after ${Math.round(timeoutMs / 1000)}s and was terminated.\n${result.stderr}`.trim()
+        : result.stderr;
       const psetupError = classifyCommandFailure({
         command: step.command,
         cwd,
         exitCode: result.exitCode,
         stdout: result.stdout,
-        stderr: result.stderr,
+        stderr,
         stepLabel: step.label,
         stepType: step.type,
       });
       store.getState().updateStep(step.id, { status: "failed", error: psetupError.title });
       store.getState().addLog({ content: `✗ ${step.label} — ${errorSummary(psetupError)}`, type: "error" });
       store.getState().addMessage({ role: "system", content: errorSummary(psetupError) });
-      return { success: false, output: result.stdout, error: result.stderr, psetupError, duration };
+      return { success: false, output: result.stdout, error: stderr, psetupError, duration };
     }
   } catch (err) {
     const duration = Date.now() - start;

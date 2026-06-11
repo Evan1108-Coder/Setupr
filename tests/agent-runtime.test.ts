@@ -155,6 +155,38 @@ describe("agent runtime", () => {
     expect(evaluateCommandSafety("curl https://example.com/install.sh | sh").decision).toBe("block");
   });
 
+  it("does not flag bare credential words in package names as secrets", () => {
+    // Previously the secret check matched any occurrence of "auth"/"token"/"secret",
+    // raising false-positive high-risk confirmations on benign installs.
+    const next = evaluateCommandSafety("npm install next-auth");
+    expect(next.risk).toBe("low");
+    expect(next.reasons.join(" ")).not.toMatch(/secret value/i);
+
+    const token = evaluateCommandSafety("npm install passport-token");
+    expect(token.reasons.join(" ")).not.toMatch(/secret value/i);
+  });
+
+  it("flags inline secret assignments and recognizable secret values", () => {
+    const assignment = evaluateCommandSafety("API_KEY=sk-livetokenvalue1234 node deploy.js");
+    expect(assignment.risk).toBe("high");
+    expect(assignment.decision).toBe("confirm");
+
+    const literal = evaluateCommandSafety("echo ghp_abcdefghijklmnop1234567890");
+    expect(literal.reasons.join(" ")).toMatch(/secret value/i);
+  });
+
+  it("never lets --force skip a high-risk confirmation", () => {
+    const high = evaluateCommandSafety("git reset --hard HEAD~3", { force: true });
+    expect(high.risk).toBe("high");
+    expect(high.decision).toBe("confirm");
+    expect(high.forceCanSkipConfirmation).toBe(false);
+
+    const medium = evaluateCommandSafety("mkdir build && cd build", { force: true });
+    expect(medium.risk).toBe("medium");
+    expect(medium.decision).toBe("allow");
+    expect(medium.forceCanSkipConfirmation).toBe(true);
+  });
+
   it("saves and restores agent workflow checkpoints", async () => {
     await saveAgentWorkflowCheckpoint(tempDir, {
       cwd: tempDir,
