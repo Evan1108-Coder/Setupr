@@ -144,7 +144,9 @@ export class ProjectEngine {
       decision: risk === "high" || risk === "medium" ? "confirm" : "allow",
       risk: risk === "none" ? "none" : risk,
       reasons,
-      forceCanSkipConfirmation: risk !== "high",
+      // Consistent with agent/safety.ts: --force only skips the medium-risk confirmation;
+      // high risk always confirms.
+      forceCanSkipConfirmation: risk === "medium",
     };
   }
 

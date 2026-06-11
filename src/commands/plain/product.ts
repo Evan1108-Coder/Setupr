@@ -8,6 +8,7 @@ import { createSetuprError, printPlainError } from "../../errors/index.js";
 import { scanProject } from "../../scanner/index.js";
 import { collectContext } from "../../context/collector.js";
 import { collectDashboardStatus } from "../../status/collector.js";
+import { shellQuote } from "../../util/shell.js";
 
 interface ProductFlags {
   args?: string[];
@@ -230,8 +231,4 @@ function parseGitHubRepo(remote: string): string | null {
   if (ssh) return ssh[1];
   const https = remote.match(/github\.com\/([^/]+\/[^/.]+)(?:\.git)?$/);
   return https?.[1] || null;
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
 }

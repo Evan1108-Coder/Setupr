@@ -1,6 +1,6 @@
 {
   "name": "@evan-coder/setupr",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Intelligent project setup & management CLI. Auto-detects your stack, installs dependencies, configures environments, and keeps projects healthy.",
   "type": "module",
   "repository": {

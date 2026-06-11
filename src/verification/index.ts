@@ -4,6 +4,7 @@ import { basename, dirname, extname, join } from "path";
 import { runCommand } from "../executor/index.js";
 import { scanProject, type ScanResult } from "../scanner/index.js";
 import { appendHistoryEvent, readProjectJson, writeProjectJson } from "../state/project.js";
+import { shellQuote } from "../util/shell.js";
 
 export type VerificationStatus = "pass" | "warn" | "fail" | "skip";
 
@@ -469,10 +470,6 @@ function statusFromChecks(checks: VerificationCheck[]): VerificationReport["stat
 
 function dedupe(values: string[]): string[] {
   return [...new Set(values)];
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 function safeName(file: string): string {
