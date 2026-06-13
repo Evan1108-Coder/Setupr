@@ -119,7 +119,7 @@ async function chatOpenAICompatible(
   signal?: AbortSignal
 ): Promise<{ content: string; tokens: number; model: string }> {
   const response = await client.chat.completions.create({
-    model: model.id,
+    model: model.upstreamId ?? model.id,
     messages,
     temperature: options?.temperature ?? 0.3,
     max_tokens: options?.maxTokens ?? 2048,

@@ -46,11 +46,11 @@ describe("setupr chat", () => {
 
   it("can steer model choice from plain chat", async () => {
     env.MINIMAX_API_KEY = "minimax-test-key";
-    const answer = await askProjectChat(tempDir, "switch model to minimax-m2.5-lightning");
+    const answer = await askProjectChat(tempDir, "switch model to minimax-m2.5");
 
     expect(answer.action).toBe("model.switch");
-    expect(env.P_SETUP_AI_MODEL).toBe("minimax-m2.5-lightning");
-    expect(answer.text).toContain("Switched to minimax-m2.5-lightning");
+    expect(env.P_SETUP_AI_MODEL).toBe("minimax-m2.5");
+    expect(answer.text).toContain("Switched to minimax-m2.5");
   });
 
   it("records chat logs with secrets redacted", async () => {

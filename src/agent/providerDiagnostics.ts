@@ -14,7 +14,7 @@ export const PROVIDER_PROFILES: Record<AIProvider, ProviderProfile> = {
   anthropic: { provider: "anthropic", timeoutMs: 45000, retries: 2, fallbackModels: ["claude-haiku-4-5", "claude-sonnet-4-6"], retryableStatuses: [408, 429, 500, 502, 503, 504] },
   google: { provider: "google", timeoutMs: 30000, retries: 2, fallbackModels: ["gemini-2.5-flash-lite", "gemini-3-flash"], retryableStatuses: [408, 429, 500, 502, 503, 504] },
   groq: { provider: "groq", timeoutMs: 20000, retries: 2, fallbackModels: ["llama-4-scout", "llama-3.3-70b"], retryableStatuses: [408, 429, 500, 502, 503, 504] },
-  minimax: { provider: "minimax", timeoutMs: 30000, retries: 2, fallbackModels: ["minimax-m2.5-lightning", "minimax-m2.7"], retryableStatuses: [408, 429, 500, 502, 503, 504] },
+  minimax: { provider: "minimax", timeoutMs: 30000, retries: 2, fallbackModels: ["minimax-m2.5", "minimax-m2.7"], retryableStatuses: [408, 429, 500, 502, 503, 504] },
   moonshot: { provider: "moonshot", timeoutMs: 45000, retries: 1, fallbackModels: ["kimi-k2-turbo-preview", "moonshot-v1-128k", "kimi-latest"], retryableStatuses: [408, 429, 500, 502, 503, 504] },
   github: { provider: "github", timeoutMs: 30000, retries: 2, fallbackModels: ["openai/gpt-4.1-mini", "openai/gpt-4o-mini", "openai/gpt-4.1"], retryableStatuses: [408, 429, 500, 502, 503, 504] },
 };

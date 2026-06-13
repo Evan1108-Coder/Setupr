@@ -15,10 +15,15 @@ import {
 } from "../src/ai/models.js";
 
 const requestedModels = [
+  "gpt-5.5-pro",
+  "gpt-5.5",
+  "gpt-5.5-mini",
   "gpt-5.4-pro",
   "gpt-5.4-mini",
   "gpt-4o",
   "gpt-4o-mini",
+  "claude-opus-4-7",
+  "claude-sonnet-4-7",
   "claude-opus-4-6",
   "claude-sonnet-4-6",
   "claude-haiku-4-5",
@@ -29,8 +34,9 @@ const requestedModels = [
   "llama-4-maverick",
   "llama-4-scout",
   "llama-3.3-70b",
+  "minimax-m3",
+  "minimax-m2.5",
   "minimax-m2.7",
-  "minimax-m2.5-lightning",
   "kimi-latest",
   "kimi-k2-thinking",
   "kimi-k2-turbo-preview",

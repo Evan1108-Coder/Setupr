@@ -50,15 +50,15 @@ describe("AI director", () => {
     const store = createAppStore(tempDir);
 
     await handleDirectorInput({
-      text: "please switch the model to minimax-m2.5-lightning",
+      text: "please switch the model to minimax-m2.5",
       cwd: tempDir,
       scan,
       contextDSL: "js/react/npm",
       store,
     });
 
-    expect(env.P_SETUP_AI_MODEL).toBe("minimax-m2.5-lightning");
-    expect(store.getState().messages.at(-1)?.content).toContain("Switched to minimax-m2.5-lightning");
+    expect(env.P_SETUP_AI_MODEL).toBe("minimax-m2.5");
+    expect(store.getState().messages.at(-1)?.content).toContain("Switched to minimax-m2.5");
   });
 
   it("can switch to a GitHub Models catalog id mentioned later in the sentence", async () => {

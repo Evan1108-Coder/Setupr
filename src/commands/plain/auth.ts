@@ -439,7 +439,7 @@ function ask(question: string): Promise<string> {
 
 function preferredTestModel(provider: AIProvider) {
   if (provider === "github") return MODELS.find((model) => model.id === "openai/gpt-4.1-mini")!;
-  if (provider === "minimax") return MODELS.find((model) => model.id === "minimax-m2.5-lightning")!;
+  if (provider === "minimax") return MODELS.find((model) => model.id === "minimax-m2.5")!;
   if (provider === "moonshot") return MODELS.find((model) => model.id === "kimi-latest")!;
   return MODELS.find((model) => model.provider === provider)!;
 }
