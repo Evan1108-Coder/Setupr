@@ -28,6 +28,26 @@ These visuals are generated from the actual repository structure and project wor
 
 ![Project workflow](docs/assets/workflow.svg)
 
+## Screenshots
+
+Real output captured from the Setupr CLI (`@evan-coder/setupr`) running against this repository.
+
+**`setupr status` — project health, git, env, processes, and recent history at a glance:**
+
+![setupr status](docs/images/screenshot-status.png)
+
+**`setupr doctor` — runtime, package-manager, and AI-director environment diagnosis:**
+
+![setupr doctor](docs/images/screenshot-doctor.png)
+
+**`setupr health` — full project health check with a pass/warn/fail score:**
+
+![setupr health](docs/images/screenshot-health.png)
+
+**`setupr status --json` — machine-readable output for CI/CD and scripting:**
+
+![setupr status --json](docs/images/screenshot-json.png)
+
 ## Architecture
 
 ![Architecture](docs/images/architecture.jpg)
