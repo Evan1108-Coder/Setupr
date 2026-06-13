@@ -19,6 +19,7 @@ coverage/
 # Local visual smoke-test artifacts
 tui-screenshots/
 tui-live-screenshots/
+tui-pty-screenshots/
 tui-live-test-project/
 tui-empty-test-project/
 .setupr/secrets.key

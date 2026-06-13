@@ -3,7 +3,7 @@ import { Box, Text, useApp } from "ink";
 import { getDefaultModel, getProviderEnvValue, getProviderKeySource, MODELS, PROVIDERS, type AIProvider } from "../../ai/models.js";
 import { AUTH_PROVIDERS, maskApiKey } from "../../auth/secrets.js";
 import { Panel } from "../components/Panel.js";
-import { KVRow, TuiFooter, TuiHeader } from "../components/TuiFrame.js";
+import { KVRow, TooSmallTerminal, TuiFooter, TuiHeader, isTerminalTooSmall } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { colors, layout as tuiLayout } from "../theme.js";
@@ -35,10 +35,14 @@ export function AuthLayout() {
   });
   const availableModels = MODELS.filter((model) => getProviderEnvValue(model.provider));
   const focusItems = useMemo(
-    () => buildFocusItems(layout),
+    () => buildAuthFocusItems(layout),
     [layout]
   );
   const focus = useFocusNavigation({ items: focusItems, onQuit: () => exit() });
+
+  if (isTerminalTooSmall(terminal.width, terminal.height)) {
+    return <TooSmallTerminal command="setupr auth" width={terminal.width} height={terminal.height} />;
+  }
 
   if (layout.mode === "compact") {
     return (
@@ -95,10 +99,10 @@ export function AuthLayout() {
         </Box>
 
         <Box flexDirection="column" width={layout.stacked ? "100%" : layout.actions.width} height={layout.actions.height} gap={tuiLayout.panelGap}>
-          <Panel title="Test Results" focusState={focus.focusState("tests")} width="100%" height={layout.stacked ? Math.max(6, Math.floor(layout.actions.height * 0.46)) : Math.max(8, Math.floor((layout.actions.height - tuiLayout.panelGap) * 0.48))}>
+          <Panel title="Test Results" focusState={focus.focusState("tests")} width="100%" height={layout.stacked ? stackedAuthActionHeights(layout.actions.height).testsHeight : Math.max(8, Math.floor((layout.actions.height - tuiLayout.panelGap) * 0.48))}>
             <TestResults rows={rows} activeModelProvider={activeModel.provider} />
           </Panel>
-          <Panel title="Secure Storage" focusState={focus.focusState("storage")} width="100%" flexGrow={1} minHeight={6}>
+          <Panel title="Secure Storage" focusState={focus.focusState("storage")} width="100%" height={layout.stacked ? stackedAuthActionHeights(layout.actions.height).storageHeight : undefined} flexGrow={layout.stacked ? undefined : 1} minHeight={layout.stacked ? undefined : 6}>
             <StoragePanel />
           </Panel>
         </Box>
@@ -191,7 +195,7 @@ interface AuthLayoutGeometry {
   actions: { x: number; y: number; width: number; height: number };
 }
 
-function buildAuthLayout(width: number, height: number): AuthLayoutGeometry {
+export function buildAuthLayout(width: number, height: number): AuthLayoutGeometry {
   const contentHeight = Math.max(8, height - 2);
   const gap = tuiLayout.panelGap;
   const compact = width < 96 || contentHeight < 18;
@@ -212,8 +216,8 @@ function buildAuthLayout(width: number, height: number): AuthLayoutGeometry {
 
   const stacked = width < 118 || contentHeight < 22;
   if (stacked) {
-    const providerHeight = clamp(Math.floor(contentHeight * 0.42), 6, Math.max(6, contentHeight - 8));
-    const modelHeight = clamp(Math.floor(contentHeight * 0.30), 5, Math.max(5, contentHeight - providerHeight - 4));
+    const providerHeight = clamp(Math.floor(contentHeight * 0.36), 6, Math.max(6, contentHeight - 13));
+    const modelHeight = clamp(Math.floor(contentHeight * 0.26), 5, Math.max(5, contentHeight - providerHeight - 8));
     const actionsHeight = Math.max(4, contentHeight - providerHeight - modelHeight - gap * 2);
     return {
       width,
@@ -244,18 +248,19 @@ function buildAuthLayout(width: number, height: number): AuthLayoutGeometry {
   };
 }
 
-function buildFocusItems(layout: AuthLayoutGeometry): FocusItem[] {
+export function buildAuthFocusItems(layout: AuthLayoutGeometry): FocusItem[] {
   if (layout.mode === "compact") {
     return [
       { id: "overview", row: 0, column: 0, bounds: layout.providers },
     ];
   }
   if (layout.stacked) {
+    const { testsHeight, storageHeight } = stackedAuthActionHeights(layout.actions.height);
     return [
       { id: "providers", row: 0, column: 0, bounds: layout.providers },
       { id: "model", row: 1, column: 0, bounds: layout.model },
-      { id: "tests", row: 2, column: 0, bounds: layout.actions },
-      { id: "storage", row: 3, column: 0, bounds: layout.actions },
+      { id: "tests", row: 2, column: 0, bounds: { ...layout.actions, height: testsHeight } },
+      { id: "storage", row: 3, column: 0, bounds: { ...layout.actions, y: layout.actions.y + testsHeight + tuiLayout.panelGap, height: storageHeight } },
     ];
   }
   return [
@@ -265,6 +270,21 @@ function buildFocusItems(layout: AuthLayoutGeometry): FocusItem[] {
     { id: "tests", row: 0, column: 2, bounds: { ...layout.actions, height: Math.max(8, Math.floor((layout.actions.height - tuiLayout.panelGap) * 0.48)) } },
     { id: "storage", row: 1, column: 2, bounds: { ...layout.actions, y: layout.actions.y + Math.max(8, Math.floor((layout.actions.height - tuiLayout.panelGap) * 0.48)) + tuiLayout.panelGap, height: Math.max(6, layout.actions.height - Math.max(8, Math.floor((layout.actions.height - tuiLayout.panelGap) * 0.48)) - tuiLayout.panelGap) } },
   ];
+}
+
+function stackedAuthActionHeights(actionHeight: number) {
+  if (actionHeight <= 8) {
+    const testsHeight = Math.max(3, Math.floor((actionHeight - tuiLayout.panelGap) * 0.55));
+    return {
+      testsHeight,
+      storageHeight: Math.max(2, actionHeight - testsHeight - tuiLayout.panelGap),
+    };
+  }
+  const testsHeight = Math.max(5, Math.floor((actionHeight - tuiLayout.panelGap) * 0.48));
+  return {
+    testsHeight,
+    storageHeight: Math.max(3, actionHeight - testsHeight - tuiLayout.panelGap),
+  };
 }
 
 function distributeWidths(total: number, weights: number[], mins: number[]): number[] {

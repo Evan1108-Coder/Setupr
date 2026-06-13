@@ -85,7 +85,7 @@ export async function collectDashboardStatus(cwd: string): Promise<DashboardStat
     scanError = humanError(err);
   }
 
-  const [git, env, processes, history, logs, projectState, verificationSummary, securitySummary] = await Promise.all([
+  const [git, env, processes, rawHistory, rawLogs, projectState, verificationSummary, securitySummary] = await Promise.all([
     collectGitStatus(cwd),
     collectEnvStatus(cwd),
     collectProcessStatus(cwd),
@@ -108,6 +108,8 @@ export async function collectDashboardStatus(cwd: string): Promise<DashboardStat
     topFindings: securitySummary.topFindings,
   };
   const health = computeHealth({ scan, scanError, hasProject, git, env, dependencies, processes, verification, security });
+  const history = normalizeProjectEvents(rawHistory);
+  const logs = normalizeProjectEvents(rawLogs);
 
   return {
     cwd,
@@ -347,13 +349,35 @@ function stateHistory(state: JsonObject): ProjectEvent[] {
   const raw = Array.isArray(state.history) ? state.history : [];
   return raw
     .filter((entry): entry is JsonObject => Boolean(entry && typeof entry === "object" && !Array.isArray(entry)))
-    .map((entry) => ({
-      type: String(entry.type || "history"),
-      timestamp: typeof entry.timestamp === "number" ? entry.timestamp : Date.now(),
-      message: typeof entry.message === "string" ? entry.message : undefined,
-      data: undefined,
-    }))
+    .map((entry) => normalizeProjectEvent(entry))
+    .filter((entry): entry is ProjectEvent => Boolean(entry))
     .slice(-8);
+}
+
+function normalizeProjectEvents(events: ProjectEvent[]): ProjectEvent[] {
+  return events
+    .map((event) => normalizeProjectEvent(event as unknown as JsonObject))
+    .filter((event): event is ProjectEvent => Boolean(event));
+}
+
+function normalizeProjectEvent(entry: JsonObject): ProjectEvent | null {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+
+  const type = stringValue(entry.type)
+    || (stringValue(entry.status) ? `history.${stringValue(entry.status)}` : "")
+    || (stringValue(entry.command) ? "command" : "history");
+  const message = stringValue(entry.message) || stringValue(entry.command) || type;
+
+  return {
+    type,
+    timestamp: typeof entry.timestamp === "number" ? entry.timestamp : Date.now(),
+    message,
+    data: undefined,
+  };
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
 }
 
 export async function detectScriptCommand(cwd: string, names: string[]): Promise<string | null> {

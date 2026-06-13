@@ -32,8 +32,8 @@ export function HeaderBar({
   checkpointSaved,
 }: HeaderBarProps) {
   return (
-    <Box width="100%" justifyContent="space-between">
-      <Box>
+    <Box width="100%" minWidth={0} justifyContent="space-between">
+      <Box minWidth={0} flexShrink={1}>
         <Text color={colors.accent}>◆ </Text>
         <Text color={colors.textBright} bold>{projectName}</Text>
         <Text color={colors.textDim}>{"  "}</Text>
@@ -42,7 +42,7 @@ export function HeaderBar({
         <Text color={colors.textDim}>{"  "}</Text>
         <Text color={colors.text}>Step {stepNum}/{totalSteps} — {currentStep}</Text>
       </Box>
-      <Box>
+      <Box flexShrink={0}>
         <Text color={colors.textDim}>Elapsed </Text>
         <Text color={colors.text}>{formatTime(elapsed)}</Text>
         {eta !== undefined && (

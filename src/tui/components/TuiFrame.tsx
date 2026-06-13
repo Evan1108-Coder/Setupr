@@ -1,6 +1,32 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { colors, icons, shortcuts } from "../theme.js";
+import { Panel } from "./Panel.js";
+
+export const MIN_TUI_WIDTH = 60;
+export const MIN_TUI_HEIGHT = 18;
+
+export function isTerminalTooSmall(width: number, height: number): boolean {
+  return width < MIN_TUI_WIDTH || height < MIN_TUI_HEIGHT;
+}
+
+export function TooSmallTerminal({ command, width, height }: { command: string; width: number; height: number }) {
+  return (
+    <Box flexDirection="column" width={width} height={height}>
+      <TuiHeader command={command} title="terminal too small" status={`${width}x${height}`} statusColor={colors.warning} width={width} />
+      <Box flexGrow={1} overflow="hidden">
+        <Panel title="Resize Terminal" focusState="focused" width="100%" height="100%">
+          <Text color={colors.warning} bold wrap="truncate">Terminal is too small for this TUI.</Text>
+          <Text color={colors.textDim} wrap="truncate">
+            Minimum supported size is {MIN_TUI_WIDTH}x{MIN_TUI_HEIGHT}. Current size is {width}x{height}.
+          </Text>
+          <Text color={colors.textDim} wrap="truncate">Enlarge the terminal or use --plain / --no-tui.</Text>
+        </Panel>
+      </Box>
+      <TuiFooter width={width} left="Ctrl+C abort · resize terminal · --plain for non-interactive output" />
+    </Box>
+  );
+}
 
 interface TuiHeaderProps {
   command: string;

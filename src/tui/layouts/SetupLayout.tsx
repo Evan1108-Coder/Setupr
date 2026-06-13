@@ -4,7 +4,7 @@ import { ChatInput } from "../components/ChatInput.js";
 import { EnvInput } from "../components/EnvInput.js";
 import { Panel } from "../components/Panel.js";
 import { PromptCard } from "../components/PromptCard.js";
-import { TuiFooter, TuiHeader } from "../components/TuiFrame.js";
+import { TooSmallTerminal, TuiFooter, TuiHeader, isTerminalTooSmall } from "../components/TuiFrame.js";
 import { Timeline, type TimelineEvent } from "../components/Timeline.js";
 import { useAppStore } from "../hooks/useStore.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
@@ -131,6 +131,10 @@ export function SetupLayout({ store }: SetupLayoutProps) {
   const needInput = envVars.filter((v) => v.status === "pending").length;
   const remainingEnv = envVars.filter((v) => v.status === "pending").length;
 
+  if (isTerminalTooSmall(terminal.width, terminal.height)) {
+    return <TooSmallTerminal command="setupr setup" width={terminal.width} height={terminal.height} />;
+  }
+
   return (
     <Box flexDirection="column" width={terminal.width} height={terminal.height}>
       <Header
@@ -234,7 +238,7 @@ interface Layout {
   sideWidth: number;
 }
 
-function buildLayout(width: number, height: number): Layout {
+export function buildLayout(width: number, height: number): Layout {
   const stacked = width < 118 || height < 24;
   const gap = tuiLayout.panelGap;
   const infoHeight = stacked ? 0 : clamp(Math.floor(height * 0.27), 8, 12);
@@ -250,7 +254,7 @@ function buildLayout(width: number, height: number): Layout {
   return { width, height, stacked, infoHeight, mainHeight, footerY, infoWidths, mainWidth, sideWidth };
 }
 
-function buildFocusItems(layout: Layout): FocusItem[] {
+export function buildFocusItems(layout: Layout): FocusItem[] {
   if (layout.stacked) {
     const { projectHeight, stepHeight, diaryHeight, noticesHeight } = stackedSectionHeights(layout.height);
     const projectY = 2;
@@ -356,9 +360,13 @@ function WideSetup(props: WideSetupProps) {
         </Panel>
         <Panel title="SERVICES" focusState={props.focus("services")} width={props.layout.infoWidths[4]} height="100%">
           {props.services.length > 0 ? props.services.slice(0, props.layout.infoHeight - 3).map((svc) => (
-            <Box key={svc.name} justifyContent="space-between">
-              <Text color={colors.label} wrap="truncate">{svc.name}</Text>
-              <Text color={svc.status === "ready" || svc.status === "running" ? colors.success : svc.status === "starting" ? colors.warning : colors.textDim}>{svc.status}</Text>
+            <Box key={svc.name} justifyContent="space-between" width="100%" minWidth={0}>
+              <Box flexShrink={1} minWidth={0} marginRight={1}>
+                <Text color={colors.label} wrap="truncate">{svc.name}</Text>
+              </Box>
+              <Box flexShrink={0}>
+                <Text color={svc.status === "ready" || svc.status === "running" ? colors.success : svc.status === "starting" ? colors.warning : colors.textDim} wrap="truncate">{svc.status}</Text>
+              </Box>
             </Box>
           )) : <Text color={colors.textDim}>{props.noProject ? "No project" : "None detected"}</Text>}
         </Panel>
@@ -388,7 +396,7 @@ function WideSetup(props: WideSetupProps) {
           chatActive={props.chatActive}
           onChat={props.onChat}
           inputMaxLines={props.inputMaxLines}
-          inputWidth={Math.max(12, props.inputWidth - 8)}
+          inputWidth={Math.max(12, props.inputWidth - 4)}
           inputBounds={props.inputBounds}
           maxLogLines={Math.max(1, props.layout.mainHeight - props.inputMaxLines - 5)}
         />
@@ -441,7 +449,7 @@ function StackedSetup(props: StackedSetupProps) {
         chatActive={props.chatActive}
         onChat={props.onChat}
         inputMaxLines={inputMaxLines}
-        inputWidth={Math.max(12, props.layout.width - 8)}
+        inputWidth={Math.max(12, props.layout.width - 4)}
         inputBounds={props.inputBounds}
         maxLogLines={maxLogLines}
       />
@@ -785,9 +793,13 @@ function PortRows({ ports, limit }: { ports: Array<{ service: string; port: numb
   return (
     <>
       {ports.length > 0 ? ports.slice(0, Math.max(1, limit)).map((p) => (
-        <Box key={p.service} justifyContent="space-between">
-          <Text color={colors.label} wrap="truncate">{p.service}</Text>
-          <Text color={p.status === "free" ? colors.success : colors.error}>:{p.port} {p.status === "free" ? "free" : "in use"}</Text>
+        <Box key={p.service} justifyContent="space-between" width="100%" minWidth={0}>
+          <Box flexShrink={1} minWidth={0} marginRight={1}>
+            <Text color={colors.label} wrap="truncate">{p.service}</Text>
+          </Box>
+          <Box flexShrink={0}>
+            <Text color={p.status === "free" ? colors.success : colors.error} wrap="truncate">:{p.port} {p.status === "free" ? "free" : "in use"}</Text>
+          </Box>
         </Box>
       )) : <Text color={colors.textDim}>No ports detected</Text>}
       {ports.length > limit && <Text color={colors.textDim}>… {ports.length - limit} more ports</Text>}
@@ -799,9 +811,13 @@ function KeyDependencyRows({ keyDeps, limit }: { keyDeps: Array<{ name: string; 
   return (
     <>
       {keyDeps.length > 0 ? keyDeps.slice(0, Math.max(1, limit)).map((dep) => (
-        <Box key={dep.name} justifyContent="space-between">
-          <Text color={colors.label} wrap="truncate">{dep.name}</Text>
-          <Text color={colors.value}>{dep.version}</Text>
+        <Box key={dep.name} justifyContent="space-between" width="100%" minWidth={0}>
+          <Box flexShrink={1} minWidth={0} marginRight={1}>
+            <Text color={colors.label} wrap="truncate">{dep.name}</Text>
+          </Box>
+          <Box flexShrink={0}>
+            <Text color={colors.value} wrap="truncate">{dep.version}</Text>
+          </Box>
         </Box>
       )) : <Text color={colors.textDim}>None found</Text>}
       {keyDeps.length > limit && <Text color={colors.textDim}>… {keyDeps.length - limit} more deps</Text>}
@@ -872,7 +888,7 @@ interface WideSetupProps {
 }
 
 function inputLinesForPanel(panelHeight: number): number {
-  return Math.max(1, Math.floor(panelHeight / 4));
+  return clamp(Math.floor(panelHeight / 4), 1, 6);
 }
 
 function inputBoundsHeightForPanel(panelHeight: number): number {

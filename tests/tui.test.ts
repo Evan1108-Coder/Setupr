@@ -8,8 +8,11 @@ import { buildEnvFocusItems, buildEnvLayout } from "../src/tui/layouts/EnvLayout
 import { buildStartFocusItems, buildStartLayout } from "../src/tui/layouts/StartLayout.js";
 import { buildUpdateFocusItems, buildUpdateLayout } from "../src/tui/layouts/UpdateLayout.js";
 import { buildCleanFocusItems, buildCleanLayout } from "../src/tui/layouts/CleanLayout.js";
-import { formatManualEnvLogValue } from "../src/tui/layouts/SetupLayout.js";
+import { buildFocusItems as buildSetupFocusItems, buildLayout as buildSetupLayout, formatManualEnvLogValue } from "../src/tui/layouts/SetupLayout.js";
+import { buildAuthFocusItems, buildAuthLayout } from "../src/tui/layouts/AuthLayout.js";
 import { stripCoalescedOtherShortcut } from "../src/tui/components/PromptCard.js";
+import { MIN_TUI_HEIGHT, MIN_TUI_WIDTH, isTerminalTooSmall } from "../src/tui/components/TuiFrame.js";
+import { getBorderStyle } from "../src/tui/theme.js";
 
 const wideSetupItems: FocusItem[] = [
   { id: "steps", row: 0, column: 0, bounds: { x: 1, y: 2, width: 20, height: 6 } },
@@ -59,7 +62,7 @@ describe("TUI focus navigation", () => {
 
     expect(layout.stacked).toBe(true);
     expect(layout.inputMaxLines).toBeGreaterThanOrEqual(1);
-    expect(maxBottom).toBeLessThanOrEqual(layout.height + 2);
+    expect(maxBottom).toBeLessThanOrEqual(layout.height + 1);
   });
 
   it("keeps env editor input bottom-anchored and navigable", () => {
@@ -112,7 +115,7 @@ describe("TUI focus navigation", () => {
       const maxBottom = Math.max(...items.map((item) => (item.bounds?.y || 0) + (item.bounds?.height || 0)));
 
       expect(layout.stacked).toBe(true);
-      expect(maxBottom).toBeLessThanOrEqual(layout.height + 2);
+      expect(maxBottom).toBeLessThanOrEqual(layout.height + 1);
     }
   });
 
@@ -152,7 +155,7 @@ describe("TUI focus navigation", () => {
     for (const { layout, items } of cases) {
       const maxBottom = Math.max(...items.map((item) => (item.bounds?.y || 0) + (item.bounds?.height || 0)));
       expect(layout.stacked).toBe(true);
-      expect(maxBottom).toBeLessThanOrEqual(layout.height + 2);
+      expect(maxBottom).toBeLessThanOrEqual(layout.height + 1);
     }
   });
 
@@ -192,7 +195,7 @@ describe("TUI focus navigation", () => {
     for (const { layout, items } of cases) {
       const maxBottom = Math.max(...items.map((item) => (item.bounds?.y || 0) + (item.bounds?.height || 0)));
       expect(layout.stacked).toBe(true);
-      expect(maxBottom).toBeLessThanOrEqual(layout.height + 2);
+      expect(maxBottom).toBeLessThanOrEqual(layout.height + 1);
     }
   });
 
@@ -203,9 +206,108 @@ describe("TUI focus navigation", () => {
 
     expect(layout.stacked).toBe(true);
     expect(layout.inputMaxLines).toBeGreaterThanOrEqual(1);
-    expect(maxBottom).toBeLessThanOrEqual(layout.height + 2);
+    expect(maxBottom).toBeLessThanOrEqual(layout.height + 1);
+  });
+
+  it("keeps every TUI focus bound inside the terminal across realistic terminal sizes", () => {
+    const sizes = [
+      { width: 60, height: 18 },
+      { width: 61, height: 18 },
+      { width: 63, height: 19 },
+      { width: 72, height: 22 },
+      { width: 80, height: 24 },
+      { width: 90, height: 18 },
+      { width: 100, height: 30 },
+      { width: 138, height: 42 },
+      { width: 160, height: 50 },
+      { width: 220, height: 48 },
+      { width: 260, height: 80 },
+    ];
+    const builders = [
+      { name: "dashboard", build: (w: number, h: number) => [buildDashboardLayout(w, h, "dashboard"), buildDashboardFocusItems(buildDashboardLayout(w, h, "dashboard"))] as const },
+      { name: "status", build: (w: number, h: number) => [buildDashboardLayout(w, h, "status"), buildDashboardFocusItems(buildDashboardLayout(w, h, "status"))] as const },
+      { name: "setup", build: (w: number, h: number) => [buildSetupLayout(w, h), buildSetupFocusItems(buildSetupLayout(w, h))] as const },
+      { name: "chat", build: (w: number, h: number) => [buildChatLayout(w, h), buildChatFocusItems(buildChatLayout(w, h))] as const },
+      { name: "start", build: (w: number, h: number) => [buildStartLayout(w, h), buildStartFocusItems(buildStartLayout(w, h))] as const },
+      { name: "doctor", build: (w: number, h: number) => [buildDoctorLayout(w, h), buildDoctorFocusItems(buildDoctorLayout(w, h))] as const },
+      { name: "update", build: (w: number, h: number) => [buildUpdateLayout(w, h), buildUpdateFocusItems(buildUpdateLayout(w, h))] as const },
+      { name: "clean", build: (w: number, h: number) => [buildCleanLayout(w, h), buildCleanFocusItems(buildCleanLayout(w, h))] as const },
+      { name: "env", build: (w: number, h: number) => [buildEnvLayout(w, h), buildEnvFocusItems(buildEnvLayout(w, h))] as const },
+      { name: "auth", build: (w: number, h: number) => [buildAuthLayout(w, h), buildAuthFocusItems(buildAuthLayout(w, h))] as const },
+    ];
+
+    for (const { width, height } of sizes) {
+      for (const { name, build } of builders) {
+        const [, items] = build(width, height);
+        expectFocusBoundsWithinTerminal(items, width, height, `${name}@${width}x${height}`);
+      }
+    }
+  });
+
+  it("keeps bottom input slots proportional instead of taking over their panels", () => {
+    const layouts = [
+      { name: "setup", layout: buildSetupLayout(160, 50), items: buildSetupFocusItems(buildSetupLayout(160, 50)), parent: "diary" },
+      { name: "chat", layout: buildChatLayout(160, 50), items: buildChatFocusItems(buildChatLayout(160, 50)), parent: "conversation" },
+      { name: "start", layout: buildStartLayout(160, 50), items: buildStartFocusItems(buildStartLayout(160, 50)), parent: "logs" },
+      { name: "doctor", layout: buildDoctorLayout(160, 50), items: buildDoctorFocusItems(buildDoctorLayout(160, 50)), parent: "diagnostics" },
+      { name: "update", layout: buildUpdateLayout(160, 50), items: buildUpdateFocusItems(buildUpdateLayout(160, 50)), parent: "packages" },
+      { name: "env", layout: buildEnvLayout(160, 50), items: buildEnvFocusItems(buildEnvLayout(160, 50)), parent: "editor" },
+    ];
+
+    for (const { name, items, parent } of layouts) {
+      const input = items.find((item) => item.id === "input");
+      const parentItem = items.find((item) => item.id === parent);
+      expect(input?.bounds, name).toBeDefined();
+      expect(parentItem?.bounds, name).toBeDefined();
+      const inputHeight = input!.bounds!.height;
+      const parentHeight = parentItem!.bounds!.height;
+      expect(inputHeight, name).toBeLessThanOrEqual(Math.ceil(parentHeight / 4) + 2);
+      expect(input!.bounds!.y, name).toBeGreaterThanOrEqual(parentItem!.bounds!.y);
+      expect(input!.bounds!.y + inputHeight - 1, name).toBeLessThanOrEqual(parentItem!.bounds!.y + parentHeight - 1);
+    }
+  });
+
+  it("uses an explicit too-small screen below the supported grid size", () => {
+    expect(isTerminalTooSmall(MIN_TUI_WIDTH - 1, MIN_TUI_HEIGHT)).toBe(true);
+    expect(isTerminalTooSmall(MIN_TUI_WIDTH, MIN_TUI_HEIGHT - 1)).toBe(true);
+    expect(isTerminalTooSmall(MIN_TUI_WIDTH, MIN_TUI_HEIGHT)).toBe(false);
+  });
+
+  it("supports border fallbacks for terminal/font combinations with bad thin-line rendering", () => {
+    const previous = process.env.SETUPR_TUI_BORDER;
+    try {
+      delete process.env.SETUPR_TUI_BORDER;
+      expect(getBorderStyle("panel")).toBe("single");
+      expect(getBorderStyle("input")).toBe("round");
+
+      process.env.SETUPR_TUI_BORDER = "bold";
+      expect(getBorderStyle("panel")).toBe("bold");
+
+      process.env.SETUPR_TUI_BORDER = "ascii";
+      expect(getBorderStyle("panel")).toBe("classic");
+
+      process.env.SETUPR_TUI_BORDER = "double";
+      expect(getBorderStyle("input")).toBe("double");
+    } finally {
+      if (previous === undefined) delete process.env.SETUPR_TUI_BORDER;
+      else process.env.SETUPR_TUI_BORDER = previous;
+    }
   });
 });
+
+function expectFocusBoundsWithinTerminal(items: FocusItem[], width: number, height: number, label: string) {
+  expect(items.length, label).toBeGreaterThan(0);
+  for (const item of items) {
+    expect(item.bounds, `${label}:${item.id}`).toBeDefined();
+    const bounds = item.bounds!;
+    expect(bounds.width, `${label}:${item.id}:width`).toBeGreaterThan(0);
+    expect(bounds.height, `${label}:${item.id}:height`).toBeGreaterThan(0);
+    expect(bounds.x, `${label}:${item.id}:x`).toBeGreaterThanOrEqual(1);
+    expect(bounds.y, `${label}:${item.id}:y`).toBeGreaterThanOrEqual(2);
+    expect(bounds.x + bounds.width - 1, `${label}:${item.id}:right`).toBeLessThanOrEqual(width);
+    expect(bounds.y + bounds.height - 1, `${label}:${item.id}:bottom`).toBeLessThanOrEqual(height);
+  }
+}
 
 describe("TUI terminal control input", () => {
   it("strips SGR mouse reports even when the escape prefix is missing", () => {

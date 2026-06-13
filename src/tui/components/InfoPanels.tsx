@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { colors, icons } from "../theme.js";
+import { colors, getBorderStyle, icons } from "../theme.js";
 import type { SetupStep } from "../../ai/planner.js";
 import type { ScanResult } from "../../scanner/index.js";
 import type { EnvVar, ServiceInfo } from "../../state/store.js";
@@ -20,8 +20,8 @@ interface InfoPanelsProps {
 
 function PanelColumn({ title, children, width }: { title: string; children: React.ReactNode; width?: string }) {
   return (
-    <Box flexDirection="column" width={width} borderStyle="single" borderColor={colors.border} paddingX={1}>
-      <Text color={colors.heading} bold>{title}</Text>
+    <Box flexDirection="column" width={width} borderStyle={getBorderStyle("panel")} borderColor={colors.border} paddingX={1} minWidth={0}>
+      <Text color={colors.heading} bold wrap="truncate">{title}</Text>
       {children}
     </Box>
   );
@@ -29,9 +29,13 @@ function PanelColumn({ title, children, width }: { title: string; children: Reac
 
 function Row({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
-    <Box justifyContent="space-between" width="100%">
-      <Text color={colors.label}>{label}</Text>
-      <Text color={color || colors.value}>{value}</Text>
+    <Box justifyContent="space-between" width="100%" minWidth={0}>
+      <Box flexShrink={0} marginRight={1}>
+        <Text color={colors.label}>{label}</Text>
+      </Box>
+      <Box flexShrink={1} minWidth={0}>
+        <Text color={color || colors.value} wrap="truncate">{String(value)}</Text>
+      </Box>
     </Box>
   );
 }
@@ -55,8 +59,8 @@ export function InfoPanels({
   return (
     <Box flexDirection="row" width="100%">
       {/* STEPS column */}
-      <Box flexDirection="column" width="14%" borderStyle="single" borderColor={colors.border} paddingX={1}>
-        <Text color={colors.heading} bold>STEPS</Text>
+      <Box flexDirection="column" width="14%" borderStyle={getBorderStyle("panel")} borderColor={colors.border} paddingX={1} minWidth={0}>
+        <Text color={colors.heading} bold wrap="truncate">STEPS</Text>
         {steps.map((step, i) => {
           const icon = step.status === "done" ? icons.check
             : step.status === "running" ? icons.arrowRight
@@ -67,8 +71,8 @@ export function InfoPanels({
             : step.status === "failed" ? colors.error
             : colors.textDim;
           return (
-            <Box key={step.id}>
-              <Text color={statusColor}>{i === currentStepIndex ? icons.arrowRight : icon} {step.label}</Text>
+            <Box key={step.id} minWidth={0}>
+              <Text color={statusColor} wrap="truncate">{i === currentStepIndex ? icons.arrowRight : icon} {step.label}</Text>
             </Box>
           );
         })}
@@ -111,9 +115,11 @@ export function InfoPanels({
       <PanelColumn title="SERVICES" width="18%">
         {services.length > 0 ? (
           services.map((svc) => (
-            <Box key={svc.name} justifyContent="space-between" width="100%">
-              <Text color={colors.label}>{svc.name}</Text>
-              <Text color={getServiceColor(svc.status)}>
+            <Box key={svc.name} justifyContent="space-between" width="100%" minWidth={0}>
+              <Box flexShrink={1} minWidth={0} marginRight={1}>
+                <Text color={colors.label} wrap="truncate">{svc.name}</Text>
+              </Box>
+              <Text color={getServiceColor(svc.status)} wrap="truncate">
                 {svc.status}{svc.port ? ` :${svc.port}` : ""}
               </Text>
             </Box>

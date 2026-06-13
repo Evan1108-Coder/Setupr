@@ -9,8 +9,8 @@ interface FooterBarProps {
 
 export function FooterBar({ version, checkpointPath }: FooterBarProps) {
   return (
-    <Box width="100%" justifyContent="space-between">
-      <Box gap={2}>
+    <Box width="100%" minWidth={0} justifyContent="space-between">
+      <Box gap={2} minWidth={0} flexShrink={1}>
         {shortcuts.map((s) => (
           <Box key={s.key}>
             <Text color={colors.accent} bold>{s.key}</Text>
@@ -18,8 +18,8 @@ export function FooterBar({ version, checkpointPath }: FooterBarProps) {
           </Box>
         ))}
       </Box>
-      <Box>
-        <Text color={colors.textDim}>{version} · checkpoint: {checkpointPath}</Text>
+      <Box flexShrink={1} minWidth={0}>
+        <Text color={colors.textDim} wrap="truncate">{version} · checkpoint: {checkpointPath}</Text>
       </Box>
     </Box>
   );

@@ -23,8 +23,8 @@ export function StatusBar({ stepProgress, aiStatus }: StatusBarProps) {
   }
 
   return (
-    <Box flexDirection="row" justifyContent="space-between" width="100%">
-      <Box gap={2}>
+    <Box flexDirection="row" justifyContent="space-between" width="100%" minWidth={0}>
+      <Box gap={2} minWidth={0} flexShrink={1}>
         {shortcuts.map((shortcut) => {
           const s = shortcut.key === "q" ? { ...shortcut, desc: "quit outside input" } : shortcut;
           return (
@@ -35,9 +35,9 @@ export function StatusBar({ stepProgress, aiStatus }: StatusBarProps) {
           );
         })}
       </Box>
-      <Box gap={2}>
-        {aiStatus && <Text color={colors.info}>{aiStatus}</Text>}
-        <Text color={colors.success}>{stepProgress}</Text>
+      <Box gap={2} flexShrink={1} minWidth={0}>
+        {aiStatus && <Text color={colors.info} wrap="truncate">{aiStatus}</Text>}
+        <Text color={colors.success} wrap="truncate">{stepProgress}</Text>
       </Box>
     </Box>
   );

@@ -28,7 +28,14 @@ printf '\033[0m\033[?1000l\033[?1006l\033[?25h\033[?1049l'
 clear
 ```
 
-The TUI uses Unicode box-drawing characters. Small visual gaps in vertical lines usually come from the terminal font or line-height settings rather than Setupr drawing separate graphical rectangles.
+The TUI uses Unicode box-drawing characters. Small visual gaps in vertical lines usually come from the terminal font or line-height settings rather than Setupr drawing separate graphical rectangles. Setupr keeps panel coordinates inside the terminal grid and switches to a resize notice below `60x18`. If your terminal profile still shows gaps, use a stronger border style:
+
+```bash
+SETUPR_TUI_BORDER=bold setupr
+SETUPR_TUI_BORDER=classic setupr setup
+```
+
+Supported values are `bold`, `double`, `round`, and `classic`/`ascii`.
 
 ### Mouse or scroll codes appear in the input
 

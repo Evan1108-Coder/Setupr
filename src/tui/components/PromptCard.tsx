@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { colors, icons } from "../theme.js";
+import { colors, getBorderStyle, icons } from "../theme.js";
 import type { FocusBounds, FocusState } from "../hooks/useFocusNavigation.js";
 import { createTerminalControlInputStripper } from "../terminalInput.js";
 import { BoundedTextInput } from "./BoundedTextInput.js";
@@ -50,8 +50,8 @@ export function PromptCard({
   const suppressNextFreeformPrefix = useRef<string | null>(null);
   const controlStripper = useMemo(() => createTerminalControlInputStripper(), []);
   const focused = active || focusState === "focused";
-  const cardWidth = Math.max(14, width - 2);
-  const inputWidth = Math.max(8, cardWidth - 8);
+  const cardWidth = Math.max(14, width);
+  const inputWidth = Math.max(1, cardWidth - 6);
   const messageLines = useMemo(() => clampLines(message || "", 5), [message]);
   const visibleOptions = useMemo(
     () => includeOther ? [...options, { id: OTHER_OPTION_ID, label: otherLabel }] : options,
@@ -122,7 +122,7 @@ export function PromptCard({
   return (
     <Box
       flexDirection="column"
-      borderStyle="single"
+      borderStyle={getBorderStyle("panel")}
       borderColor={focused ? colors.borderActive : colors.border}
       paddingX={1}
       width={cardWidth}
@@ -150,7 +150,7 @@ export function PromptCard({
         </Box>
       )}
       {isOtherSelected && (
-        <Box marginTop={1} borderStyle="round" borderColor={focused ? colors.accent : colors.border} paddingX={1} flexShrink={1} width={Math.max(10, cardWidth - 2)}>
+        <Box marginTop={1} borderStyle={getBorderStyle("input")} borderColor={focused ? colors.accent : colors.border} paddingX={1} flexShrink={1} width={Math.max(10, cardWidth - 2)}>
           <Text color={colors.primary}>{icons.arrowRight} </Text>
           <BoundedTextInput
             value={freeformValue}

@@ -10,7 +10,7 @@ import type { ScanResult } from "../../scanner/index.js";
 import { ChatInput } from "../components/ChatInput.js";
 import { Panel } from "../components/Panel.js";
 import { Spinner } from "../components/Spinner.js";
-import { KVRow, TuiFooter, TuiHeader, statusColor } from "../components/TuiFrame.js";
+import { KVRow, TooSmallTerminal, TuiFooter, TuiHeader, isTerminalTooSmall, statusColor } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { hasProjectSignals } from "../projectSignals.js";
@@ -78,6 +78,10 @@ export function DoctorLayout({ scan, cwd }: DoctorLayoutProps) {
   const failCount = checks.filter((check) => check.status === "fail").length;
   const warnCount = checks.filter((check) => check.status === "warn").length;
   const risk = failCount > 0 ? "High" : warnCount > 0 ? "Moderate" : done ? "Low" : "Checking";
+
+  if (isTerminalTooSmall(terminal.width, terminal.height)) {
+    return <TooSmallTerminal command="setupr doctor" width={terminal.width} height={terminal.height} />;
+  }
 
   return (
     <Box flexDirection="column" width={terminal.width} height={terminal.height}>
@@ -154,15 +158,13 @@ function WideDoctor(props: DoctorViewProps) {
 }
 
 function StackedDoctor(props: DoctorViewProps) {
-  const groupHeight = stackedGroupHeight(props.layout);
-  const envHeight = stackedEnvironmentHeight(props.layout);
-  const aiHeight = Math.max(3, props.layout.bodyHeight - groupHeight - props.layout.diagHeight - envHeight - tuiLayout.panelGap * 3);
+  const { groupHeight, diagHeight, envHeight, aiHeight } = stackedDoctorHeights(props.layout.bodyHeight);
   return (
     <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
       <Panel title="Check Groups" focusState={props.focus("groups")} width="100%" height={groupHeight}>
         <CheckGroups checks={props.checks} done={props.done} compact />
       </Panel>
-      <DiagnosticsPanel {...props} width={props.layout.width} height={props.layout.diagHeight} />
+      <DiagnosticsPanel {...props} width={props.layout.width} height={diagHeight} />
       <Panel title="Environment" focusState={props.focus("environment")} width="100%" height={envHeight}>
         <EnvironmentPanel scan={props.scan} compact />
       </Panel>
@@ -287,24 +289,24 @@ export function buildDoctorLayout(width: number, height: number): DoctorLayoutGe
   const groupWidth = stacked ? width : clamp(Math.floor(width * 0.18), 20, 30);
   const sideWidth = stacked ? width : clamp(Math.floor(width * 0.25), 30, 42);
   const diagWidth = stacked ? width : Math.max(8, width - groupWidth - sideWidth - gap * 2);
-  const diagHeight = stacked ? Math.max(8, bodyHeight - 13 - gap * 3) : bodyHeight;
+  const stackedHeights = stacked ? stackedDoctorHeights(bodyHeight) : null;
+  const diagHeight = stacked ? stackedHeights!.diagHeight : bodyHeight;
   const inputMaxLines = Math.max(1, Math.min(6, Math.floor(diagHeight / 4)));
   const inputHeight = inputMaxLines + 2;
-  const stackedGroups = stacked ? Math.max(5, Math.min(6, Math.floor(bodyHeight * 0.22))) : 0;
-  const inputBounds = { x: stacked ? 3 : groupWidth + gap + 3, y: Math.max(4, 2 + stackedGroups + diagHeight - inputHeight - 1), width: Math.max(8, diagWidth - 6), height: inputHeight };
+  const stackedGroups = stacked ? stackedHeights!.groupHeight : 0;
+  const diagY = stacked ? 2 + stackedGroups + gap : 2;
+  const inputBounds = { x: stacked ? 3 : groupWidth + gap + 3, y: Math.max(4, diagY + diagHeight - inputHeight - 1), width: Math.max(8, diagWidth - 6), height: inputHeight };
   return { width, height, stacked, bodyHeight, groupWidth, diagWidth, sideWidth, diagHeight, inputMaxLines, inputHeight, inputBounds };
 }
 
 export function buildDoctorFocusItems(layout: DoctorLayoutGeometry): FocusItem[] {
   if (layout.stacked) {
-    const groupHeight = stackedGroupHeight(layout);
-    const envHeight = stackedEnvironmentHeight(layout);
-    const aiHeight = Math.max(2, layout.bodyHeight - groupHeight - layout.diagHeight - envHeight - tuiLayout.panelGap * 3);
+    const { groupHeight, diagHeight, envHeight, aiHeight } = stackedDoctorHeights(layout.bodyHeight);
     const diagY = 2 + groupHeight + tuiLayout.panelGap;
-    const envY = diagY + layout.diagHeight + tuiLayout.panelGap;
+    const envY = diagY + diagHeight + tuiLayout.panelGap;
     return [
       { id: "groups", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.width, height: groupHeight } },
-      { id: "diagnostics", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: diagY, width: layout.width, height: layout.diagHeight } },
+      { id: "diagnostics", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: diagY, width: layout.width, height: diagHeight } },
       { id: "input", row: 2, column: 0, parentIds: ["diagnostics"], bounds: layout.inputBounds },
       { id: "environment", row: 3, column: 0, bounds: { x: 1, y: envY, width: layout.width, height: envHeight } },
       { id: "ai", row: 4, column: 0, bounds: { x: 1, y: envY + envHeight + tuiLayout.panelGap, width: layout.width, height: aiHeight } },
@@ -322,12 +324,29 @@ export function buildDoctorFocusItems(layout: DoctorLayoutGeometry): FocusItem[]
   ];
 }
 
-function stackedGroupHeight(layout: DoctorLayoutGeometry): number {
-  return Math.max(5, Math.min(6, Math.floor(layout.bodyHeight * 0.22)));
-}
-
-function stackedEnvironmentHeight(layout: DoctorLayoutGeometry): number {
-  return Math.max(4, Math.min(5, Math.floor(layout.bodyHeight * 0.2)));
+function stackedDoctorHeights(bodyHeight: number) {
+  const gapTotal = tuiLayout.panelGap * 3;
+  const available = Math.max(8, bodyHeight - gapTotal);
+  if (bodyHeight < 20) {
+    const groupHeight = 3;
+    const envHeight = 3;
+    const aiHeight = 2;
+    return {
+      groupHeight,
+      diagHeight: Math.max(3, available - groupHeight - envHeight - aiHeight),
+      envHeight,
+      aiHeight,
+    };
+  }
+  const groupHeight = Math.max(4, Math.min(6, Math.floor(bodyHeight * 0.20)));
+  const envHeight = Math.max(3, Math.min(5, Math.floor(bodyHeight * 0.18)));
+  const aiHeight = Math.max(3, Math.min(7, Math.floor(bodyHeight * 0.18)));
+  return {
+    groupHeight,
+    diagHeight: Math.max(4, available - groupHeight - envHeight - aiHeight),
+    envHeight,
+    aiHeight,
+  };
 }
 
 interface DoctorViewProps {

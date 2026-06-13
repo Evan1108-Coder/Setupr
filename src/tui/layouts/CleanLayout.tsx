@@ -7,7 +7,7 @@ import type { ScanResult } from "../../scanner/index.js";
 import { ChatInput } from "../components/ChatInput.js";
 import { Panel } from "../components/Panel.js";
 import { Spinner } from "../components/Spinner.js";
-import { KVRow, MetricText, TuiFooter, TuiHeader, statusColor } from "../components/TuiFrame.js";
+import { KVRow, MetricText, TooSmallTerminal, TuiFooter, TuiHeader, isTerminalTooSmall, statusColor } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { colors, icons, layout as tuiLayout } from "../theme.js";
@@ -99,6 +99,10 @@ export function CleanLayout({ cwd, mode, force = false }: CleanLayoutProps) {
   const failed = targets.filter((target) => target.status === "failed").length;
   const risk = mode === "all" ? "High" : mode === "share" ? "High" : "Medium";
 
+  if (isTerminalTooSmall(terminal.width, terminal.height)) {
+    return <TooSmallTerminal command="setupr clean" width={terminal.width} height={terminal.height} />;
+  }
+
   return (
     <Box flexDirection="column" width={terminal.width} height={terminal.height}>
       <TuiHeader
@@ -172,10 +176,7 @@ function WideClean(props: CleanViewProps) {
 }
 
 function StackedClean(props: CleanViewProps) {
-  const panelHeight = Math.max(8, props.layout.bodyHeight - props.layout.inputHeight - tuiLayout.panelGap * 3);
-  const targetsHeight = Math.max(8, Math.floor(panelHeight * 0.45));
-  const reviewHeight = Math.max(7, Math.floor(panelHeight * 0.32));
-  const riskHeight = Math.max(5, panelHeight - targetsHeight - reviewHeight);
+  const { targetsHeight, reviewHeight, riskHeight } = stackedCleanHeights(props.layout.bodyHeight, props.layout.inputHeight);
   return (
     <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
       <Panel title="Targets" focusState={props.focus("targets")} width="100%" height={targetsHeight}>
@@ -288,10 +289,7 @@ export function buildCleanLayout(width: number, height: number): CleanLayoutGeom
 
 export function buildCleanFocusItems(layout: CleanLayoutGeometry): FocusItem[] {
   if (layout.stacked) {
-    const panelHeight = Math.max(8, layout.bodyHeight - layout.inputHeight - tuiLayout.panelGap * 3);
-    const targetsHeight = Math.max(8, Math.floor(panelHeight * 0.45));
-    const reviewHeight = Math.max(7, Math.floor(panelHeight * 0.32));
-    const riskHeight = Math.max(5, panelHeight - targetsHeight - reviewHeight);
+    const { targetsHeight, reviewHeight, riskHeight } = stackedCleanHeights(layout.bodyHeight, layout.inputHeight);
     return [
       { id: "targets", row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.width, height: targetsHeight } },
       { id: "review", row: 1, column: 0, redirectTo: "input", bounds: { x: 1, y: 2 + targetsHeight + tuiLayout.panelGap, width: layout.width, height: reviewHeight } },
@@ -305,6 +303,26 @@ export function buildCleanFocusItems(layout: CleanLayoutGeometry): FocusItem[] {
     { id: "input", row: 1, column: 1, parentIds: ["review"], bounds: layout.inputBounds },
     { id: "risk", row: 0, column: 2, bounds: { x: layout.targetsWidth + layout.reviewWidth + tuiLayout.panelGap * 2 + 1, y: 2, width: layout.riskWidth, height: layout.bodyHeight - layout.inputHeight - tuiLayout.panelGap } },
   ];
+}
+
+function stackedCleanHeights(bodyHeight: number, inputHeight: number) {
+  const available = Math.max(8, bodyHeight - inputHeight - tuiLayout.panelGap * 3);
+  if (bodyHeight < 22) {
+    const targetsHeight = Math.max(4, Math.floor(available * 0.42));
+    const reviewHeight = Math.max(3, Math.floor(available * 0.34));
+    return {
+      targetsHeight,
+      reviewHeight,
+      riskHeight: Math.max(2, available - targetsHeight - reviewHeight),
+    };
+  }
+  const targetsHeight = Math.max(7, Math.floor(available * 0.45));
+  const reviewHeight = Math.max(6, Math.floor(available * 0.32));
+  return {
+    targetsHeight,
+    reviewHeight,
+    riskHeight: Math.max(4, available - targetsHeight - reviewHeight),
+  };
 }
 
 interface CleanViewProps {

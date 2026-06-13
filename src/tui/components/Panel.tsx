@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { colors } from "../theme.js";
+import { colors, getBorderStyle } from "../theme.js";
 import type { FocusState } from "../hooks/useFocusNavigation.js";
 
 interface PanelProps {
@@ -37,7 +37,7 @@ export function Panel({
   return (
     <Box
       flexDirection="column"
-      borderStyle="single"
+      borderStyle={getBorderStyle("panel")}
       borderColor={borderColor}
       width={width}
       height={height}
@@ -46,11 +46,17 @@ export function Panel({
       flexShrink={flexShrink}
       paddingX={1}
     >
-      <Box width="100%" flexShrink={0} justifyContent="space-between">
-        <Text color={titleColor} bold>
-          {title.toUpperCase()}
-        </Text>
-        {subtitle && <Text color={colors.textDim} wrap="truncate">{subtitle}</Text>}
+      <Box width="100%" minWidth={0} flexShrink={0} justifyContent="space-between">
+        <Box minWidth={0} flexShrink={1}>
+          <Text color={titleColor} bold wrap="truncate">
+            {title.toUpperCase()}
+          </Text>
+        </Box>
+        {subtitle && (
+          <Box minWidth={0} flexShrink={1} marginLeft={1}>
+            <Text color={colors.textDim} wrap="truncate">{subtitle}</Text>
+          </Box>
+        )}
       </Box>
       <Box flexDirection="column" width="100%" minWidth={0} flexGrow={1} flexShrink={1} overflow="hidden">
         {children}

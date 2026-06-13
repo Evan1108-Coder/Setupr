@@ -30,7 +30,7 @@ export function BoundedTextInput({
   const [cursor, setCursor] = useState(value.length);
   const [scrollLine, setScrollLine] = useState(0);
   const controlStripper = useMemo(() => createTerminalControlInputStripper(), []);
-  const wrapWidth = Math.max(8, (width || 80) - 4);
+  const wrapWidth = Math.max(1, width || 80);
 
   const displayValue = mask ? mask.repeat(value.length) : value;
   const renderedValue = focus
@@ -143,7 +143,7 @@ export function BoundedTextInput({
   const placeholderColor = value.length === 0 ? colors.textDim : colors.text;
 
   return (
-    <Box flexDirection="column" height={visibleHeight} overflowY="hidden" minWidth={0} flexGrow={1} flexShrink={1}>
+    <Box flexDirection="column" height={visibleHeight} overflowY="hidden" width={wrapWidth} minWidth={0} flexShrink={1}>
       {visibleLines.map((line, index) => (
         <Text key={`${scrollLine}-${index}`} color={placeholderColor} wrap="truncate">
           {line || " "}

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text } from "ink";
-import { colors } from "../theme.js";
+import { colors, getBorderStyle } from "../theme.js";
 import { BoundedTextInput } from "./BoundedTextInput.js";
 import type { FocusBounds, FocusState } from "../hooks/useFocusNavigation.js";
 import { stripTerminalControlInput } from "../terminalInput.js";
@@ -32,8 +32,8 @@ export function ChatInput({
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const focused = focusState === "focused" || active;
-  const boxWidth = Math.max(12, (width || 80) - 2);
-  const inputWidth = Math.max(8, boxWidth - 6);
+  const boxWidth = Math.max(12, width || 80);
+  const inputWidth = Math.max(1, boxWidth - 6);
 
   const handleSubmit = (text: string, meta?: { steer?: boolean }) => {
     const cleanText = stripTerminalControlInput(text).trim();
@@ -49,7 +49,7 @@ export function ChatInput({
 
   return (
     <Box
-      borderStyle="round"
+      borderStyle={getBorderStyle("input")}
       borderColor={disabled ? colors.textDim : focused ? colors.borderActive : colors.border}
       paddingX={1}
       width={boxWidth}
@@ -57,7 +57,9 @@ export function ChatInput({
     >
       <Text color={disabled ? colors.textDim : colors.primary}>❯ </Text>
       {disabled ? (
-        <Text color={colors.textDim} wrap="truncate">{disabledText}</Text>
+        <Box width={inputWidth} minWidth={0} overflow="hidden">
+          <Text color={colors.textDim} wrap="truncate">{disabledText}</Text>
+        </Box>
       ) : (
         <BoundedTextInput
           value={value}

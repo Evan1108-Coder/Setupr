@@ -69,6 +69,17 @@ export const borders = {
   cross: "┼",
 };
 
+export type TuiBorderStyle = "single" | "round" | "bold" | "double" | "classic";
+
+export function getBorderStyle(kind: "panel" | "input" = "panel"): TuiBorderStyle {
+  const requested = (process.env.SETUPR_TUI_BORDER || "").trim().toLowerCase();
+  if (requested === "bold" || requested === "heavy" || requested === "solid") return "bold";
+  if (requested === "double") return "double";
+  if (requested === "classic" || requested === "ascii") return "classic";
+  if (requested === "round" || requested === "rounded") return "round";
+  return kind === "input" ? "round" : "single";
+}
+
 export const layout = {
   panelGap: 1,
 };

@@ -8,7 +8,7 @@ import type { ScanResult } from "../../scanner/index.js";
 import { ChatInput } from "../components/ChatInput.js";
 import { Panel } from "../components/Panel.js";
 import { Spinner } from "../components/Spinner.js";
-import { KVRow, TuiFooter, TuiHeader, statusColor } from "../components/TuiFrame.js";
+import { KVRow, TooSmallTerminal, TuiFooter, TuiHeader, isTerminalTooSmall, statusColor } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { hasProjectSignals } from "../projectSignals.js";
@@ -102,6 +102,10 @@ export function StartLayout({ scan, cwd }: StartLayoutProps) {
     );
     setChatMessages((prev) => [...prev, `AI → ${result.response}`]);
   }, [scan, command, output, status]);
+
+  if (isTerminalTooSmall(terminal.width, terminal.height)) {
+    return <TooSmallTerminal command="setupr start" width={terminal.width} height={terminal.height} />;
+  }
 
   return (
     <Box flexDirection="column" width={terminal.width} height={terminal.height}>

@@ -152,7 +152,7 @@ export function appendHistoryEvent(
 }
 
 export function readRecentHistoryEvents(cwd: string, limit = 50): Promise<ProjectEvent[]> {
-  return readRecentProjectEvents(cwd, limit, PROJECT_HISTORY_FILE);
+  return readRecentStoredEvents(cwd, limit, PROJECT_HISTORY_FILE);
 }
 
 export function appendLogEvent(
@@ -163,5 +163,37 @@ export function appendLogEvent(
 }
 
 export function readRecentLogEvents(cwd: string, limit = 50): Promise<ProjectEvent[]> {
-  return readRecentProjectEvents(cwd, limit, PROJECT_LOG_FILE);
+  return readRecentStoredEvents(cwd, limit, PROJECT_LOG_FILE);
+}
+
+async function readRecentStoredEvents(
+  cwd: string,
+  limit: number,
+  fileName: ProjectJsonlFile
+): Promise<ProjectEvent[]> {
+  if (limit <= 0) return [];
+  const events = (await readProjectJsonl<unknown>(cwd, fileName)).slice(-limit);
+  return events
+    .map((event) => normalizeStoredEvent(event))
+    .filter((event): event is ProjectEvent => Boolean(event));
+}
+
+function normalizeStoredEvent(event: unknown): ProjectEvent | null {
+  if (!event || typeof event !== "object" || Array.isArray(event)) return null;
+  const value = event as JsonObject;
+  const type = stringValue(value.type)
+    || (stringValue(value.status) ? `history.${stringValue(value.status)}` : "")
+    || (stringValue(value.command) ? "command" : "history");
+  const message = stringValue(value.message) || stringValue(value.command) || type;
+
+  return {
+    type,
+    timestamp: typeof value.timestamp === "number" ? value.timestamp : Date.now(),
+    message,
+    data: value.data,
+  };
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
 }

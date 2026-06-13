@@ -35,9 +35,7 @@ export function useTerminalSize(): TerminalSize {
   }, [stdout]);
 
   const width = size.width;
-  // Keep one row of headroom so Ink never falls into its full-terminal
-  // clear path, which emits a scrollback-clear sequence that iTerm warns about.
-  const height = Math.max(1, size.rows - 1);
+  const height = Math.max(1, size.rows);
 
   return {
     width,

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { colors, icons } from "../theme.js";
+import { colors, getBorderStyle, icons } from "../theme.js";
 import { BoundedTextInput } from "./BoundedTextInput.js";
 import type { FocusBounds, FocusState } from "../hooks/useFocusNavigation.js";
 import { createTerminalControlInputStripper } from "../terminalInput.js";
@@ -21,8 +21,8 @@ export function EnvInput({ varKey, remainingCount, onSubmit, onSkip, isSensitive
   const [value, setValue] = useState("");
   const controlStripper = useMemo(() => createTerminalControlInputStripper(), []);
   const focused = focusState === "focused";
-  const boxWidth = Math.max(12, (width || 80) - 2);
-  const inputWidth = Math.max(8, boxWidth - 6);
+  const boxWidth = Math.max(12, width || 80);
+  const inputWidth = Math.max(1, boxWidth - 4);
 
   useInput((input, key) => {
     if (key.escape) {
@@ -49,13 +49,13 @@ export function EnvInput({ varKey, remainingCount, onSubmit, onSkip, isSensitive
 
   return (
     <Box flexDirection="column" width="100%">
-      <Box>
+      <Box width={boxWidth} minWidth={0}>
         <Text color={colors.accent}>{icons.arrowRight} </Text>
         <Text color={colors.textBright} bold>{varKey}</Text>
         <Text color={colors.textDim}> (paste key or press Enter to skip — {remainingCount} more vars after this)</Text>
       </Box>
       <Box
-        borderStyle="single"
+        borderStyle={getBorderStyle("input")}
         borderColor={focused ? colors.borderActive : colors.border}
         paddingX={1}
         width={boxWidth}

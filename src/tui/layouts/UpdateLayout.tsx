@@ -8,7 +8,7 @@ import type { ScanResult } from "../../scanner/index.js";
 import { ChatInput } from "../components/ChatInput.js";
 import { Panel } from "../components/Panel.js";
 import { Spinner } from "../components/Spinner.js";
-import { KVRow, MetricText, TuiFooter, TuiHeader, statusColor } from "../components/TuiFrame.js";
+import { KVRow, MetricText, TooSmallTerminal, TuiFooter, TuiHeader, isTerminalTooSmall, statusColor } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { hasProjectSignals } from "../projectSignals.js";
@@ -82,6 +82,10 @@ export function UpdateLayout({ scan, cwd }: UpdateLayoutProps) {
 
   const counts = packageCounts(packages);
   const risk = counts.major > 0 ? "High" : counts.minor > 0 ? "Medium" : counts.patch > 0 ? "Low" : "Clean";
+
+  if (isTerminalTooSmall(terminal.width, terminal.height)) {
+    return <TooSmallTerminal command="setupr update" width={terminal.width} height={terminal.height} />;
+  }
 
   return (
     <Box flexDirection="column" width={terminal.width} height={terminal.height}>
@@ -175,10 +179,8 @@ function WideUpdate(props: UpdateViewProps) {
 }
 
 function StackedUpdate(props: UpdateViewProps) {
-  const summaryHeight = Math.max(6, Math.floor(props.layout.bodyHeight * 0.24));
-  const sideHeight = Math.max(7, Math.floor(props.layout.bodyHeight * 0.25));
+  const { summaryHeight, packageHeight, sideHeight } = stackedUpdateHeights(props.layout.bodyHeight);
   const third = Math.floor((props.layout.width - tuiLayout.panelGap * 2) / 3);
-  const packageHeight = Math.max(8, props.layout.bodyHeight - summaryHeight - sideHeight - tuiLayout.panelGap * 2);
   return (
     <Box flexDirection="column" width={props.layout.width} height={props.layout.bodyHeight} gap={tuiLayout.panelGap}>
       <Box flexDirection="row" width="100%" height={summaryHeight} gap={tuiLayout.panelGap}>
@@ -279,9 +281,13 @@ function NoticePanel({ notice, error, chatMessages }: UpdateViewProps) {
 
 function TableHeader() {
   return (
-    <Box justifyContent="space-between">
-      <Text color={colors.heading}>PACKAGE</Text>
-      <Text color={colors.heading}>CURRENT → LATEST  TYPE</Text>
+    <Box justifyContent="space-between" width="100%" minWidth={0}>
+      <Box flexShrink={0} marginRight={1}>
+        <Text color={colors.heading}>PACKAGE</Text>
+      </Box>
+      <Box flexShrink={1} minWidth={0}>
+        <Text color={colors.heading} wrap="truncate">CURRENT → LATEST  TYPE</Text>
+      </Box>
     </Box>
   );
 }
@@ -329,22 +335,25 @@ export function buildUpdateLayout(width: number, height: number): UpdateLayoutGe
   const bodyHeight = Math.max(8, height - 2);
   const stacked = width < 108 || bodyHeight < 22;
   const gap = tuiLayout.panelGap;
-  const summaryHeight = stacked ? Math.max(6, Math.floor(bodyHeight * 0.24)) : clamp(Math.floor(bodyHeight * 0.22), 6, 8);
-  const mainHeight = Math.max(8, bodyHeight - summaryHeight - (stacked ? gap * 2 : gap));
+  const stackedHeights = stacked ? stackedUpdateHeights(bodyHeight) : null;
+  const summaryHeight = stacked ? stackedHeights!.summaryHeight : clamp(Math.floor(bodyHeight * 0.22), 6, 8);
+  const stackedSideHeight = stacked ? stackedHeights!.sideHeight : 0;
+  const mainHeight = stacked
+    ? stackedHeights!.packageHeight
+    : Math.max(8, bodyHeight - summaryHeight - gap);
   const sideWidth = stacked ? width : clamp(Math.floor(width * 0.30), 34, 48);
   const mainWidth = stacked ? width : Math.max(8, width - sideWidth - gap);
   const summaryWidths = distributeWidths(Math.max(1, width - gap * 3), [1, 1, 1, 1], [18, 18, 18, 18]);
   const inputMaxLines = Math.max(1, Math.min(6, Math.floor(mainHeight / 4)));
   const inputHeight = inputMaxLines + 2;
-  const inputBounds = { x: 3, y: Math.max(4, 2 + summaryHeight + mainHeight - inputHeight - 1), width: Math.max(8, mainWidth - 6), height: inputHeight };
+  const mainY = 2 + summaryHeight + gap;
+  const inputBounds = { x: 3, y: Math.max(4, mainY + mainHeight - inputHeight - 1), width: Math.max(8, mainWidth - 6), height: inputHeight };
   return { width, height, stacked, bodyHeight, summaryHeight, mainHeight, mainWidth, sideWidth, summaryWidths, inputMaxLines, inputHeight, inputBounds };
 }
 
 export function buildUpdateFocusItems(layout: UpdateLayoutGeometry): FocusItem[] {
   if (layout.stacked) {
-    const summaryHeight = Math.max(6, Math.floor(layout.bodyHeight * 0.24));
-    const sideHeight = Math.max(6, Math.floor(layout.bodyHeight * 0.25));
-    const packageHeight = Math.max(8, layout.bodyHeight - summaryHeight - sideHeight - tuiLayout.panelGap * 2);
+    const { summaryHeight, packageHeight, sideHeight } = stackedUpdateHeights(layout.bodyHeight);
     const third = Math.floor((layout.width - tuiLayout.panelGap * 2) / 3);
     return [
       { id: "major", row: 0, column: 0, bounds: { x: 1, y: 2, width: third, height: summaryHeight } },
@@ -468,6 +477,17 @@ function packageCounts(packages: OutdatedPkg[]) {
 
 function buildStack(scan: ScanResult): string {
   return [scan.framework, scan.language, scan.packageManager].filter(Boolean).join(" + ") || "unknown";
+}
+
+function stackedUpdateHeights(bodyHeight: number) {
+  const available = Math.max(8, bodyHeight - tuiLayout.panelGap * 2);
+  const summaryHeight = bodyHeight < 22 ? 5 : Math.max(6, Math.floor(bodyHeight * 0.24));
+  const sideHeight = bodyHeight < 22 ? 5 : Math.max(7, Math.floor(bodyHeight * 0.25));
+  return {
+    summaryHeight,
+    sideHeight,
+    packageHeight: Math.max(4, available - summaryHeight - sideHeight),
+  };
 }
 
 function distributeWidths(total: number, weights: number[], mins: number[]): number[] {

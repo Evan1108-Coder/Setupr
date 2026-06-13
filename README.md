@@ -421,7 +421,7 @@ Setupr TUIs share one terminal-native visual grammar:
 | **Esc** | Leave or skip the active input (where supported) |
 | **q** | Quit when focus is not inside an input |
 
-**Behavior notes:** The TUI runs in the terminal alternate screen, so exiting returns you to the original shell history instead of leaving the dashboard in scrollback. It enables SGR mouse reporting and bracketed paste while active, then disables both on cleanup. It does **not** set a background color — Terminal, iTerm2, Ghostty, and other profiles keep their own theme. Interactive inputs stay anchored at the bottom of their panel, wrap within the box, and scroll once they reach the panel's line cap.
+**Behavior notes:** The TUI runs in the terminal alternate screen, so exiting returns you to the original shell history instead of leaving the dashboard in scrollback. It enables SGR mouse reporting and bracketed paste while active, then disables both on cleanup. It does **not** set a background color — Terminal, iTerm2, Ghostty, and other profiles keep their own theme. Interactive inputs stay anchored at the bottom of their panel, wrap within the box, and scroll once they reach the panel's line cap. TUIs require at least a `60x18` terminal grid; smaller windows show a resize notice instead of compressing panels until borders break. If a terminal font/profile renders thin Unicode borders with visible gaps, set `SETUPR_TUI_BORDER=bold`, `double`, `round`, or `classic`.
 
 > `setupr clean` opens a safety review first; type `CLEAN` to delete reviewed targets, or use `--force` only when you intentionally want to skip the review prompt.
 

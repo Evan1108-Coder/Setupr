@@ -4,10 +4,10 @@ import { loadEnvEditorState, mergeEnvEditorValues, parseEnvPairs, saveEnvEditorE
 import { createSetuprError, errorSummary, fromUnknownError, type SetuprError } from "../../errors/index.js";
 import { Panel } from "../components/Panel.js";
 import { BoundedTextInput } from "../components/BoundedTextInput.js";
-import { MetricText, TuiFooter, TuiHeader } from "../components/TuiFrame.js";
+import { MetricText, TooSmallTerminal, TuiFooter, TuiHeader, isTerminalTooSmall } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem, type FocusState } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
-import { colors, icons, layout as tuiLayout } from "../theme.js";
+import { colors, getBorderStyle, icons, layout as tuiLayout } from "../theme.js";
 import { parseSgrMouse, stripTerminalControlInput } from "../terminalInput.js";
 
 interface EnvLayoutProps {
@@ -158,6 +158,10 @@ export function EnvLayout({ cwd }: EnvLayoutProps) {
 
   const footer = dirty ? "unsaved" : saving ? "saving..." : message ? "saved" : state ? `${entries.length} vars` : "loading";
 
+  if (isTerminalTooSmall(terminal.width, terminal.height)) {
+    return <TooSmallTerminal command="setupr env" width={terminal.width} height={terminal.height} />;
+  }
+
   return (
     <Box key={`${terminal.width}x${terminal.height}`} flexDirection="column" width={terminal.width} height={terminal.height}>
       <TuiHeader command="setupr env" cwd={cwd} status={footer} statusColor={dirty ? colors.warning : error ? colors.error : colors.success} right={footer} width={terminal.width} />
@@ -187,15 +191,15 @@ export function EnvLayout({ cwd }: EnvLayoutProps) {
             </Box>
           )}
           <Box flexDirection={layout.stacked ? "column" : "row"} height={layout.contentHeight} width="100%" flexGrow={1} overflow="hidden" gap={tuiLayout.panelGap}>
-            <Panel title="Variables" focusState={focus.focusState("vars")} width={layout.stacked ? "100%" : layout.listWidth} height={layout.stacked ? Math.max(7, Math.floor(layout.contentHeight * 0.42)) : "100%"}>
+            <Panel title="Variables" focusState={focus.focusState("vars")} width={layout.stacked ? "100%" : layout.listWidth} height={layout.stacked ? layout.listBounds.height : "100%"}>
               <VariableList entries={visibleEntries} offset={listOffset} selectedIndex={selectedIndex} />
             </Panel>
 
-            <Box flexDirection="column" width={layout.stacked ? "100%" : layout.sideWidth} height={layout.stacked ? Math.max(10, Math.ceil(layout.contentHeight * 0.58)) : "100%"} gap={tuiLayout.panelGap}>
+            <Box flexDirection="column" width={layout.stacked ? "100%" : layout.sideWidth} height={layout.stacked ? layout.detailsHeight + layout.editorHeight + tuiLayout.panelGap : "100%"} gap={tuiLayout.panelGap}>
               <Panel title="Details" focusState={focus.focusState("details")} width="100%" height={layout.detailsHeight}>
                 <DetailsPanel state={state} selected={selected} message={message} error={error} />
               </Panel>
-              <Panel title="Editor" focusState={focus.focusState("editor")} width="100%" flexGrow={1} minHeight={layout.editorHeight}>
+              <Panel title="Editor" focusState={focus.focusState("editor")} width="100%" height={layout.editorHeight}>
                 <EditorPanel
                   selected={selected}
                   draft={draft}
@@ -352,7 +356,7 @@ function EditorPanel({
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
 }) {
-  const inputWidth = Math.max(8, width - 6);
+  const inputWidth = Math.max(1, width - 4);
   return (
     <Box flexDirection="column" width="100%" height="100%" justifyContent="flex-end">
       <Box flexGrow={1} flexDirection="column">
@@ -364,7 +368,7 @@ function EditorPanel({
         </Text>
         {dirty && <Text color={colors.warning}>Unsaved changes. Press Enter to save.</Text>}
       </Box>
-      <Box borderStyle="round" borderColor={focusState === "focused" ? colors.borderActive : colors.border} paddingX={1} width={Math.max(12, width - 2)} flexShrink={0}>
+      <Box borderStyle={getBorderStyle("input")} borderColor={focusState === "focused" ? colors.borderActive : colors.border} paddingX={1} width={Math.max(12, width)} flexShrink={0}>
         <Text color={colors.primary}>{icons.arrowRight} </Text>
         <BoundedTextInput
           value={draft}
@@ -388,12 +392,17 @@ export function buildEnvLayout(width: number, height: number): EnvLayoutGeometry
   const gap = tuiLayout.panelGap;
   const summaryHeight = stacked ? 0 : clamp(Math.floor(bodyHeight * 0.18), 5, 6);
   const contentHeight = Math.max(8, bodyHeight - summaryHeight - (stacked ? 0 : gap));
-  const baseInputMaxLines = Math.max(1, Math.min(6, Math.floor(bodyHeight / 4)));
   if (stacked) {
-    const editorHeight = clamp(baseInputMaxLines + 5, 6, Math.max(6, Math.floor(bodyHeight * 0.42)));
-    const inputMaxLines = Math.max(1, Math.min(baseInputMaxLines, editorHeight - 4));
-    const detailsHeight = clamp(Math.floor(bodyHeight * 0.28), 6, Math.max(6, bodyHeight - editorHeight - 5));
-    const listHeight = Math.max(5, bodyHeight - detailsHeight - editorHeight - gap * 2);
+    const compact = bodyHeight < 20;
+    const available = Math.max(8, bodyHeight - gap * 2);
+    const editorHeight = compact
+      ? 5
+      : clamp(Math.floor(bodyHeight * 0.34), 6, Math.max(6, Math.floor(bodyHeight * 0.42)));
+    const inputMaxLines = clamp(Math.floor(editorHeight / 4), 1, 4);
+    const detailsHeight = compact
+      ? Math.max(3, available - editorHeight - 5)
+      : clamp(Math.floor(bodyHeight * 0.28), 6, Math.max(6, bodyHeight - editorHeight - 5));
+    const listHeight = Math.max(compact ? 4 : 5, bodyHeight - detailsHeight - editorHeight - gap * 2);
     const inputY = Math.max(4, height - inputMaxLines - 2);
     return {
       width,
@@ -420,8 +429,8 @@ export function buildEnvLayout(width: number, height: number): EnvLayoutGeometry
       visibleRows: Math.max(1, listHeight - 3),
     };
   }
-  const inputMaxLines = baseInputMaxLines;
-  const editorHeight = Math.max(7, inputMaxLines + 5);
+  const editorHeight = Math.max(10, Math.floor(contentHeight * 0.28));
+  const inputMaxLines = clamp(Math.floor(editorHeight / 4), 1, 4);
   const listWidth = Math.max(30, Math.floor(width * 0.30));
   const helperWidth = clamp(Math.floor(width * 0.26), 28, 40);
   const sideWidth = Math.max(24, width - listWidth - helperWidth - gap * 2);

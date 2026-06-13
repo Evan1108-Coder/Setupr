@@ -11,7 +11,7 @@ import type { AgentPrompt, AppMessage, AppStore, LogEntry, NoticeInfo } from "..
 import { ChatInput } from "../components/ChatInput.js";
 import { Panel } from "../components/Panel.js";
 import { PromptCard } from "../components/PromptCard.js";
-import { TuiFooter, TuiHeader } from "../components/TuiFrame.js";
+import { TooSmallTerminal, TuiFooter, TuiHeader, isTerminalTooSmall } from "../components/TuiFrame.js";
 import { Timeline, type TimelineEvent } from "../components/Timeline.js";
 import { useFocusNavigation, type FocusBounds, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useAppStore } from "../hooks/useStore.js";
@@ -243,6 +243,10 @@ export function ChatLayout({ cwd, store, initialMessage, startNew = false }: Cha
     return events.slice(Math.max(0, end - maxGroups), end);
   }, [events, layout.transcriptHeight, scrollBack]);
 
+  if (isTerminalTooSmall(terminal.width, terminal.height)) {
+    return <TooSmallTerminal command="setupr chat" width={terminal.width} height={terminal.height} />;
+  }
+
   return (
     <Box flexDirection="column" width={terminal.width} height={terminal.height}>
       <Header cwd={cwd} projectName={projectName} status={status} ready={ready} width={terminal.width} />
@@ -406,7 +410,7 @@ function ConversationPanel({
               active={promptActive}
               focusState={focus("input")}
               onSubmit={onPromptSubmit}
-              width={Math.max(12, Number(width) - 6)}
+              width={Math.max(12, Number(width) - 4)}
               maxInputLines={layout.inputMaxLines}
               scrollBounds={inputBounds}
             />
@@ -469,7 +473,7 @@ function Footer({ status, width }: { status: ChatSessionStatus; width: number })
     ? "Esc pause AI · Ctrl+R resume · Tab panels · q quit outside input"
     : "Enter send · Ctrl+Enter or /steer steer · Tab panels · ↑/↓ navigate · q quit outside input";
   return (
-    <TuiFooter width={width} left={width < 90 ? text.replace(" · ↑/↓ navigate", "") : text} right="v1.0.0" />
+    <TuiFooter width={width} left={width < 90 ? text.replace(" · ↑/↓ navigate", "") : text} right={`v${process.env.npm_package_version || "0.0.0"}`} />
   );
 }
 
@@ -531,9 +535,13 @@ function buildChatEvents(messages: AppMessage[], logs: LogEntry[], notices: Noti
 
 function KV({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <Box justifyContent="space-between" minWidth={0}>
-      <Text color={colors.label}>{label}</Text>
-      <Text color={color || colors.value} wrap="truncate">{value}</Text>
+    <Box justifyContent="space-between" width="100%" minWidth={0}>
+      <Box flexShrink={0} marginRight={1}>
+        <Text color={colors.label}>{label}</Text>
+      </Box>
+      <Box flexShrink={1} minWidth={0}>
+        <Text color={color || colors.value} wrap="truncate">{value}</Text>
+      </Box>
     </Box>
   );
 }

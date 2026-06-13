@@ -1,4 +1,7 @@
 import { defineConfig } from "tsup";
+import { readFileSync } from "fs";
+
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8")) as { version?: string };
 
 export default defineConfig({
   entry: ["bin/setup.ts"],
@@ -19,6 +22,7 @@ export default defineConfig({
   esbuildOptions(options) {
     options.define = {
       "process.env.NODE_ENV": '"production"',
+      "process.env.npm_package_version": JSON.stringify(pkg.version || "0.0.0"),
     };
   },
 });

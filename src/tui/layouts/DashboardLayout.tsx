@@ -3,7 +3,7 @@ import { Box, Text, useApp } from "ink";
 import { collectDashboardStatus, createDashboardFallbackStatus, type DashboardStatus } from "../../status/collector.js";
 import { Panel } from "../components/Panel.js";
 import { Spinner } from "../components/Spinner.js";
-import { KVRow, TuiFooter, TuiHeader, formatAge, shortPath, statusColor } from "../components/TuiFrame.js";
+import { KVRow, TooSmallTerminal, TuiFooter, TuiHeader, formatAge, isTerminalTooSmall, shortPath, statusColor } from "../components/TuiFrame.js";
 import { useFocusNavigation, type FocusItem } from "../hooks/useFocusNavigation.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { colors, icons, layout as tuiLayout } from "../theme.js";
@@ -67,6 +67,10 @@ export function DashboardLayout({ cwd, initialStatus, variant = "dashboard" }: D
   const stack = status?.scan ? buildStack(status.scan) : "collecting";
   const health = status ? `${status.health.score}/100 ${status.health.label}` : "loading";
 
+  if (isTerminalTooSmall(terminal.width, terminal.height)) {
+    return <TooSmallTerminal command={command} width={terminal.width} height={terminal.height} />;
+  }
+
   return (
     <Box flexDirection="column" width={terminal.width} height={terminal.height}>
       <TuiHeader
@@ -103,7 +107,7 @@ export function DashboardLayout({ cwd, initialStatus, variant = "dashboard" }: D
       <TuiFooter
         width={terminal.width}
         left="Ctrl+C abort · Tab next panel · ←/↑/↓/→ scroll/navigate · ? help"
-        right={status ? `v${process.env.npm_package_version || "1.0.0"} · ${status.projectName}` : undefined}
+        right={status ? `v${process.env.npm_package_version || "0.0.0"} · ${status.projectName}` : undefined}
       />
     </Box>
   );
@@ -113,7 +117,7 @@ function DashboardScreen({ layout, status, focus }: ScreenProps) {
   if (layout.stacked) {
     if (layout.compactStacked) {
       const topHeight = clamp(Math.floor(layout.bodyHeight * 0.4), 8, Math.max(8, layout.bodyHeight - 8));
-      const bottomHeight = Math.max(8, layout.bodyHeight - topHeight);
+      const bottomHeight = Math.max(6, layout.bodyHeight - topHeight - tuiLayout.panelGap);
       return (
         <Box flexDirection="column" width={layout.width} height={layout.bodyHeight} overflow="hidden" gap={tuiLayout.panelGap}>
           <Box flexDirection="row" width="100%" height={topHeight} gap={tuiLayout.panelGap}>
@@ -197,7 +201,7 @@ function StatusScreen({ layout, status, focus }: ScreenProps) {
   if (layout.stacked) {
     if (layout.compactStacked) {
       const topHeight = clamp(Math.floor(layout.bodyHeight * 0.4), 8, Math.max(8, layout.bodyHeight - 8));
-      const bottomHeight = Math.max(8, layout.bodyHeight - topHeight);
+      const bottomHeight = Math.max(6, layout.bodyHeight - topHeight - tuiLayout.panelGap);
       return (
         <Box flexDirection="column" width={layout.width} height={layout.bodyHeight} overflow="hidden" gap={tuiLayout.panelGap}>
           <Box flexDirection="row" width="100%" height={topHeight} gap={tuiLayout.panelGap}>
@@ -540,7 +544,7 @@ export function buildDashboardFocusItems(layout: DashboardLayoutGeometry): Focus
     if (layout.compactStacked) {
       const ids = layout.variant === "status" ? ["health", "overview", "state", "actions"] : ["project", "overview", "actions", "notices"];
       const topHeight = clamp(Math.floor(layout.bodyHeight * 0.4), 8, Math.max(8, layout.bodyHeight - 8));
-      const bottomHeight = Math.max(8, layout.bodyHeight - topHeight);
+      const bottomHeight = Math.max(6, layout.bodyHeight - topHeight - tuiLayout.panelGap);
       return [
         { id: ids[0], row: 0, column: 0, bounds: { x: 1, y: 2, width: layout.leftWidth, height: topHeight } },
         { id: ids[1], row: 0, column: 1, bounds: { x: layout.leftWidth + tuiLayout.panelGap + 1, y: 2, width: layout.rightWidth, height: topHeight } },
