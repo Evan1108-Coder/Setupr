@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { env } from "process";
-import { applyPluginPlanners, runPluginDoctorChecks, tryRunPluginCommand } from "../src/plugins/runtime.js";
+import { applyPluginPlanners, loadEnabledPlugins, runPluginDoctorChecks, tryRunPluginCommand } from "../src/plugins/runtime.js";
 import { saveConfig } from "../src/state/config.js";
 import type { ScanResult } from "../src/scanner/index.js";
 import type { SetupStep } from "../src/ai/planner.js";
@@ -96,4 +96,95 @@ describe("plugin runtime", () => {
     expect(commandHandled).toBe(true);
     expect(logs.join("\n")).toContain("team command one");
   });
+
+  it("loads plugins that expose an exports object entrypoint", async () => {
+    const pluginDir = join(tempDir, ".setupr", "plugins", "exported");
+    await mkdir(join(pluginDir, "build"), { recursive: true });
+    await writeFile(join(pluginDir, "package.json"), JSON.stringify({
+      name: "setupr-plugin-exported",
+      version: "0.1.0",
+      type: "module",
+      exports: { ".": { import: "./build/plugin.js" } },
+      setupr: { apiVersion: "1" },
+    }));
+    await writeFile(join(pluginDir, "build", "plugin.js"), `
+      export default {
+        name: "setupr-plugin-exported",
+        apiVersion: "1",
+        commands: [{ name: "exported-ok", summary: "OK", run(context) { context.log("exported command"); } }],
+      };
+    `);
+    await saveConfig(configWithPlugins([
+      { name: "setupr-plugin-exported", version: "0.1.0", enabled: true, source: ".setupr/plugins/exported" },
+    ]));
+
+    const loaded = await loadEnabledPlugins(tempDir);
+
+    expect(loaded.diagnostics).toContainEqual(expect.objectContaining({ name: "setupr-plugin-exported", status: "loaded" }));
+    expect(loaded.plugins.map((item) => item.plugin.name)).toContain("setupr-plugin-exported");
+  });
+
+  it("rejects plugin entrypoints that escape the plugin directory", async () => {
+    const pluginDir = join(tempDir, ".setupr", "plugins", "escape");
+    await mkdir(pluginDir, { recursive: true });
+    await writeFile(join(tempDir, ".setupr", "plugins", "evil.js"), "export default { name: 'evil', apiVersion: '1' };\n");
+    await writeFile(join(pluginDir, "package.json"), JSON.stringify({
+      name: "setupr-plugin-escape",
+      version: "0.1.0",
+      type: "module",
+      main: "../evil.js",
+      setupr: { apiVersion: "1" },
+    }));
+    await saveConfig(configWithPlugins([
+      { name: "setupr-plugin-escape", version: "0.1.0", enabled: true, source: ".setupr/plugins/escape" },
+    ]));
+
+    const loaded = await loadEnabledPlugins(tempDir);
+
+    expect(loaded.plugins).toHaveLength(0);
+    expect(loaded.diagnostics[0]).toMatchObject({ name: "setupr-plugin-escape", status: "failed" });
+    expect(loaded.diagnostics[0].message).toContain("escapes plugin directory");
+  });
+
+  it("turns throwing plugin commands into structured plugin errors", async () => {
+    const pluginDir = join(tempDir, ".setupr", "plugins", "thrower");
+    await mkdir(pluginDir, { recursive: true });
+    await writeFile(join(pluginDir, "package.json"), JSON.stringify({
+      name: "setupr-plugin-thrower",
+      version: "0.1.0",
+      type: "module",
+      main: "index.js",
+      setupr: { apiVersion: "1" },
+    }));
+    await writeFile(join(pluginDir, "index.js"), `
+      export default {
+        name: "setupr-plugin-thrower",
+        apiVersion: "1",
+        commands: [{ name: "explode", summary: "Fail", run() { throw new Error("plugin boom"); } }],
+      };
+    `);
+    await saveConfig(configWithPlugins([
+      { name: "setupr-plugin-thrower", version: "0.1.0", enabled: true, source: ".setupr/plugins/thrower" },
+    ]));
+
+    await expect(tryRunPluginCommand({ cwd: tempDir, command: "explode", args: [] }))
+      .rejects.toMatchObject({ code: "PLUGIN_LOAD_FAILED", details: expect.arrayContaining(["Plugin: setupr-plugin-thrower", "plugin boom"]) });
+  });
 });
+
+function configWithPlugins(plugins: Array<{ name: string; version: string; enabled: boolean; source: string }>) {
+  return {
+    ai: { enabled: true, timeoutMs: 30000, maxRetries: 3, retryDelayMs: 1000, rateLimitPerMinute: 20 },
+    preferences: {
+      theme: "dark",
+      confirmBeforeInstall: true,
+      autoUpdate: false,
+      telemetry: false,
+      defaultBranch: "main",
+      commitConvention: "conventional",
+      ciPlatform: "auto",
+    },
+    plugins,
+    remembered: {},
+  };
+}

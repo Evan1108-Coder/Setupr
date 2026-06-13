@@ -136,14 +136,14 @@ export function classifyCommandFailure(input: {
 }
 
 export function classifyAIProviderError(error: unknown, context: Partial<SetuprErrorInput> = {}): SetuprError {
-  const raw = error instanceof Error ? error.message : String(error || "");
+  const raw = providerErrorText(error);
   const lower = raw.toLowerCase();
   let code: SetuprErrorCode = "AI_PROVIDER_REQUEST_FAILED";
   if (/timed? out|timeout|abort/.test(lower)) code = "AI_PROVIDER_TIMEOUT";
   else if (/401|unauthorized|invalid api key|authentication/.test(lower)) code = "AI_PROVIDER_AUTH_FAILED";
   else if (/403|forbidden|access denied/.test(lower)) code = "AI_PROVIDER_AUTH_FAILED";
+  else if (/insufficient[_ -]?quota|quota|credit|insufficient balance|billing hard limit|out of credits/.test(lower)) code = "AI_PROVIDER_QUOTA_EXHAUSTED";
   else if (/429|rate limit|too many requests/.test(lower)) code = "AI_PROVIDER_RATE_LIMITED";
-  else if (/quota|credit|insufficient balance|billing|exceeded/.test(lower)) code = "AI_PROVIDER_QUOTA_EXHAUSTED";
   else if (/500|502|503|504|unavailable|overloaded/.test(lower)) code = "AI_PROVIDER_UNAVAILABLE";
   else if (/json|parse|invalid response|protocol/.test(lower)) code = "AI_PROVIDER_PROTOCOL_ERROR";
 
@@ -158,6 +158,37 @@ export function classifyAIProviderError(error: unknown, context: Partial<SetuprE
     ],
     cause: error,
   });
+}
+
+function providerErrorText(error: unknown): string {
+  const parts: string[] = [];
+  const seen = new Set<unknown>();
+
+  const collect = (value: unknown, depth: number) => {
+    if (value === null || value === undefined || seen.has(value) || depth > 2) return;
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      parts.push(String(value));
+      return;
+    }
+    if (value instanceof Error) {
+      parts.push(value.name);
+      parts.push(value.message);
+    }
+    if (typeof value !== "object") return;
+    seen.add(value);
+    const record = value as Record<string, unknown>;
+    for (const key of ["status", "statusCode", "code", "type", "name", "message", "statusText"]) {
+      const hint = record[key];
+      if (typeof hint === "string" || typeof hint === "number") parts.push(`${key}: ${hint}`);
+    }
+    for (const key of ["error", "response", "body", "data", "cause"]) {
+      if (record[key] !== undefined) collect(record[key], depth + 1);
+    }
+  };
+
+  collect(error, 0);
+  const raw = parts.filter(Boolean).join(" | ").trim();
+  return raw || String(error || "");
 }
 
 export function sanitizeSecret(value: string): string {

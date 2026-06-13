@@ -1,12 +1,13 @@
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 import { pathToFileURL } from "url";
-import { join, resolve } from "path";
+import { isAbsolute, join, relative, resolve } from "path";
 import type { SetupStep } from "../ai/planner.js";
 import type { ProjectContext } from "../ai/dsl.js";
 import { collectContext } from "../context/collector.js";
 import { loadConfig, type PluginEntry } from "../state/config.js";
 import { scanProject, type ScanResult } from "../scanner/index.js";
+import { createSetuprError } from "../errors/index.js";
 import type {
   SetuprPlugin,
   SetuprPluginContext,
@@ -173,7 +174,17 @@ export async function tryRunPluginCommand(input: {
   for (const { plugin } of plugins) {
     const command = plugin.commands?.find((candidate) => candidate.name === input.command);
     if (!command) continue;
-    await command.run(await pluginContext(input.cwd, scan, context, input.log), input.args);
+    try {
+      await command.run(await pluginContext(input.cwd, scan, context, input.log), input.args);
+    } catch (err) {
+      throw createSetuprError({
+        code: "PLUGIN_LOAD_FAILED",
+        command: input.command,
+        cwd: input.cwd,
+        details: [`Plugin: ${plugin.name}`, err instanceof Error ? err.message : String(err)],
+        cause: err,
+      });
+    }
     return true;
   }
 
@@ -231,16 +242,44 @@ async function loadPluginFromDir(name: string, dir: string): Promise<LoadedPlugi
 function resolveEntrypoint(dir: string, manifest: PluginManifest): string | null {
   const candidates = [
     typeof manifest.exports === "string" ? manifest.exports : undefined,
+    ...exportsObjectEntrypoints(manifest.exports),
     manifest.main,
     "dist/index.js",
     "index.js",
   ].filter((item): item is string => Boolean(item));
 
   for (const candidate of candidates) {
-    const entry = join(dir, candidate);
+    const entry = resolve(dir, candidate);
+    if (!isInsideDirectory(dir, entry)) {
+      throw new Error(`Plugin entrypoint escapes plugin directory: ${candidate}`);
+    }
     if (existsSync(entry)) return entry;
   }
   return null;
+}
+
+function exportsObjectEntrypoints(value: PluginManifest["exports"]): string[] {
+  if (!value || typeof value === "string") return [];
+  const results: string[] = [];
+  const visit = (node: unknown, depth: number) => {
+    if (depth > 3 || !node) return;
+    if (typeof node === "string") {
+      results.push(node);
+      return;
+    }
+    if (typeof node !== "object") return;
+    const record = node as Record<string, unknown>;
+    for (const key of [".", "import", "default", "node", "require"]) {
+      if (record[key] !== undefined) visit(record[key], depth + 1);
+    }
+  };
+  visit(value, 0);
+  return results;
+}
+
+function isInsideDirectory(dir: string, entry: string): boolean {
+  const rel = relative(resolve(dir), entry);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
 async function pluginContext(

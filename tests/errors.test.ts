@@ -51,6 +51,17 @@ describe("centralized error system", () => {
     expect(classifyAIProviderError(new Error("invalid json response")).code).toBe("AI_PROVIDER_PROTOCOL_ERROR");
   });
 
+  it("classifies structured provider errors from SDK status and code fields", () => {
+    expect(classifyAIProviderError(Object.assign(new Error("provider refused request"), { status: 401 })).code)
+      .toBe("AI_PROVIDER_AUTH_FAILED");
+    expect(classifyAIProviderError(Object.assign(new Error("too many requests"), { status: 429 })).code)
+      .toBe("AI_PROVIDER_RATE_LIMITED");
+    expect(classifyAIProviderError(Object.assign(new Error("too many requests"), { status: 429, code: "insufficient_quota" })).code)
+      .toBe("AI_PROVIDER_QUOTA_EXHAUSTED");
+    expect(classifyAIProviderError({ response: { status: 502, statusText: "Bad Gateway" } }).code)
+      .toBe("AI_PROVIDER_UNAVAILABLE");
+  });
+
   it("sanitizes common secret formats", () => {
     const value = sanitizeSecret("OPENAI_API_KEY=sk-abcdef1234567890 GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz");
 
