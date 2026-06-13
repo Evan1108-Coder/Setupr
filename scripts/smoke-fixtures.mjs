@@ -142,6 +142,8 @@ function plainSmoke() {
   expectRun("security quick", "js-new", ["security", "quick", "--plain"], ["Setupr Security scan", "Score:"]);
   expectRun("security deep report", "docker-heavy", ["security", "deep", "--plain", "--report", ".setupr/security-smoke.md"], ["Setupr Security deep", "Container may run as root"]);
   expectRun("security headers guarded", "js-new", ["security", "headers", "--plain", "--url", "https://example.com"], ["External URL requires explicit authorization", "Rerun with --force"]);
+  expectRun("invalid --cwd rejected", "js-new", ["status", "--plain", "--cwd", join(temp, "does-not-exist")], ["INVALID_CWD", "Directory not found"]);
+  expectRun("missing package arg", "js-new", ["add", "--plain"], ["MISSING_PACKAGE", "Package name required"]);
 	  expectRun("no project setup", "no-project", ["setup", "--plain", "--force"], ["NO_PROJECT_DETECTED"]);
   expectRun("no project update", "no-project", ["update", "--plain"], ["NO_PROJECT_DETECTED"]);
   expectRun("forced non-tty tui", "js-new", ["status", "--tui"], ["TUI_RENDER_FAILED", "--tui was requested"]);

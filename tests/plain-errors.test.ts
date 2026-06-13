@@ -54,6 +54,26 @@ describe("plain command structured errors", () => {
     expect(output()).toContain("LOG_FILE_MISSING");
   });
 
+  it("asks for a package name (not an 'unknown subcommand') when add/remove get no argument", async () => {
+    await runNonTUICommand("add", undefined, tempDir, {});
+    expect(output()).toContain("MISSING_PACKAGE");
+    expect(output()).not.toContain("UNKNOWN_SUBCOMMAND");
+    expect(process.exitCode).toBe(1);
+
+    logs = [];
+    process.exitCode = undefined;
+    await runNonTUICommand("remove", undefined, tempDir, {});
+    expect(output()).toContain("MISSING_PACKAGE");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("asks for a package name when 'deps why' gets no argument", async () => {
+    await runNonTUICommand("deps", "why", tempDir, { args: [] });
+
+    expect(output()).toContain("MISSING_PACKAGE");
+    expect(output()).toContain("setupr deps why <package>");
+  });
+
   function output(): string {
     return logs.join("\n");
   }

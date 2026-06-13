@@ -620,7 +620,7 @@ async function cmdSwitch(version: string | undefined, cwd: string) {
 
 async function cmdAdd(pkg: string | undefined, cwd: string) {
   if (!pkg) {
-    printPlainError(createSetuprError({ code: "UNKNOWN_SUBCOMMAND", command: "add", cwd, details: ["Usage: setup add <package>"] }));
+    printPlainError(createSetuprError({ code: "MISSING_PACKAGE", command: "add", cwd, details: ["Usage: setup add <package>"] }));
     return;
   }
   if (!/^[@a-zA-Z0-9/_.-]+$/.test(pkg)) {
@@ -636,7 +636,7 @@ async function cmdAdd(pkg: string | undefined, cwd: string) {
 
 async function cmdRemove(pkg: string | undefined, cwd: string) {
   if (!pkg) {
-    printPlainError(createSetuprError({ code: "UNKNOWN_SUBCOMMAND", command: "remove", cwd, details: ["Usage: setup remove <package>"] }));
+    printPlainError(createSetuprError({ code: "MISSING_PACKAGE", command: "remove", cwd, details: ["Usage: setup remove <package>"] }));
     return;
   }
   if (!/^[@a-zA-Z0-9/_.-]+$/.test(pkg)) {
@@ -926,7 +926,7 @@ async function cmdDepsAudit(cwd: string): Promise<void> {
 async function cmdDepsWhy(cwd: string, packageName: string | undefined): Promise<void> {
   if (!packageName) {
     printPlainError(createSetuprError({
-      code: "UNKNOWN_SUBCOMMAND",
+      code: "MISSING_PACKAGE",
       command: "deps",
       subcommand: "why",
       cwd,

@@ -1,4 +1,5 @@
 import meow from "meow";
+import { statSync } from "fs";
 import { join, resolve } from "path";
 import { showPreWarning } from "./preWarning.js";
 import { showTransition } from "./transition.js";
@@ -142,6 +143,16 @@ export async function run() {
 
   const subCommand = resolveSubCommand(command, cli.input[1], cli.flags);
   const cwd = typeof cli.flags.cwd === "string" ? resolve(cli.flags.cwd) : process.cwd();
+  if (typeof cli.flags.cwd === "string" && !isExistingDirectory(cwd)) {
+    printPlainError(createSetuprError({
+      code: "INVALID_CWD",
+      command,
+      subcommand: subCommand,
+      cwd,
+      details: [`--cwd ${cli.flags.cwd} did not resolve to an existing directory.`],
+    }));
+    return;
+  }
   const mode = cli.flags.plain || cli.flags.noTui ? "plain" : cli.flags.tui ? "tui" : "auto";
   const engine = createProjectEngine({
     cwd,
@@ -393,6 +404,14 @@ function validateCliRequest(command: string, subCommand: string | undefined, cwd
     return false;
   }
   return true;
+}
+
+function isExistingDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function resolveSubCommand(command: string, positional: string | undefined, flags: typeof cli.flags): string | undefined {

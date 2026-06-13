@@ -60,6 +60,17 @@ describe("centralized error system", () => {
     expect(value).toContain("GITHUB_TOKEN=****");
   });
 
+  it("exposes catalog entries for invalid cwd and missing package usage errors", () => {
+    const cwdError = createSetuprError({ code: "INVALID_CWD", command: "status", cwd: "/missing" });
+    expect(cwdError.category).toBe("usage");
+    expect(cwdError.exitCode).toBe(1);
+    expect(renderPlainError(cwdError)).toContain("Directory not found");
+
+    const pkgError = createSetuprError({ code: "MISSING_PACKAGE", command: "add" });
+    expect(pkgError.exitCode).toBe(1);
+    expect(renderPlainError(pkgError)).toContain("Package name required");
+  });
+
   it("does not wrap already structured errors as unknown failures", () => {
     const original = createSetuprError({
       code: "MALFORMED_PROJECT_FILE",

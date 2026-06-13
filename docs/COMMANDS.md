@@ -74,6 +74,10 @@ Full reference of all Setupr CLI commands.
 | `--deps` | With `clean`, remove dependency/cache artifacts |
 | `--share` | With `clean`, remove sensitive/local-only files before sharing a project |
 | `--all` | With `clean`, remove dependencies, build output, caches, and local env files |
+| `--json` | Emit machine-readable JSON where a command supports it (`status`, `ps`, `release`, `perf`, `github`, …) |
+| `--cwd <path>` | Run against another project directory; Setupr errors if the path does not exist or is not a directory |
+
+Run `setupr help` for the full global option list, or `setupr help <command>` for a command's own flags and examples.
 
 ## TUI Navigation
 

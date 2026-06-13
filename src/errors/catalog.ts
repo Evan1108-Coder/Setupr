@@ -7,6 +7,8 @@ export const ERROR_CATALOG: Record<SetuprErrorCode, Template> = {
   UNKNOWN_SUBCOMMAND: usage("Unknown subcommand", "That subcommand is not available for this command.", ["Run setup help <command> to see valid subcommands."]),
   INVALID_FLAG: usage("Flag is not valid here", "The flag was accepted by the shell parser but does not apply to this command.", ["Remove the flag or run setup help <command>."]),
   INVALID_FLAG_COMBINATION: usage("Flags conflict", "Two or more flags request incompatible behavior.", ["Pick one mode and rerun the command."]),
+  INVALID_CWD: usage("Directory not found", "The path passed with --cwd does not exist or is not a directory.", ["Check the path and rerun with a valid --cwd, or omit it to use the current directory."]),
+  MISSING_PACKAGE: usage("Package name required", "This command needs a package name to act on.", ["Pass a package, e.g. setup add <package> or setup remove <package>."]),
   NON_INTERACTIVE_CONFIRMATION_REQUIRED: usage("Confirmation required", "This action needs confirmation, but the current terminal cannot accept interactive input.", ["Rerun in an interactive terminal or pass --force if you accept the risk."]),
   NON_INTERACTIVE_INPUT_REQUIRED: usage("Input required", "This command needs a value, but the current terminal cannot prompt for it.", ["Pass the value as an option, or rerun in an interactive terminal."]),
 
