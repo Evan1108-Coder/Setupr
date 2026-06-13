@@ -1,58 +1,33 @@
 # Setupr
 
-> AI-powered project-control CLI that detects project stacks, plans setup, installs dependencies, configures environments, and verifies local health.
+> **AI-powered project-control CLI.** Setupr detects your project's stack, plans setup, installs dependencies, configures environments, verifies local health, and keeps the project running — all from one terminal-native command.
 
-![Status](https://img.shields.io/badge/status-beta-6b7280) ![License](https://img.shields.io/github/license/Evan1108-Coder/Setupr)
+![Status](https://img.shields.io/badge/status-beta-6b7280) ![License](https://img.shields.io/github/license/Evan1108-Coder/Setupr) ![Node](https://img.shields.io/badge/node-%3E%3D18-3c873a) ![npm](https://img.shields.io/badge/npm-%40evan--coder%2Fsetupr-cb3837)
 
-**TypeScript CLI | stack detection | setup automation | project doctor | terminal dashboard**
+**TypeScript CLI · stack detection · setup automation · project doctor · terminal dashboard · AI director**
 
-## At A Glance
+---
 
-- Public npm package: `@evan-coder/setupr`
-- Installed commands: `setupr` and legacy `setup`
-- Public repo: https://github.com/Evan1108-Coder/Setupr
-- Maintenance snapshot: [docs/project-snapshot.md](docs/project-snapshot.md)
-- Full command reference: [docs/COMMANDS.md](docs/COMMANDS.md)
-- Full feature reference: [docs/FEATURES.md](docs/FEATURES.md)
-- Security policy: [SECURITY.md](SECURITY.md)
+## ⚡ TL;DR — What you need to know
 
-> Status: beta. Setupr is usable as a CLI today, but stack-specific setup paths should keep getting real-world test coverage before a 1.0-stable claim.
+| | |
+|---|---|
+| **Install** | `npm install -g @evan-coder/setupr` &nbsp;·&nbsp; or run instantly with `npx @evan-coder/setupr` |
+| **Commands** | `setupr` (the installed binary) — legacy alias `setup` |
+| **First run** | `cd your-project` → `setupr` → confirm the warning → the dashboard scans, plans, and sets up |
+| **Full setup** | `setupr setup` — scan, install runtime + deps, configure `.env`, verify |
+| **Health check** | `setupr doctor` (environment) · `setupr health` (project) · `setupr status` (live dashboard) |
+| **AI (optional)** | `setupr auth login` — Setupr works fully without a key; AI only kicks in for novel situations |
+| **CI / scripts** | add `--plain` (no TUI) and `--force` (skip safe prompts); `--json` for machine-readable output |
+| **Requires** | Node.js ≥ 18, a Unicode-capable terminal |
 
-Setupr is for developers who clone projects often and do not want to manually guess install commands, runtime versions, environment files, ports, or verification steps.
+> **Status: beta.** Setupr is usable as a daily CLI today. Stack-specific setup paths keep getting real-world coverage before a 1.0-stable claim.
 
-## Visual Snapshot
+**Who it's for:** developers who clone projects often and don't want to manually guess install commands, runtime versions, env files, ports, or verification steps.
 
-These visuals are generated from the actual repository structure and project workflow, not placeholders.
+**Jump to:** [Install](#installation) · [Quick Start](#quick-start) · [Screenshots](#screenshots) · [Commands](#command-reference) · [Flags](#global-flags) · [Features](#features) · [AI Providers](#ai-providers) · [TUI Design](#tui-design--navigation) · [Safety](#safety-policy) · [Config](#configuration) · [Troubleshooting](#troubleshooting)
 
-![Repository file mix](docs/assets/repo-file-mix.svg)
-
-![Project workflow](docs/assets/workflow.svg)
-
-## Screenshots
-
-Real output captured from the Setupr CLI (`@evan-coder/setupr`) running against this repository.
-
-**`setupr status` — project health, git, env, processes, and recent history at a glance:**
-
-![setupr status](docs/images/screenshot-status.png)
-
-**`setupr doctor` — runtime, package-manager, and AI-director environment diagnosis:**
-
-![setupr doctor](docs/images/screenshot-doctor.png)
-
-**`setupr health` — full project health check with a pass/warn/fail score:**
-
-![setupr health](docs/images/screenshot-health.png)
-
-**`setupr status --json` — machine-readable output for CI/CD and scripting:**
-
-![setupr status --json](docs/images/screenshot-json.png)
-
-## Architecture
-
-![Architecture](docs/images/architecture.jpg)
-
-*Stack detection, AI-powered planning, guided TUI setup, and project health monitoring in one CLI.*
+---
 
 ## Installation
 
@@ -71,8 +46,18 @@ npm install -g @evan-coder/setupr
 The npm package is published under the owned scope `@evan-coder/setupr`, but the installed terminal command is still:
 
 ```bash
-setupr
+setupr            # primary binary
+setup             # legacy alias (identical)
 ```
+
+**Requirements**
+
+- Node.js **≥ 18.0.0** for the published CLI (Node 20+ recommended for repo development/CI)
+- A terminal with Unicode support for TUI mode
+
+See [SETUP.md](SETUP.md) for the full setup guide, and [docs/project-snapshot.md](docs/project-snapshot.md) for the current repository/maintenance snapshot.
+
+---
 
 ## Quick Start
 
@@ -83,7 +68,10 @@ setupr
 # Full project setup: scan, plan, install/configure, verify
 setupr setup
 
-# Configure Setupr AI once, globally
+# Diagnose your environment (runtimes, deps, ports, services)
+setupr doctor
+
+# Configure Setupr's AI once, globally (optional)
 setupr auth login
 
 # Use fewer prompts while still stopping for serious blockers
@@ -93,86 +81,374 @@ setupr setup --force
 setupr setup --plain
 ```
 
-## Key Features
+**First run walkthrough:** `cd` into any project → run `setupr` → Setupr prints a pre-execution warning and waits for Enter → the TUI launches, scans the project, plans setup steps and shows the agent's reasoning → it asks for missing env values or risky choices only when needed → confirms the final plan → executes → shows a completion summary. You can steer the agent at any time from the persistent input at the bottom (e.g. paste `KEY=value` lines, type `skip build`, or choose `Other...` to override a decision).
 
-- **Smart Detection** - Detects languages, frameworks, package managers, services, and monorepos.
-- **AI Director Runtime** - Reads bounded project context, compresses docs, plans actions, explains decisions, and resumes from checkpoints.
-- **Multi-Provider AI** - OpenAI, Anthropic, Google, Groq, MiniMax, Moonshot, and GitHub Models.
-- **Project Dashboard** - Health, git, env, process, history, and command summaries in one TUI.
-- **Environment Management** - Interactive `.env` editor, `.env.example` sync, validation, and guarded force behavior.
-- **Verification & Security** - Test workflows, smoke checks, defensive scans, reports, and local baselines.
-- **Process Management** - Start, list, log, restart, and stop Setupr-managed processes.
-- **Plugin System** - Extend commands, scanners, planners, doctor checks, fixers, and TUI/dashboard panels.
-- **Central Safety Policy** - Medium/high-risk actions require confirmation; critical actions are blocked. `--force` cannot bypass high-risk or critical safety blockers.
+---
 
-See [docs/FEATURES.md](docs/FEATURES.md) for detailed feature documentation.
+## Screenshots
 
-## Commands
+Real output captured from the Setupr CLI (`@evan-coder/setupr`) running against this repository. These are not mockups.
 
-### TUI Commands
+### Project dashboard & status
+
+**`setupr status` — project health, git, env, processes, and recent history at a glance:**
+
+![setupr status](docs/images/screenshot-status.png)
+
+**`setupr status --json` — machine-readable output for CI/CD and scripting:**
+
+![setupr status --json](docs/images/screenshot-json.png)
+
+### Diagnostics & health
+
+**`setupr doctor` — runtime, package-manager, and AI-director environment diagnosis:**
+
+![setupr doctor](docs/images/screenshot-doctor.png)
+
+**`setupr health` — full project health check with a pass/warn/fail score:**
+
+![setupr health](docs/images/screenshot-health.png)
+
+**`setupr env check` — environment validation with a clear, structured error path:**
+
+![setupr env check](docs/images/screenshot-envcheck.png)
+
+### Project intelligence
+
+**`setupr info` — at-a-glance project summary (language, framework, PM, runtime, deps):**
+
+![setupr info](docs/images/screenshot-info.png)
+
+**`setupr deps list` — full dependency tree from the detected package manager:**
+
+![setupr deps list](docs/images/screenshot-deps.png)
+
+### Verification, release & performance
+
+**`setupr test list` — discovered verification suites with pass/warn/fail status:**
+
+![setupr test list](docs/images/screenshot-testlist.png)
+
+**`setupr release check` — release-readiness gate (package, README, LICENSE, dist, git):**
+
+![setupr release check](docs/images/screenshot-release.png)
+
+**`setupr perf startup` — scan/context/status performance timings:**
+
+![setupr perf startup](docs/images/screenshot-perf.png)
+
+### The full command index
+
+**`setupr --help` — every command and global option, in one screen:**
+
+![setupr --help](docs/images/screenshot-help.png)
+
+> All Setupr TUIs share one terminal-native visual grammar — see [TUI Design & Navigation](#tui-design--navigation) for the full design system and keyboard map.
+
+---
+
+## Architecture
+
+![Architecture](docs/images/architecture.jpg)
+
+*Stack detection, AI-powered planning, guided TUI setup, and project health monitoring in one CLI.*
+
+These visuals are generated from the actual repository structure and project workflow, not placeholders:
+
+![Repository file mix](docs/assets/repo-file-mix.svg)
+
+![Project workflow](docs/assets/workflow.svg)
+
+---
+
+## Features
+
+### 🔍 Smart Detection
+
+Setupr automatically detects:
+
+- **Languages**: TypeScript, JavaScript, Python, Rust, Go, Java, Ruby, PHP, Dart, Elixir, Swift, C#, Kotlin, Scala, and more
+- **Frameworks**: Next.js, Nuxt, SvelteKit, React, Vue, Angular, Express, Django, Flask, Rails, Spring Boot, and 20+ more
+- **Package Managers**: npm, yarn, pnpm, bun, pip, poetry, cargo, go, bundler, composer, pub, mix
+- **Services**: PostgreSQL, MySQL, MongoDB, Redis, RabbitMQ, Elasticsearch, Docker
+- **Monorepos**: npm workspaces, pnpm workspaces, Turborepo, Lerna, Nx
+
+**Detection priority:** (1) `.setupr.json` config → (2) `package.json` `"setupr"` field → (3) file-based scanning (lock/config files) → (4) content analysis (dependency inspection) → (5) AI fallback (novel situations only).
+
+### 🤖 AI Director Runtime
+
+Setupr's AI layer is a **director runtime, not a one-shot planner**. It:
+
+- Reads bounded project context from README/setup docs, `.env.example`, package scripts, Docker/Compose files, CI files, and scanner output
+- Compresses setup docs into compact facts before model calls (minimal token usage)
+- Parses your chat into compact intent facts while preserving the exact raw message for fallback
+- Caches context under `.setupr/cache` so startup stays fast
+- Turns failures into structured diagnosis and safe re-planning decisions
+- Shows plan diffs when chat steering changes the active plan
+- Writes workflow checkpoints to `.setupr/agent-workflow.json` so interrupted flows can resume
+
+AI output is **never** treated as raw shell text. The director proposes *structured actions*; Setupr's executor and [safety policy](#safety-policy) decide whether each action is allowed, needs confirmation, or must be blocked.
+
+**3-tier progressive intelligence** keeps it cheap and fast:
+
+1. **Pattern Matching** (Level 0) — free, instant; handles ~80% of queries
+2. **Cached Responses** (Level 1) — free after first hit; smart deduplication
+3. **Live AI** (Level 2) — only for novel situations; uses a compressed internal DSL for minimal tokens
+
+> The compressed DSL is internal-only. Generated explanations, docs, code edits, commands, and TUI messages always stay in normal human-readable language.
+
+**Without an API key, Setupr works fully** — it just uses pattern matching and heuristics instead of AI for step planning and chat.
+
+### 🧭 Agent-Guided TUI Flow
+
+The `setup` TUI is an agent workspace, not just a log viewer:
+
+- A plain-text pre-execution warning describes what Setupr may do before the dashboard opens
+- The main panel shows a time-ordered timeline: system events, AI decisions, user messages, command output, warnings, confirmations
+- When the agent needs input, it pauses with an option card above the persistent chat input
+- The director acts on natural language while setup is open: change models, fill env values, skip or rewrite plan steps
+- `--force` skips safe prompts and uses defaults where possible — but never invents secrets and still stops for blockers
+
+### 💾 Checkpoint & Resume
+
+- Progress saved to `.setupr/checkpoint.json`; agent workflow state to `.setupr/agent-workflow.json`
+- Setup stops on the first failed step (non-zero exit in plain mode)
+- Persists across terminals and reboots; auto-cleaned on success
+
+### 🌱 Environment Management
+
+```bash
+setupr env            # Open the interactive .env editor TUI
+setupr env init       # Create .env from .env.example
+setupr env check      # Check for missing/empty variables
+setupr env sync       # Sync structure with .env.example
+setupr env smart      # Smart reorganize + auto-fill
+```
+
+### ✅ Verification & Security
+
+```bash
+setupr test quick                                  # Fast local check
+setupr test full --report .setupr/test-report.md   # Broader check + report
+setupr test doctor                                 # Coverage explanation
+setupr security scan                               # Defensive local scan
+setupr security deep --report .setupr/security-report.json
+```
+
+`setupr test` chooses project-native commands from package scripts, Python, Rust, Go, and common build/lint/typecheck names. `setupr security` runs defensive checks for likely committed secrets, risky env naming, dependency lockfile/version problems, Docker/CI risks, dangerous code primitives, and route/auth smells. Reports are saved under `.setupr/`.
+
+### 🧩 Plugin System
+
+```bash
+setupr plugin create team-tools
+setupr plugin validate .
+setupr plugin doctor
+```
+
+Plugins extend Setupr with commands, scanners, planners, doctor checks, fixers, and TUI/dashboard panels. Plugin-proposed work still routes through Setupr's safety systems.
+
+See [docs/FEATURES.md](docs/FEATURES.md) for the full feature reference.
+
+---
+
+## Command Reference
+
+> Run `setupr help` for the live command index, or `setupr help <command>` for a command's own subcommands, flags, and examples.
+
+### TUI commands (rich interactive UI)
 
 | Command | Description |
 |---------|-------------|
-| `setupr` / `dashboard` | Project dashboard with health, git, env, processes, and history |
-| `setup` | Full project setup: scan, install, configure, verify |
-| `chat <question>` | AI director chat TUI for project questions and steering |
+| `setupr` / `dashboard` | Project dashboard: health, git, env, processes, history, quick commands |
+| `setup` | Full project setup — scan, install runtime, deps, env, verify |
+| `chat <question>` | AI director chat TUI for questions, steering, plans, logs, and context |
 | `status` | Dashboard/status view with plain, JSON, or TUI output |
 | `start` | Start and track a managed project process |
-| `doctor` | Diagnose environment health |
-| `update` | Check dependency updates |
-| `clean` | Review and remove artifacts |
-| `env` | Open the `.env` editor TUI |
-| `auth` | Manage global AI provider API keys and models |
+| `doctor` | Diagnose environment health (runtimes, deps, ports, services) |
+| `update` | Check dependency updates with breaking-change warnings |
+| `clean` | Review and remove artifacts (`--deps`, `--share`, `--all`) |
+| `env` | Open the `.env` editor TUI, or manage `.env` from `.env.example` |
+| `auth` | Manage global Setupr AI provider API keys and models |
 
-See [docs/COMMANDS.md](docs/COMMANDS.md) for the full command reference, including non-TUI commands, grouped workflows, flags, and keyboard controls.
+### Project intelligence & processes
 
-## Flags
+| Command | Description |
+|---------|-------------|
+| `info` | Show project summary |
+| `list` | List available project scripts |
+| `run <script>` | Run a project script |
+| `switch <version>` | Switch runtime version |
+| `add <package>` | Smart add a dependency with the detected package manager |
+| `remove <package>` | Remove a dependency |
+| `port [number]` | Check / find / kill a port |
+| `deps [list\|audit\|why\|licenses]` | Dependency tree, audit summary, package reasoning, license checks |
+| `ps` | List Setupr-managed processes |
+| `stop [target]` | Stop one or all managed processes |
+| `restart [target]` | Restart a managed process |
+| `logs [target]` | Show managed-process logs, falling back to package-manager logs |
+| `lock` / `diff` | Snapshot environment state / compare current vs locked |
+
+### Verification, security & release
+
+| Command | Description |
+|---------|-------------|
+| `test [run\|quick\|full\|ci\|smoke\|unit\|integration\|e2e\|watch\|coverage\|changed\|file\|failed\|doctor\|list\|report\|clean\|fix\|security]` | Run verification suites, smoke checks, and reports |
+| `security [scan\|quick\|deep\|deps\|secrets\|env\|docker\|ci\|code\|routes\|auth\|headers\|doctor\|report\|baseline\|ignore\|fix\|watch\|test]` | Defensive security scans, baselines, ignores, safe fixes |
+| `fix [doctor\|env\|lint\|format\|security\|all]` | Preview or run grouped safe fixes |
+| `release [check\|publish-check\|notes\|version]` | Release-readiness checks, package dry-runs, notes, version summaries |
+| `perf [startup\|scan\|context\|status]` | Measure Setupr scan/context/status performance |
+| `health [full\|deps\|security\|outdated\|size]` | Run project health checks |
+| `lint <run\|setup\|fix>` / `format <run\|check\|setup>` | Run or set up linting / formatting |
+
+### Scaffolding, infra & integrations
+
+| Command | Description |
+|---------|-------------|
+| `init` | Scaffold new projects from stacks or templates |
+| `templates <new\|list\|save\|remove>` | Create, save, list, or remove templates |
+| `migrate <npm\|yarn\|pnpm\|bun>` | Migrate package-manager metadata and lockfiles |
+| `ci <github\|gitlab\|bitbucket\|circleci>` | Generate CI/CD config |
+| `docker <generate\|compose\|check>` | Generate Dockerfile/compose, or check Docker readiness |
+| `secrets <init\|set\|get\|list\|remove\|export\|import\|rotate>` | Manage encrypted project-local secrets |
+| `workspace <list\|run\|exec\|add\|info\|check>` | Operate on monorepo workspaces |
+| `github [status\|ci\|pr\|issue]` | Show GitHub repo, Actions, PR, and issue targets |
+| `registry <npm\|pypi\|crates> <package>` | Look up package registry information |
+| `build` / `deploy` | Detect and run build / deploy scripts |
+| `open [repo\|ide]` | Open project in browser / IDE / repo |
+| `git` | Git workflows + commit-message, PR-description, branch-check, conflict helpers |
+
+### Team handoff & extensibility
+
+| Command | Description |
+|---------|-------------|
+| `share <export\|import\|inspect>` | Export/import shareable setup bundles |
+| `notes <add\|list\|remove\|clear>` | Manage project-local notes in `.setupr` |
+| `history [list] [limit]` | Show recent project-local Setupr history |
+| `context <show\|export\|import>` | Export/import notes + history for team handoff |
+| `plugin <create\|validate\|doctor\|install\|remove\|list\|info\|enable\|disable>` | Manage plugins and plugin development |
+| `config` | Manage global Setupr preferences |
+| `help [command]` | Show global or command-specific help |
+
+See [docs/COMMANDS.md](docs/COMMANDS.md) for the complete reference, including every subcommand and example.
+
+---
+
+## Global Flags
 
 | Flag | Description |
 |------|-------------|
-| `--force` | Skip safe prompts, stop for blockers and destructive/high-risk choices |
-| `--no-tui` / `--plain` | Plain terminal output for CI/CD, piping, SSH |
-| `--deps` | With `clean`, remove dependency/cache artifacts |
-| `--share` | With `clean`, remove sensitive/local-only files before sharing |
-| `--all` | With `clean`, remove dependencies, build output, caches, and local env files |
+| `--plain` / `--no-tui` | Plain terminal output for CI/CD, piping, SSH |
+| `--json` | Emit machine-readable JSON where supported (`status`, `ps`, `release`, `perf`, `github`, …) |
+| `--tui` | Prefer a rich TUI when the command has one |
+| `--smart` | Use AI assistance where the command supports it |
+| `--force` | Skip ordinary prompts; install what the project specifies; **never** bypasses critical blockers |
+| `--dry-run` | Preview changes without writing, where supported |
+| `--yes` | Accept ordinary confirmations, where supported |
+| `--fix` | Apply safe fixes, where supported |
+| `--watch` | Keep watching and updating, where supported |
+| `--new` / `--resume` | Start a fresh / resume the latest saved session or workflow |
+| `--scope <name>` | Limit a command to a workspace/package scope |
+| `--provider <name>` / `--model <id>` | Override AI provider / model |
+| `--timeout <seconds>` | Set a command/process timeout |
+| `--report <file>` | Write a JSON or Markdown report |
+| `--cwd <path>` | Run against another project directory (errors if the path is missing or not a directory) |
+| `--verbose` / `--quiet` | Show more / less output |
 
-## TUI Behavior
+**`clean`-specific:** `--deps` (dependency/cache artifacts), `--share` (sensitive/local-only files), `--all` (everything). Positional forms also work: `setupr clean deps|share|all`.
 
-- Arrow keys move between neighboring panels.
-- Tab and Shift+Tab move focus through panels.
-- Mouse focus works in terminals that support SGR mouse events.
-- Inputs stay anchored to the bottom of their panel.
-- Long input wraps inside the box and scrolls after the line cap.
-- Prompt cards can show options, `Other...`, or text/secret input.
-- The TUI uses the terminal alternate screen and restores the original shell on exit.
-- Setupr does not force a background color; iTerm2, Ghostty, Terminal.app, and other terminal profiles keep their own theme/background.
+---
 
-Setupr TUIs share the same visual grammar: blue uppercase panel titles, thin blue borders, yellow focused borders/actions, green success states, yellow warnings/current work, and red failures. Each command still gets a command-specific board rather than one universal layout.
+## AI Providers
+
+Setupr supports **7 providers (25+ models)**, plus any custom GitHub Models catalog ID:
+
+| Provider | Models | Env Key |
+|----------|--------|---------|
+| **OpenAI** | gpt-5.5-pro, gpt-5.5, gpt-5.5-mini, gpt-5.4-pro, gpt-5.4-mini, gpt-4o, gpt-4o-mini | `OPENAI_API_KEY` |
+| **Anthropic** | claude-opus-4-7, claude-sonnet-4-7, claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5, claude-3.5-sonnet | `ANTHROPIC_API_KEY` |
+| **Google** | gemini-3.1-pro, gemini-3-flash, gemini-2.5-flash-lite | `GOOGLE_API_KEY` |
+| **Groq (Llama)** | llama-4-maverick, llama-4-scout, llama-3.3-70b | `GROQ_API_KEY` |
+| **MiniMax** | minimax-m3, minimax-m2.5, minimax-m2.7 | `MINIMAX_API_KEY` |
+| **Moonshot (Kimi)** | kimi-latest, kimi-k2-thinking, kimi-k2-turbo-preview, kimi-k2.5-vision, moonshot-v1-128k | `MOONSHOT_API_KEY` |
+| **GitHub Models** | openai/gpt-4.1, openai/gpt-4.1-mini, openai/gpt-4o, openai/gpt-4o-mini, or any GitHub catalog ID | `GITHUB_MODELS_API_KEY`, `GITHUB_TOKEN`, or `GITHUB_API_KEY` |
+
+```bash
+setupr auth login                 # Guided setup for provider API keys
+setupr auth set-key github        # Save one provider key globally
+setupr auth list                  # View configured providers (never prints raw keys)
+setupr auth test                  # Test configured providers with tiny requests
+setupr auth models                # View available models
+setupr auth use openai/gpt-4.1-mini   # Set preferred model
+```
+
+Setupr stores provider API keys globally in `~/.setupr/secrets.json` with file permissions `0600`. **Raw keys are never printed.** Project `.env` files are for the app being set up — not Setupr's own keys.
+
+Chat with the project-aware director:
+
+```bash
+setupr chat
+setupr chat "how do I start this app?"
+setupr chat "what failed last time?"
+setupr chat "switch model to moonshot-v1-128k"
+setupr chat --plain "question"    # one-shot output for scripts
+setupr chat --new                 # fresh session
+setupr chat resume                # resume the latest
+```
+
+---
+
+## TUI Design & Navigation
+
+Setupr TUIs share one terminal-native visual grammar:
+
+- **Blue uppercase panel titles**, thin **blue** borders
+- **Yellow** focused borders / actions / current work
+- **Green** success states · **Yellow** warnings · **Red** failures
+- Each command gets a command-specific board rather than one universal layout
+
+**Keyboard & mouse map:**
+
+| Input | Action |
+|-------|--------|
+| **Arrow keys** | Move between neighboring panels |
+| **Tab / Shift+Tab** | Move to next / previous focusable panel |
+| **Mouse click** | Focus a panel (terminals with SGR mouse events) |
+| **Option/Alt+Arrow** | Move by word (where the terminal supports it) |
+| **Option/Alt+Delete or Ctrl+W** | Delete previous word |
+| **Ctrl+A / Ctrl+E** | Jump to start / end of input |
+| **Ctrl+U / Ctrl+K** | Clear before / after cursor |
+| **Enter** | Confirm / submit focused input |
+| **Esc** | Leave or skip the active input (where supported) |
+| **q** | Quit when focus is not inside an input |
+
+**Behavior notes:** The TUI runs in the terminal alternate screen, so exiting returns you to the original shell history instead of leaving the dashboard in scrollback. It enables SGR mouse reporting and bracketed paste while active, then disables both on cleanup. It does **not** set a background color — Terminal, iTerm2, Ghostty, and other profiles keep their own theme. Interactive inputs stay anchored at the bottom of their panel, wrap within the box, and scroll once they reach the panel's line cap.
+
+> `setupr clean` opens a safety review first; type `CLEAN` to delete reviewed targets, or use `--force` only when you intentionally want to skip the review prompt.
+
+---
+
+## Safety Policy
+
+All command-like actions pass through **one safety layer**:
+
+- ✅ Safe checks and normal dependency installs run freely
+- ⚠️ Medium/high-risk actions require confirmation
+- ⛔ Critical actions (root/home wildcard deletion, `curl | sh`, unsafe elevated commands) are **blocked**
+- `--force` skips ordinary prompts but **never** bypasses high-risk or critical blockers
+
+See [SECURITY.md](SECURITY.md) for the vulnerability and secret-handling policy.
+
+---
 
 ## Configuration
 
-Global config:
-
 ```text
-~/.setupr/config.json
+~/.setupr/config.json      # Global config
+~/.setupr/secrets.json     # Global provider API keys (chmod 0600, never printed)
+.setupr/                   # Project-local cache, checkpoints, reports, notes, history
 ```
 
-Global provider API keys:
-
-```text
-~/.setupr/secrets.json
-```
-
-Manage provider keys with:
-
-```bash
-setupr auth login
-setupr auth list
-setupr auth test
-setupr auth use openai/gpt-4.1-mini
-```
-
-Project-level config:
+Project-level config (`.setupr.json`):
 
 ```json
 {
@@ -183,9 +459,23 @@ Project-level config:
 }
 ```
 
+See [ENVREADME.md](ENVREADME.md) for environment-variable details.
+
+---
+
+## CI/CD Usage
+
+```bash
+setupr --force --plain     # non-interactive: skip safe prompts, no TUI
+```
+
+Setupr still avoids inventing secrets and stops for destructive or blocked actions. If any setup step fails in plain mode, Setupr stops immediately and returns a **non-zero exit code** so CI fails correctly. Use `--json` for machine-readable status in pipelines.
+
+---
+
 ## Release Smoke Testing
 
-Before publishing or after touching scanner, error, auth, env, command execution, or TUI code, run:
+Before publishing, or after touching scanner, error, auth, env, command-execution, or TUI code:
 
 ```bash
 npm run typecheck
@@ -205,14 +495,49 @@ npm publish --dry-run
 rm -f "$pkg"
 ```
 
-Use `file:` or `--package` for tarball checks. A bare `npx ./$pkg` is treated like an executable file path and fails with a permission error. Scoped packages must be public when published, so `package.json` includes `publishConfig.access = "public"`.
+> Use `file:` or `--package` for tarball checks. A bare `npx ./$pkg` is treated like an executable file path and fails. Scoped packages must be public when published, so `package.json` sets `publishConfig.access = "public"`.
 
-## Requirements
+---
 
-- Node.js >= 18.0.0 for the published CLI
-- Node.js 20+ recommended for repository development and CI test tooling
-- Terminal with Unicode support for TUI mode
+## Troubleshooting
+
+Common issues and fixes live in [TROUBLESHOOTING.md](TROUBLESHOOTING.md). Quick pointers:
+
+- **`setupr` not found after global install** → ensure your npm global bin is on `PATH`
+- **TUI looks broken / boxes mangled** → use a Unicode-capable terminal; try `--plain`
+- **`INVALID_CWD` error** → the `--cwd` path doesn't exist or isn't a directory
+- **AI features inactive** → run `setupr auth login`; Setupr still works fully without a key
+
+---
+
+## Documentation Map
+
+| Doc | Contents |
+|-----|----------|
+| [SETUP.md](SETUP.md) | Full setup & first-run guide |
+| [docs/COMMANDS.md](docs/COMMANDS.md) | Complete command + subcommand reference |
+| [docs/FEATURES.md](docs/FEATURES.md) | Detailed feature documentation |
+| [ENVREADME.md](ENVREADME.md) | Environment-variable reference |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common problems & fixes |
+| [SECURITY.md](SECURITY.md) | Security & secret-handling policy |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [docs/project-snapshot.md](docs/project-snapshot.md) | Repository/maintenance snapshot |
+
+---
+
+## Contributing
+
+Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Development setup:
+
+```bash
+git clone https://github.com/Evan1108-Coder/Setupr.git
+cd Setupr
+npm install
+npm run build
+node dist/setup.js --help
+```
 
 ## License
 
-MIT
+[MIT](LICENSE) © Evan Lu
