@@ -337,7 +337,6 @@ export function buildUpdateLayout(width: number, height: number): UpdateLayoutGe
   const gap = tuiLayout.panelGap;
   const stackedHeights = stacked ? stackedUpdateHeights(bodyHeight) : null;
   const summaryHeight = stacked ? stackedHeights!.summaryHeight : clamp(Math.floor(bodyHeight * 0.22), 6, 8);
-  const stackedSideHeight = stacked ? stackedHeights!.sideHeight : 0;
   const mainHeight = stacked
     ? stackedHeights!.packageHeight
     : Math.max(8, bodyHeight - summaryHeight - gap);

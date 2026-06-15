@@ -2,6 +2,18 @@
 
 All notable changes to Setupr will be documented in this file. Setupr keeps a changelog because it is a versioned developer tool with user-facing CLI behavior.
 
+## 1.0.3
+
+### Fixed
+- Merged the latest GitHub `1.0.2` release line with the local TUI hardening work.
+- Added terminal-size protection for TUI screens so very small terminals show a resize notice instead of breaking panel borders.
+- Added configurable TUI border fallback styles through `SETUPR_TUI_BORDER=bold`, `double`, `round`, or `classic` for terminal/font profiles that render thin Unicode borders with gaps.
+- Improved AI provider error classification for structured SDK errors, including nested status/statusCode/code/response fields and clearer quota-vs-rate-limit handling.
+- Hardened plugin runtime loading by supporting common package `exports` objects, rejecting entrypoints that escape the plugin directory, and wrapping plugin command crashes in structured Setupr errors.
+
+### Testing
+- Added regression coverage for structured provider errors, plugin package `exports`, plugin path escapes, plugin command failures, terminal-size fallback, and border-style fallback behavior.
+
 ## 1.0.2
 
 ### Fixed
