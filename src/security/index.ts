@@ -143,6 +143,7 @@ async function runSingle(cwd: string, category: SecurityCategory, options: Secur
 async function scanSecrets(cwd: string, depth: "quick" | "deep"): Promise<SecurityFinding[]> {
   const findings: SecurityFinding[] = [];
   for (const file of await listFiles(cwd, depth === "quick" ? 120 : 500)) {
+    if (isNonProductionPath(file)) continue;
     if (!/\.(env|js|jsx|ts|tsx|py|go|rs|json|ya?ml|toml|md|txt|sh)$/i.test(file)) continue;
     const content = await readFile(join(cwd, file), "utf-8").catch(() => "");
     const lines = content.split(/\r?\n/);
@@ -233,6 +234,7 @@ async function scanDeps(cwd: string): Promise<SecurityFinding[]> {
 async function scanCode(cwd: string, depth: "quick" | "deep"): Promise<SecurityFinding[]> {
   const findings: SecurityFinding[] = [];
   for (const file of await listFiles(cwd, depth === "quick" ? 150 : 700)) {
+    if (isNonProductionPath(file)) continue;
     if (!/\.[jt]sx?$|\.py$|\.go$|\.rs$/i.test(file)) continue;
     const content = await readFile(join(cwd, file), "utf-8").catch(() => "");
     const checks: Array<[RegExp, string, SecuritySeverity, string]> = [
@@ -240,7 +242,7 @@ async function scanCode(cwd: string, depth: "quick" | "deep"): Promise<SecurityF
       [/child_process\.(exec|execSync)\s*\(/, "Shell execution", "medium", "Prefer spawn/execFile with argument arrays and validate inputs."],
       [/jwt\.sign\([^)]*['"]none['"]|algorithm\s*:\s*['"]none['"]/, "JWT none algorithm", "critical", "Never allow unsigned JWTs."],
       [/secure\s*:\s*false|httpOnly\s*:\s*false/, "Weak cookie option", "medium", "Use secure and httpOnly cookies for sessions."],
-      [/md5|sha1/i, "Weak hash usage", "low", "Use modern password hashing or SHA-256+ for non-password integrity."],
+      [/\b(createHash\s*\(\s*['"](?:md5|sha1)['"]|md5\s*\(|sha1\s*\()/i, "Weak hash usage", "low", "Use modern password hashing or SHA-256+ for non-password integrity."],
     ];
     for (const [pattern, title, severity, recommendation] of checks) {
       const line = content.split(/\r?\n/).findIndex((row) => pattern.test(row));
@@ -253,10 +255,27 @@ async function scanCode(cwd: string, depth: "quick" | "deep"): Promise<SecurityF
 async function scanRoutes(cwd: string): Promise<SecurityFinding[]> {
   const findings: SecurityFinding[] = [];
   for (const file of await listFiles(cwd, 500)) {
+    if (isNonProductionPath(file)) continue;
     if (!/\.[jt]sx?$|\.py$/i.test(file)) continue;
     const content = await readFile(join(cwd, file), "utf-8").catch(() => "");
-    if (/(\/admin|\/internal|\/debug)/i.test(content) && !/(auth|authorize|session|permission|requireUser|middleware)/i.test(content)) {
-      findings.push(finding(`route-admin:${file}`, "Sensitive route without nearby auth signal", "routes", "medium", file, "Confirm this route is protected by middleware or explicit authorization."));
+    const lines = content.split(/\r?\n/);
+    const line = lines.findIndex((row) => (
+      /(\/admin|\/internal|\/debug)/i.test(row)
+      && /(router|app\.|route|handler|pathname|href|redirect|rewrite|navigate|fetch|axios|\bGET\b|\bPOST\b|\bPUT\b|\bPATCH\b|\bDELETE\b)/i.test(row)
+      && !/(auth|authorize|session|permission|requireUser|middleware)/i.test(row)
+    ));
+    if (line >= 0) {
+      findings.push({
+        id: `route-admin:${file}:${line + 1}`,
+        title: "Sensitive route without nearby auth signal",
+        category: "routes",
+        severity: "medium",
+        confidence: "medium",
+        file,
+        line: line + 1,
+        evidence: redact(lines[line]),
+        recommendation: "Confirm this route is protected by middleware or explicit authorization.",
+      });
     }
   }
   return findings;
@@ -265,10 +284,23 @@ async function scanRoutes(cwd: string): Promise<SecurityFinding[]> {
 async function scanAuth(cwd: string): Promise<SecurityFinding[]> {
   const findings: SecurityFinding[] = [];
   for (const file of await listFiles(cwd, 400)) {
+    if (isNonProductionPath(file)) continue;
     if (!/\.[jt]sx?$|\.py$/i.test(file)) continue;
     const content = await readFile(join(cwd, file), "utf-8").catch(() => "");
-    if (/password/i.test(content) && /==|===/.test(content) && !/hash|bcrypt|argon|scrypt/i.test(content)) {
-      findings.push(finding(`auth-password-compare:${file}`, "Plain password comparison signal", "auth", "high", file, "Use a password hashing library and constant-time verification."));
+    const lines = content.split(/\r?\n/);
+    const line = lines.findIndex((row) => /password/i.test(row) && /(===|==)/.test(row) && !/hash|bcrypt|argon|scrypt/i.test(row));
+    if (line >= 0) {
+      findings.push({
+        id: `auth-password-compare:${file}:${line + 1}`,
+        title: "Plain password comparison signal",
+        category: "auth",
+        severity: "high",
+        confidence: "medium",
+        file,
+        line: line + 1,
+        evidence: redact(lines[line]),
+        recommendation: "Use a password hashing library and constant-time verification.",
+      });
     }
   }
   return findings;
@@ -382,7 +414,13 @@ function markdown(report: SecurityReport): string {
 async function applyIgnores(cwd: string, findings: SecurityFinding[]): Promise<SecurityFinding[]> {
   const ignored = new Set(await readProjectJson<string[]>(cwd, SECURITY_IGNORE_FILE, []));
   const baseline = new Set(await readProjectJson<string[]>(cwd, SECURITY_BASELINE_FILE, []));
-  return findings.filter((finding) => !ignored.has(finding.id) && !baseline.has(finding.id));
+  const seen = new Set<string>();
+  return findings.filter((finding) => {
+    const dedupeKey = [finding.category, finding.title, finding.file || "", finding.line || 0].join(":");
+    if (seen.has(dedupeKey)) return false;
+    seen.add(dedupeKey);
+    return !ignored.has(finding.id) && !baseline.has(finding.id);
+  });
 }
 
 async function listFiles(cwd: string, max: number): Promise<string[]> {
@@ -405,6 +443,10 @@ async function listFiles(cwd: string, max: number): Promise<string[]> {
   }
   await walk(cwd, "", 0);
   return files;
+}
+
+function isNonProductionPath(file: string): boolean {
+  return /(^|\/)(test|tests|__tests__|__mocks__|fixtures|fixture|examples|example|docs)(\/|$)/i.test(file);
 }
 
 function finding(id: string, title: string, category: SecurityCategory, severity: SecuritySeverity, evidence: string, recommendation: string): SecurityFinding {

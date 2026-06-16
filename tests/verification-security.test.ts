@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -102,6 +102,22 @@ describe("verification and security command groups", () => {
     const status = await collectDashboardStatus(tempDir);
     expect(status.security.findings).toBeGreaterThan(0);
     expect(status.health.checks.some((check) => check.label === "Security")).toBe(true);
+  });
+
+  it("ignores test fixtures for code heuristics and only reports real app auth issues", async () => {
+    await writeFile(join(tempDir, "package.json"), JSON.stringify({ scripts: { test: "node -e \"console.log('ok')\"" } }, null, 2));
+    await writeFile(join(tempDir, "app.ts"), "const password = input === passwordInput;\n");
+    await mkdir(join(tempDir, "tests"), { recursive: true });
+    await mkdir(join(tempDir, ".github", "workflows"), { recursive: true });
+    await writeFile(join(tempDir, "tests", "security.test.ts"), "eval('1+1'); const password = input === passwordInput;\n");
+    await writeFile(join(tempDir, ".github", "workflows", "ci.yml"), "name: ci\non: push\npermissions:\n  contents: read\n");
+
+    const report = await runSecurityCommand(tempDir, "deep", {});
+
+    expect(report?.findings.some((finding) => finding.title === "Plain password comparison signal" && finding.file === "app.ts")).toBe(true);
+    expect(report?.findings.some((finding) => finding.file?.includes("tests/security.test.ts"))).toBe(false);
+    expect(report?.findings.some((finding) => finding.title === "Dynamic code execution")).toBe(false);
+    expect(report?.findings.some((finding) => finding.title === "GitHub workflow has no explicit permissions block")).toBe(false);
   });
 
   it("routes CLI test/security commands through the plain command router", async () => {

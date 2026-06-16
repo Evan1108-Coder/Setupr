@@ -2,7 +2,7 @@
 
 > **AI-powered project-control CLI.** Setupr detects your project's stack, plans setup, installs dependencies, configures environments, verifies local health, and keeps the project running — all from one terminal-native command.
 
-![Status](https://img.shields.io/badge/status-beta-6b7280) ![License](https://img.shields.io/github/license/Evan1108-Coder/Setupr) ![Node](https://img.shields.io/badge/node-%3E%3D18-3c873a) ![npm](https://img.shields.io/badge/npm-%40evan--coder%2Fsetupr-cb3837)
+![Status](https://img.shields.io/badge/status-stable-2563eb) ![License](https://img.shields.io/github/license/Evan1108-Coder/Setupr) ![Node](https://img.shields.io/badge/node-%3E%3D18-3c873a) ![npm](https://img.shields.io/badge/npm-%40evan--coder%2Fsetupr-cb3837)
 
 **TypeScript CLI · stack detection · setup automation · project doctor · terminal dashboard · AI director**
 
@@ -21,7 +21,7 @@
 | **CI / scripts** | add `--plain` (no TUI) and `--force` (skip safe prompts); `--json` for machine-readable output |
 | **Requires** | Node.js ≥ 18, a Unicode-capable terminal |
 
-> **Status: beta.** Setupr is usable as a daily CLI today. Stack-specific setup paths keep getting real-world coverage before a 1.0-stable claim.
+> **Status: stable public release.** Setupr is ready for npm installation and normal daily CLI use on supported terminals and Node versions.
 
 **Who it's for:** developers who clone projects often and don't want to manually guess install commands, runtime versions, env files, ports, or verification steps.
 

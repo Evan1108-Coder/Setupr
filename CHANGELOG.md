@@ -2,6 +2,15 @@
 
 All notable changes to Setupr will be documented in this file. Setupr keeps a changelog because it is a versioned developer tool with user-facing CLI behavior.
 
+## 1.0.4
+
+### Changed
+- Promoted the public README from beta language to stable-release language now that the npm package, install flow, and release checks are in place.
+- Hardened repository ignore rules for additional local secret and credential file patterns that should never be committed during real-world CLI use.
+
+### Validation
+- Re-ran the full release gate: unit tests, typecheck, lint, build, plain and TUI smoke fixtures, `release check`, npm pack/publish dry-runs, and fresh-install execution from the packed tarball.
+
 ## 1.0.3
 
 ### Fixed
