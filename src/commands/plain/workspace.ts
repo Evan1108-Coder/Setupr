@@ -95,7 +95,7 @@ async function workspaceList(cwd: string): Promise<void> {
 async function workspaceRun(cwd: string, flags: WorkspaceFlags): Promise<void> {
   const script = flags.args?.[0];
   if (!script) {
-    console.log(chalk.yellow("Usage: setup workspace run <script> [--filter=<package>]"));
+    console.log(chalk.yellow("Usage: setupr workspace run <script> [--filter=<package>]"));
     return;
   }
 
@@ -155,7 +155,7 @@ async function workspaceRun(cwd: string, flags: WorkspaceFlags): Promise<void> {
 async function workspaceExec(cwd: string, flags: WorkspaceFlags): Promise<void> {
   const cmd = flags.args?.join(" ");
   if (!cmd) {
-    console.log(chalk.yellow("Usage: setup workspace exec <command>"));
+    console.log(chalk.yellow("Usage: setupr workspace exec <command>"));
     return;
   }
 
@@ -178,7 +178,7 @@ async function workspaceExec(cwd: string, flags: WorkspaceFlags): Promise<void> 
 async function workspaceAdd(cwd: string, flags: WorkspaceFlags): Promise<void> {
   const name = flags.args?.[0];
   if (!name) {
-    console.log(chalk.yellow("Usage: setup workspace add <package-name>"));
+    console.log(chalk.yellow("Usage: setupr workspace add <package-name>"));
     return;
   }
 

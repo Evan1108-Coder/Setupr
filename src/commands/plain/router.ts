@@ -277,7 +277,7 @@ async function cmdEnv(sub: string | undefined, cwd: string, flags: Flags) {
           command: "env",
           cwd,
           details: [".env.example exists, but .env has not been created yet."],
-          recovery: [{ kind: "run-command", label: "Create .env from template", command: "setup env init" }],
+          recovery: [{ kind: "run-command", label: "Create .env from template", command: "setupr env init" }],
           canContinue: false,
         }));
         return;
@@ -295,7 +295,7 @@ async function cmdEnv(sub: string | undefined, cwd: string, flags: Flags) {
       if (requiredKeys.length) console.log(`  Required:      ${chalk.white(requiredKeys.length)}`);
       if (missing.length) console.log(`  Missing:       ${chalk.yellow(missing.join(", "))}`);
       console.log("");
-      console.log(chalk.dim("  Run setup env in an interactive terminal to open the editor TUI."));
+      console.log(chalk.dim("  Run setupr env in an interactive terminal to open the editor TUI."));
       break;
     }
     case "init": {
@@ -1212,7 +1212,7 @@ async function cmdConfig(sub: string | undefined, cwd: string, flags?: Flags) {
     console.log(`  Confirm install: ${chalk.white(String(config.preferences.confirmBeforeInstall))}`);
     console.log(`  Auto update:    ${chalk.white(String(config.preferences.autoUpdate))}`);
     console.log("");
-    console.log(chalk.dim("  Use 'setup config set <key> <value>' to change"));
+    console.log(chalk.dim("  Use 'setupr config set <key> <value>' to change"));
     return;
   }
 
@@ -1227,7 +1227,7 @@ async function cmdConfig(sub: string | undefined, cwd: string, flags?: Flags) {
         command: "config",
         subcommand: "set",
         cwd,
-        details: ["Usage: setup config set <key> <value>", "Keys: model, theme, confirm, autoupdate, ai"],
+        details: ["Usage: setupr config set <key> <value>", "Keys: model, theme, confirm, autoupdate, ai"],
       }));
       return;
     }

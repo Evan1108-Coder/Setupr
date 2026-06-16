@@ -467,7 +467,7 @@ async function runDiagnostics(scan: ScanResult, cwd: string, noProject: boolean)
       checks.push({
         label: ".env file",
         status: "warn",
-        detail: "missing - run 'setup env init'",
+        detail: "missing - run 'setupr env init'",
         error: createSetuprError({ code: "ENV_CHECK_FAILED", command: "doctor", cwd, details: [".env.example exists but .env is missing."], canContinue: true }),
       });
     }

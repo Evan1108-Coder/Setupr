@@ -64,7 +64,7 @@ async function formatRun(cwd: string, _flags: FormatFlags): Promise<void> {
     else console.log(result.stderr);
   } else {
     console.log(chalk.yellow("No formatter detected."));
-    console.log(chalk.dim("  Run 'setup format setup' to configure Prettier or Biome."));
+    console.log(chalk.dim("  Run 'setupr format setup' to configure Prettier or Biome."));
   }
 }
 
@@ -83,11 +83,11 @@ async function formatCheck(cwd: string, _flags: FormatFlags): Promise<void> {
   if (formatter === "prettier") {
     const result = await runCommand('npx prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"', cwd);
     if (result.exitCode === 0) console.log(chalk.green("✓ All files formatted correctly"));
-    else console.log(chalk.yellow("Some files need formatting. Run 'setup format' to fix."));
+    else console.log(chalk.yellow("Some files need formatting. Run 'setupr format' to fix."));
   } else if (formatter === "biome") {
     const result = await runCommand("npx @biomejs/biome format .", cwd);
     if (result.exitCode === 0) console.log(chalk.green("✓ All files formatted correctly"));
-    else console.log(chalk.yellow("Some files need formatting. Run 'setup format' to fix."));
+    else console.log(chalk.yellow("Some files need formatting. Run 'setupr format' to fix."));
   } else {
     console.log(chalk.yellow("No formatter configured."));
   }

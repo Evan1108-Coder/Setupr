@@ -56,7 +56,7 @@ async function lintRun(cwd: string, _flags: LintFlags): Promise<void> {
       else { console.log(result.stdout); console.log(result.stderr); }
     } else {
       console.log(chalk.yellow("No lint configuration found."));
-      console.log(chalk.dim("  Run 'setup lint setup' to configure a linter."));
+      console.log(chalk.dim("  Run 'setupr lint setup' to configure a linter."));
     }
   }
 }

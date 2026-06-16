@@ -105,7 +105,7 @@ async function maybeHandleModelIntent(input: DirectorInput, text: string): Promi
   if (!model) {
     input.store.getState().addMessage({
       role: "assistant",
-      content: `I do not recognize "${requested}" as an available model ID or name. Run setup auth models to see the catalog, or use a GitHub Models ID like publisher/model-name.`,
+      content: `I do not recognize "${requested}" as an available model ID or name. Run setupr auth models to see the catalog, or use a GitHub Models ID like publisher/model-name.`,
     });
     return { handled: true, action: "model.unknown" };
   }
@@ -115,7 +115,7 @@ async function maybeHandleModelIntent(input: DirectorInput, text: string): Promi
     const keys = [provider.envKey, ...(provider.envAliases || [])].join(" or ");
     input.store.getState().addMessage({
       role: "assistant",
-      content: `I found ${model.id}, but ${model.provider} is not configured. Run setup auth set-key ${model.provider}, or set ${keys} for this shell, then I can switch to it.`,
+      content: `I found ${model.id}, but ${model.provider} is not configured. Run setupr auth set-key ${model.provider}, or set ${keys} for this shell, then I can switch to it.`,
     });
     return { handled: true, action: "model.unavailable" };
   }

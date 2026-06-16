@@ -38,7 +38,7 @@ async function templateNew(cwd: string, flags: TemplateFlags): Promise<void> {
       command: "templates",
       subcommand: "new",
       cwd,
-      details: ["Usage: setup templates new <github-repo-or-url>", "Examples:", "  setup templates new user/repo", "  setup templates new https://github.com/user/repo"],
+      details: ["Usage: setupr templates new <github-repo-or-url>", "Examples:", "  setupr templates new user/repo", "  setupr templates new https://github.com/user/repo"],
     }));
     return;
   }
@@ -106,8 +106,8 @@ async function templateList(cwd: string): Promise<void> {
     }
   }
 
-  console.log(chalk.dim("\n  Use: setup templates new <name-or-github-repo>"));
-  console.log(chalk.dim("  Use: setup init <template-name> for built-in templates"));
+  console.log(chalk.dim("\n  Use: setupr templates new <name-or-github-repo>"));
+  console.log(chalk.dim("  Use: setupr init <template-name> for built-in templates"));
 }
 
 async function templateSave(cwd: string, flags: TemplateFlags): Promise<void> {

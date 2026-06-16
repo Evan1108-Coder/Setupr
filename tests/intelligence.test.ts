@@ -74,6 +74,6 @@ describe("AI intelligence tiers", () => {
     const result = await intelligentResponse("analyze the tradeoffs of this custom architecture", scan, "js/react/npm");
 
     expect(result.level).toBe("pattern");
-    expect(result.response).toContain("setup auth");
+    expect(result.response).toContain("setupr auth");
   });
 });

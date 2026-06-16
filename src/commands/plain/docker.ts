@@ -139,7 +139,7 @@ async function dockerCheck(cwd: string): Promise<void> {
   if (existsSync(join(cwd, "Dockerfile"))) {
     console.log(`  Dockerfile: ${chalk.green("present")}`);
   } else {
-    console.log(`  Dockerfile: ${chalk.dim("missing")} ${chalk.dim("(run setup docker generate)")}`);
+    console.log(`  Dockerfile: ${chalk.dim("missing")} ${chalk.dim("(run setupr docker generate)")}`);
   }
   console.log("");
 }

@@ -78,7 +78,7 @@ export async function chat(
   if (!client) {
     const providerConfig = PROVIDERS[model.provider];
     throw new Error(
-      `No API key for ${model.provider}. Run setup auth set-key ${model.provider}, or set ${providerConfig.envKey} in your environment for this shell.`
+      `No API key for ${model.provider}. Run setupr auth set-key ${model.provider}, or set ${providerConfig.envKey} in your environment for this shell.`
     );
   }
 

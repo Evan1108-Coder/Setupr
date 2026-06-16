@@ -75,7 +75,7 @@ async function healthFull(cwd: string): Promise<void> {
       code: "HEALTH_CHECK_FAILED",
       command: "health",
       cwd,
-      details: [`${failed} check(s) failed. Run setup health <category> for details.`],
+      details: [`${failed} check(s) failed. Run setupr health <category> for details.`],
     }));
   } else {
     console.log(chalk.green("\n  ✓ Project is healthy!"));
@@ -119,7 +119,7 @@ function checkEnvFiles(cwd: string): HealthCheck {
     return { name: "Environment files", status: "pass", message: "No env files needed" };
   }
   if (hasExample && !hasEnv) {
-    return { name: "Environment files", status: "warn", message: ".env.example exists but no .env — run setup env init" };
+    return { name: "Environment files", status: "warn", message: ".env.example exists but no .env — run setupr env init" };
   }
   if (hasExample && hasEnv) {
     return { name: "Environment files", status: "pass", message: ".env configured from template" };

@@ -102,7 +102,7 @@ Setupr TUIs share the same terminal-native style: blue uppercase panel titles, t
 ```bash
 setup help
 setup help auth
-setup auth --help
+setupr auth --help
 setup help auth set-key
 ```
 

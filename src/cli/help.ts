@@ -24,12 +24,12 @@ const HELP_NODES: Record<string, HelpNode> = {
   setup: {
     name: "setup",
     summary: "Scan, plan, install/configure, verify, and explain a project setup.",
-    usage: "setup setup [--force] [--plain|--no-tui]",
+    usage: "setupr setup [--force] [--plain|--no-tui]",
     options: [
       { name: "--force", summary: "Use safe defaults and ask only for blockers." },
       { name: "--plain, --no-tui", summary: "Run without the TUI." },
     ],
-    examples: ["setup", "setup setup --force", "setup setup --plain --force"],
+    examples: ["setupr", "setupr setup --force", "setupr setup --plain --force"],
   },
   chat: {
     name: "chat",
@@ -53,7 +53,7 @@ const HELP_NODES: Record<string, HelpNode> = {
   auth: {
     name: "auth",
     summary: "Manage global Setupr AI provider API keys and active model.",
-    usage: "setup auth <command> [options]",
+    usage: "setupr auth <command> [options]",
     commands: [
       { name: "login", summary: "Guided provider API key setup." },
       { name: "list", summary: "List providers and masked API key status." },
@@ -74,33 +74,33 @@ const HELP_NODES: Record<string, HelpNode> = {
       { name: "--plain", summary: "Use plain output." },
     ],
     examples: [
-      "setup auth login",
-      "setup auth set-key github",
-      "setup auth test github",
-      "setup auth use openai/gpt-4.1-mini",
-      "setup auth migrate --force",
+      "setupr auth login",
+      "setupr auth set-key github",
+      "setupr auth test github",
+      "setupr auth use openai/gpt-4.1-mini",
+      "setupr auth migrate --force",
     ],
   },
   "auth set-key": {
     name: "auth set-key",
     summary: "Save one provider API key in global Setupr auth storage.",
-    usage: "setup auth set-key <provider> [--key <api-key>] [--force]",
+    usage: "setupr auth set-key <provider> [--key <api-key>] [--force]",
     options: [
       { name: "--key <api-key>", summary: "Use inline value; may be visible in shell history." },
       { name: "--force", summary: "Replace an existing saved key without confirmation." },
     ],
-    examples: ["setup auth set-key github", "setup auth set-key minimax --force"],
+    examples: ["setupr auth set-key github", "setupr auth set-key minimax --force"],
   },
   "auth test": {
     name: "auth test",
     summary: "Test one or all configured AI providers with tiny requests.",
-    usage: "setup auth test [provider]",
-    examples: ["setup auth test", "setup auth test github"],
+    usage: "setupr auth test [provider]",
+    examples: ["setupr auth test", "setupr auth test github"],
   },
   env: {
     name: "env",
     summary: "Open the .env editor TUI or manage the project .env file from .env.example.",
-    usage: "setup env [init|check|sync|smart] [--force|--plain]",
+    usage: "setupr env [init|check|sync|smart] [--force|--plain]",
     commands: [
       { name: "(no subcommand)", summary: "Open the interactive .env editor TUI. Creates .env from .env.example after confirmation when needed." },
       { name: "init", summary: "Create .env from .env.example. Without .env.example, requires --force to create empty .env." },
@@ -112,36 +112,36 @@ const HELP_NODES: Record<string, HelpNode> = {
       { name: "--plain, --no-tui", summary: "Show a non-interactive env summary/error instead of the editor." },
       { name: "--force", summary: "With init, overwrite existing .env or create empty .env when no .env.example exists." },
     ],
-    examples: ["setup env", "setup env --force", "setup env init", "setup env init --force", "setup env check", "setup env smart"],
+    examples: ["setupr env", "setupr env --force", "setupr env init", "setupr env init --force", "setupr env check", "setupr env smart"],
   },
   clean: {
     name: "clean",
     summary: "Remove generated or local-only artifacts.",
-    usage: "setup clean [deps|share|all] [--force] [--plain]",
+    usage: "setupr clean [deps|share|all] [--force] [--plain]",
     options: [
       { name: "--deps", summary: "Remove dependency/install artifacts." },
       { name: "--share", summary: "Remove local sensitive/share-sensitive files." },
       { name: "--all", summary: "Remove dependencies, build outputs, caches, and local env files." },
       { name: "--force", summary: "Skip confirmation." },
     ],
-    examples: ["setup clean deps", "setup clean --share --force", "setup clean all --plain --force"],
+    examples: ["setupr clean deps", "setupr clean --share --force", "setupr clean all --plain --force"],
   },
   config: {
     name: "config",
     summary: "Manage global Setupr preferences.",
-    usage: "setup config <show|set|reset|models>",
+    usage: "setupr config <show|set|reset|models>",
     commands: [
       { name: "show", summary: "Show current config." },
       { name: "set", summary: "Set model, theme, confirm, autoupdate, or ai." },
       { name: "reset", summary: "Restore defaults." },
       { name: "models", summary: "Show model catalog. Auth commands are preferred for model/auth work." },
     ],
-    examples: ["setup config show", "setup config set theme light", "setup auth models"],
+    examples: ["setupr config show", "setupr config set theme light", "setupr auth models"],
   },
   git: {
     name: "git",
     summary: "Git workflows and repository helpers.",
-    usage: "setup git <command> [options]",
+    usage: "setupr git <command> [options]",
     commands: [
       { name: "init", summary: "Initialize git and generate a stack-aware .gitignore." },
       { name: "hooks", summary: "Install or remove useful git hooks." },
@@ -178,32 +178,32 @@ const HELP_NODES: Record<string, HelpNode> = {
   init: {
     name: "init",
     summary: "Scaffold a new project.",
-    usage: "setup init [stack|name] [options]",
+    usage: "setupr init [stack|name] [options]",
     options: [
       { name: "--template <name>", summary: "Use a named template when supported." },
       { name: "--force", summary: "Overwrite generated files where supported." },
     ],
-    examples: ["setup init node", "setup init python", "setup init --template react-app"],
+    examples: ["setupr init node", "setupr init python", "setupr init --template react-app"],
   },
   migrate: {
     name: "migrate",
     summary: "Migrate package manager metadata and lockfiles.",
-    usage: "setup migrate <npm|yarn|pnpm|bun> [--force]",
+    usage: "setupr migrate <npm|yarn|pnpm|bun> [--force]",
     options: [
       { name: "--force", summary: "Proceed through supported destructive replacement steps." },
     ],
-    examples: ["setup migrate pnpm", "setup migrate npm --force"],
+    examples: ["setupr migrate pnpm", "setupr migrate npm --force"],
   },
   ci: {
     name: "ci",
     summary: "Generate CI/CD configuration for the current project.",
-    usage: "setup ci <github|gitlab|bitbucket|circleci>",
-    examples: ["setup ci github", "setup ci gitlab"],
+    usage: "setupr ci <github|gitlab|bitbucket|circleci>",
+    examples: ["setupr ci github", "setupr ci gitlab"],
   },
   docker: {
     name: "docker",
     summary: "Generate Docker assets and check Docker readiness.",
-    usage: "setup docker <generate|compose|check> [options]",
+    usage: "setupr docker <generate|compose|check> [options]",
     commands: [
       { name: "generate", summary: "Generate a Dockerfile for the detected stack." },
       { name: "compose", summary: "Generate docker-compose.yml for app services." },
@@ -212,12 +212,12 @@ const HELP_NODES: Record<string, HelpNode> = {
     options: [
       { name: "--force", summary: "Overwrite existing generated Docker files." },
     ],
-    examples: ["setup docker generate", "setup docker compose --force", "setup docker check"],
+    examples: ["setupr docker generate", "setupr docker compose --force", "setupr docker check"],
   },
   secrets: {
     name: "secrets",
     summary: "Encrypted project-local secrets management.",
-    usage: "setup secrets <init|set|get|list|remove|export|import|rotate> [name] [value]",
+    usage: "setupr secrets <init|set|get|list|remove|export|import|rotate> [name] [value]",
     commands: [
       { name: "init", summary: "Initialize encrypted secret storage." },
       { name: "set", summary: "Store a secret value." },
@@ -228,24 +228,24 @@ const HELP_NODES: Record<string, HelpNode> = {
       { name: "import", summary: "Import exported secrets." },
       { name: "rotate", summary: "Rotate the local encryption key." },
     ],
-    examples: ["setup secrets init", "setup secrets set API_KEY", "setup secrets list"],
+    examples: ["setupr secrets init", "setupr secrets set API_KEY", "setupr secrets list"],
   },
   templates: {
     name: "templates",
     summary: "Project template management.",
-    usage: "setup templates <new|list|save|remove> [name-or-url]",
+    usage: "setupr templates <new|list|save|remove> [name-or-url]",
     commands: [
       { name: "new", summary: "Create a project from a GitHub repo or saved template." },
       { name: "list", summary: "List saved templates." },
       { name: "save", summary: "Save the current project as a reusable template." },
       { name: "remove", summary: "Remove a saved template." },
     ],
-    examples: ["setup templates list", "setup templates new user/repo", "setup templates save api-starter"],
+    examples: ["setupr templates list", "setupr templates new user/repo", "setupr templates save api-starter"],
   },
   workspace: {
     name: "workspace",
     summary: "Monorepo workspace commands.",
-    usage: "setup workspace <list|run|exec|add|info|check> [args]",
+    usage: "setupr workspace <list|run|exec|add|info|check> [args]",
     commands: [
       { name: "list", summary: "List workspace packages." },
       { name: "run", summary: "Run a script across workspaces." },
@@ -254,12 +254,12 @@ const HELP_NODES: Record<string, HelpNode> = {
       { name: "info", summary: "Show workspace metadata." },
       { name: "check", summary: "Check workspace consistency." },
     ],
-    examples: ["setup workspace list", "setup workspace run test", "setup workspace check"],
+    examples: ["setupr workspace list", "setupr workspace run test", "setupr workspace check"],
   },
 	  health: {
 	    name: "health",
 	    summary: "Project health checks.",
-    usage: "setup health [full|deps|security|outdated|size]",
+    usage: "setupr health [full|deps|security|outdated|size]",
     commands: [
       { name: "full", summary: "Run all health checks." },
       { name: "deps", summary: "Check dependency health." },
@@ -267,7 +267,7 @@ const HELP_NODES: Record<string, HelpNode> = {
       { name: "outdated", summary: "Check outdated dependencies." },
       { name: "size", summary: "Report project size signals." },
     ],
-	    examples: ["setup health", "setup health security", "setup health size"],
+	    examples: ["setupr health", "setupr health security", "setupr health size"],
 	  },
 	  test: {
 	    name: "test",
@@ -339,13 +339,13 @@ const HELP_NODES: Record<string, HelpNode> = {
 	  share: {
     name: "share",
     summary: "Export and import shareable setup bundles.",
-    usage: "setup share <export|import|inspect> [file]",
+    usage: "setupr share <export|import|inspect> [file]",
     commands: [
       { name: "export", summary: "Create a shareable project setup bundle." },
       { name: "import", summary: "Apply a setup bundle." },
       { name: "inspect", summary: "Inspect a setup bundle before applying it." },
     ],
-    examples: ["setup share export", "setup share inspect setupr-share.json", "setup share import setupr-share.json"],
+    examples: ["setupr share export", "setupr share inspect setupr-share.json", "setupr share import setupr-share.json"],
   },
   plugin: {
     name: "plugin",
@@ -367,29 +367,29 @@ const HELP_NODES: Record<string, HelpNode> = {
   lint: {
     name: "lint",
     summary: "Run or configure linting.",
-    usage: "setup lint <run|setup|fix> [--force]",
+    usage: "setupr lint <run|setup|fix> [--force]",
     commands: [
       { name: "run", summary: "Run the detected lint command." },
       { name: "setup", summary: "Set up linting for the detected stack." },
       { name: "fix", summary: "Run lint fixes where supported." },
     ],
-    examples: ["setup lint run", "setup lint fix", "setup lint setup --force"],
+    examples: ["setupr lint run", "setupr lint fix", "setupr lint setup --force"],
   },
   format: {
     name: "format",
     summary: "Run or configure formatting.",
-    usage: "setup format <run|check|setup> [--force]",
+    usage: "setupr format <run|check|setup> [--force]",
     commands: [
       { name: "run", summary: "Format files with the detected formatter." },
       { name: "check", summary: "Check formatting without writing changes." },
       { name: "setup", summary: "Set up formatting for the detected stack." },
     ],
-    examples: ["setup format run", "setup format check", "setup format setup"],
+    examples: ["setupr format run", "setupr format check", "setupr format setup"],
   },
   scaffold: {
     name: "scaffold",
     summary: "Advanced compatibility command for local project-file generation.",
-    usage: "setup scaffold <component|page|api|hook|model|test|service|middleware> <name>",
+    usage: "setupr scaffold <component|page|api|hook|model|test|service|middleware> <name>",
     commands: [
       { name: "component", summary: "Generate a UI component." },
       { name: "page", summary: "Generate a page/route file." },
@@ -400,7 +400,7 @@ const HELP_NODES: Record<string, HelpNode> = {
       { name: "service", summary: "Generate a service module." },
       { name: "middleware", summary: "Generate middleware." },
     ],
-    examples: ["setup scaffold component Button", "setup scaffold api users", "setup scaffold test src/lib/math.ts"],
+    examples: ["setupr scaffold component Button", "setupr scaffold api users", "setupr scaffold test src/lib/math.ts"],
   },
 };
 

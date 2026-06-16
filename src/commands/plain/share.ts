@@ -111,7 +111,7 @@ async function shareImport(cwd: string, flags: { args?: string[]; force?: boolea
         command: "share",
         subcommand: "import",
         cwd,
-        details: ["Usage: setup share import <config-file>"],
+        details: ["Usage: setupr share import <config-file>"],
       })
     );
     return;
@@ -188,7 +188,7 @@ async function shareInspect(cwd: string, flags: { args?: string[] }): Promise<vo
         command: "share",
         subcommand: "inspect",
         cwd,
-        details: ["Usage: setup share inspect <config-file>"],
+        details: ["Usage: setupr share inspect <config-file>"],
       })
     );
     return;

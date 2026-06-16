@@ -274,7 +274,7 @@ async function authUse(modelId: string | undefined): Promise<void> {
   console.log(chalk.green(`✓ Active model set to ${model.id}`));
   if (!getProviderEnvValue(model.provider)) {
     console.log(chalk.yellow(`  ${PROVIDER_LABELS[model.provider]} does not have a configured API key yet.`));
-    console.log(chalk.dim(`  Run: setup auth set-key ${model.provider}`));
+    console.log(chalk.dim(`  Run: setupr auth set-key ${model.provider}`));
   }
 }
 
@@ -423,7 +423,7 @@ async function promptChoice(label: string, choices: AIProvider[]): Promise<AIPro
     canContinue: true,
   }));
   const fallback = "github";
-  console.log(chalk.dim(`Continuing with ${PROVIDER_LABELS[fallback]}. Use setup auth set-key <provider> for a specific provider.`));
+  console.log(chalk.dim(`Continuing with ${PROVIDER_LABELS[fallback]}. Use setupr auth set-key <provider> for a specific provider.`));
   return fallback;
 }
 

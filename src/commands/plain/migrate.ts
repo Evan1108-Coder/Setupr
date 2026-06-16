@@ -34,7 +34,7 @@ export async function cmdMigrate(sub: string | undefined, cwd: string, flags: Mi
       code: "MIGRATE_UNSUPPORTED",
       command: "migrate",
       cwd,
-      details: ["Usage: setup migrate <target-pm>", "Supported: npm, yarn, pnpm, bun"],
+      details: ["Usage: setupr migrate <target-pm>", "Supported: npm, yarn, pnpm, bun"],
     }));
     return;
   }

@@ -62,7 +62,7 @@ export function AuthLayout() {
             {layout.contentHeight >= 10 && <Text color={colors.heading} bold>MODEL</Text>}
             {layout.contentHeight >= 10 && <Text color={colors.textBright} wrap="truncate">{activeModel.id}</Text>}
             {layout.contentHeight >= 15 && <Text color={colors.heading} bold>ACTIONS</Text>}
-            {layout.contentHeight >= 15 && <Text color={colors.textDim} wrap="truncate">setup auth set-key github · setup auth test · setup auth use &lt;model&gt;</Text>}
+            {layout.contentHeight >= 15 && <Text color={colors.textDim} wrap="truncate">setupr auth set-key github · setupr auth test · setupr auth use &lt;model&gt;</Text>}
           </Box>
         </Panel>
 

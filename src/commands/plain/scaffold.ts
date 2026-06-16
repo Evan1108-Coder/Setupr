@@ -24,7 +24,7 @@ export async function cmdScaffold(sub: string | undefined, cwd: string, flags: S
     case "middleware": return scaffoldMiddleware(cwd, flags);
     case "help":
       console.log(chalk.blue.bold("\n  Scaffold — Quick file generators\n"));
-      console.log("  Usage: setup scaffold <type> <name>\n");
+      console.log("  Usage: setupr scaffold <type> <name>\n");
       console.log("  Types:");
       console.log(`    ${chalk.green("component")}   React/Vue component`);
       console.log(`    ${chalk.green("page")}        Page/route component`);
@@ -49,7 +49,7 @@ export async function cmdScaffold(sub: string | undefined, cwd: string, flags: S
 
 async function scaffoldComponent(cwd: string, flags: ScaffoldFlags): Promise<void> {
   const name = flags.args?.[0];
-  if (!name) { console.log(chalk.yellow("Usage: setup scaffold component <Name>")); return; }
+  if (!name) { console.log(chalk.yellow("Usage: setupr scaffold component <Name>")); return; }
 
   const pascal = toPascalCase(name);
   const dir = join(cwd, "src", "components", pascal);
@@ -92,7 +92,7 @@ describe("${pascal}", () => {
 
 async function scaffoldPage(cwd: string, flags: ScaffoldFlags): Promise<void> {
   const name = flags.args?.[0];
-  if (!name) { console.log(chalk.yellow("Usage: setup scaffold page <Name>")); return; }
+  if (!name) { console.log(chalk.yellow("Usage: setupr scaffold page <Name>")); return; }
 
   const pascal = toPascalCase(name);
   const kebab = toKebabCase(name);
@@ -148,7 +148,7 @@ async function scaffoldPage(cwd: string, flags: ScaffoldFlags): Promise<void> {
 
 async function scaffoldAPI(cwd: string, flags: ScaffoldFlags): Promise<void> {
   const name = flags.args?.[0];
-  if (!name) { console.log(chalk.yellow("Usage: setup scaffold api <name>")); return; }
+  if (!name) { console.log(chalk.yellow("Usage: setupr scaffold api <name>")); return; }
 
   const kebab = toKebabCase(name);
   const isNextApp = existsSync(join(cwd, "src", "app")) || existsSync(join(cwd, "app"));
@@ -189,7 +189,7 @@ export function ${toCamelCase(name)}Handler(req: Request, res: Response) {
 
 async function scaffoldHook(cwd: string, flags: ScaffoldFlags): Promise<void> {
   const name = flags.args?.[0];
-  if (!name) { console.log(chalk.yellow("Usage: setup scaffold hook <name>")); return; }
+  if (!name) { console.log(chalk.yellow("Usage: setupr scaffold hook <name>")); return; }
 
   const camel = toCamelCase(name);
   const hookName = camel.startsWith("use") ? camel : `use${toPascalCase(name)}`;
@@ -219,7 +219,7 @@ export function ${hookName}() {
 
 async function scaffoldModel(cwd: string, flags: ScaffoldFlags): Promise<void> {
   const name = flags.args?.[0];
-  if (!name) { console.log(chalk.yellow("Usage: setup scaffold model <Name>")); return; }
+  if (!name) { console.log(chalk.yellow("Usage: setupr scaffold model <Name>")); return; }
 
   const pascal = toPascalCase(name);
   const dir = join(cwd, "src", "models");
@@ -252,7 +252,7 @@ export function validate${pascal}(data: unknown): data is ${pascal} {
 
 async function scaffoldTest(cwd: string, flags: ScaffoldFlags): Promise<void> {
   const target = flags.args?.[0];
-  if (!target) { console.log(chalk.yellow("Usage: setup scaffold test <module-path>")); return; }
+  if (!target) { console.log(chalk.yellow("Usage: setupr scaffold test <module-path>")); return; }
 
   const testPath = target.replace(/\.(ts|tsx|js|jsx)$/, "") + ".test.ts";
   const moduleName = target.split("/").pop()?.replace(/\.(ts|tsx|js|jsx)$/, "") || "module";
@@ -276,7 +276,7 @@ describe("${moduleName}", () => {
 
 async function scaffoldService(cwd: string, flags: ScaffoldFlags): Promise<void> {
   const name = flags.args?.[0];
-  if (!name) { console.log(chalk.yellow("Usage: setup scaffold service <Name>")); return; }
+  if (!name) { console.log(chalk.yellow("Usage: setupr scaffold service <Name>")); return; }
 
   const pascal = toPascalCase(name);
   const dir = join(cwd, "src", "services");
@@ -315,7 +315,7 @@ export const ${toCamelCase(name)}Service = new ${pascal}Service();
 
 async function scaffoldMiddleware(cwd: string, flags: ScaffoldFlags): Promise<void> {
   const name = flags.args?.[0];
-  if (!name) { console.log(chalk.yellow("Usage: setup scaffold middleware <name>")); return; }
+  if (!name) { console.log(chalk.yellow("Usage: setupr scaffold middleware <name>")); return; }
 
   const camel = toCamelCase(name);
   const dir = join(cwd, "src", "middleware");

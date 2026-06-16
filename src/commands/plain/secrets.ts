@@ -83,7 +83,7 @@ async function secretsSet(cwd: string, flags: SecretsFlags): Promise<void> {
       command: "secrets",
       subcommand: "set",
       cwd,
-      details: ["Usage: setup secrets set <name> [value]"],
+      details: ["Usage: setupr secrets set <name> [value]"],
     }));
     return;
   }
@@ -114,7 +114,7 @@ async function secretsGet(cwd: string, flags: SecretsFlags): Promise<void> {
       command: "secrets",
       subcommand: "get",
       cwd,
-      details: ["Usage: setup secrets get <name>"],
+      details: ["Usage: setupr secrets get <name>"],
     }));
     return;
   }

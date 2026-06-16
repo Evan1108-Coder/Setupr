@@ -160,7 +160,7 @@ async function gitFlow(cwd: string, flags: GitFlags): Promise<void> {
   if (action === "feature") {
     const name = flags.args?.[1];
     if (!name) {
-      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "flow", cwd, details: ["Usage: setup git flow feature <name>"] }));
+      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "flow", cwd, details: ["Usage: setupr git flow feature <name>"] }));
       return;
     }
     await runCommandArgs("git", ["checkout", "-b", `feature/${name}`], cwd);
@@ -168,7 +168,7 @@ async function gitFlow(cwd: string, flags: GitFlags): Promise<void> {
   } else if (action === "hotfix") {
     const name = flags.args?.[1];
     if (!name) {
-      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "flow", cwd, details: ["Usage: setup git flow hotfix <name>"] }));
+      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "flow", cwd, details: ["Usage: setupr git flow hotfix <name>"] }));
       return;
     }
     await runCommandArgs("git", ["checkout", main], cwd);
@@ -178,7 +178,7 @@ async function gitFlow(cwd: string, flags: GitFlags): Promise<void> {
   } else if (action === "release") {
     const version = flags.args?.[1];
     if (!version) {
-      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "flow", cwd, details: ["Usage: setup git flow release <version>"] }));
+      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "flow", cwd, details: ["Usage: setupr git flow release <version>"] }));
       return;
     }
     await runCommandArgs("git", ["checkout", "-b", `release/${version}`], cwd);
@@ -397,7 +397,7 @@ async function gitBranch(cwd: string, flags: GitFlags): Promise<void> {
   } else if (action === "create") {
     const name = flags.args?.[1];
     if (!name) {
-      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "branch", cwd, details: ["Usage: setup git branch create <name>"] }));
+      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "branch", cwd, details: ["Usage: setupr git branch create <name>"] }));
       return;
     }
     const result = await runCommandArgs("git", ["checkout", "-b", name], cwd);
@@ -597,7 +597,7 @@ async function gitTag(cwd: string, flags: GitFlags): Promise<void> {
   } else if (action === "create") {
     const version = flags.args?.[1];
     if (!version) {
-      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "tag", cwd, details: ["Usage: setup git tag create <version>"] }));
+      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "tag", cwd, details: ["Usage: setupr git tag create <version>"] }));
       return;
     }
     const message = flags.message || `Release ${version}`;
@@ -645,10 +645,10 @@ async function gitRelease(cwd: string, flags: GitFlags): Promise<void> {
       const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf-8"));
       console.log(chalk.blue.bold("\n  Release Info\n"));
       console.log(`  Current version: ${chalk.white(pkg.version || "unknown")}`);
-      console.log(chalk.dim("\n  Usage: setup git release <version>"));
-      console.log(chalk.dim("  Example: setup git release 1.2.0"));
+      console.log(chalk.dim("\n  Usage: setupr git release <version>"));
+      console.log(chalk.dim("  Example: setupr git release 1.2.0"));
     } catch {
-      console.log(chalk.dim("Usage: setup git release <version>"));
+      console.log(chalk.dim("Usage: setupr git release <version>"));
     }
     return;
   }
@@ -935,7 +935,7 @@ async function gitBlame(cwd: string, flags: GitFlags): Promise<void> {
 
   const file = flags.args?.[0];
   if (!file) {
-    printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "blame", cwd, details: ["Usage: setup git blame <file>"] }));
+    printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "blame", cwd, details: ["Usage: setupr git blame <file>"] }));
     return;
   }
 
@@ -959,7 +959,7 @@ async function gitCherryPick(cwd: string, flags: GitFlags): Promise<void> {
 
   const commit = flags.args?.[0];
   if (!commit) {
-    printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "cherry-pick", cwd, details: ["Usage: setup git cherry-pick <commit-hash>"] }));
+    printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "cherry-pick", cwd, details: ["Usage: setupr git cherry-pick <commit-hash>"] }));
     return;
   }
 
@@ -979,7 +979,7 @@ async function gitCherryPick(cwd: string, flags: GitFlags): Promise<void> {
   if (result.exitCode === 0) {
     console.log(chalk.green(`✓ Cherry-picked ${commit}`));
   } else {
-    printPlainError(createSetuprError({ code: "GIT_MERGE_CONFLICT", command: "git", subcommand: "cherry-pick", cwd, details: ["Resolve conflicts, then run: setup git cherry-pick continue"] }));
+    printPlainError(createSetuprError({ code: "GIT_MERGE_CONFLICT", command: "git", subcommand: "cherry-pick", cwd, details: ["Resolve conflicts, then run: setupr git cherry-pick continue"] }));
   }
 }
 
@@ -999,7 +999,7 @@ async function gitWorktree(cwd: string, flags: GitFlags): Promise<void> {
     const branch = flags.args?.[1];
     const path = flags.args?.[2] || `../${branch}`;
     if (!branch) {
-      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "worktree", cwd, details: ["Usage: setup git worktree add <branch> [path]"] }));
+      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "worktree", cwd, details: ["Usage: setupr git worktree add <branch> [path]"] }));
       return;
     }
     const result = await runCommandArgs("git", ["worktree", "add", path, branch], cwd);
@@ -1035,12 +1035,12 @@ async function gitBisect(cwd: string, flags: GitFlags): Promise<void> {
     const bad = flags.args?.[1] || "HEAD";
     const good = flags.args?.[2];
     if (!good) {
-      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "bisect", cwd, details: ["Usage: setup git bisect start [bad] <good>"] }));
+      printPlainError(createSetuprError({ code: "GIT_COMMAND_FAILED", command: "git", subcommand: "bisect", cwd, details: ["Usage: setupr git bisect start [bad] <good>"] }));
       return;
     }
     await runCommandArgs("git", ["bisect", "start", bad, good], cwd);
     console.log(chalk.green(`✓ Bisect started (bad: ${bad}, good: ${good})`));
-    console.log(chalk.dim("  Test this commit, then run: setup git bisect good/bad"));
+    console.log(chalk.dim("  Test this commit, then run: setupr git bisect good/bad"));
   } else if (action === "good") {
     const result = await runCommand("git bisect good", cwd);
     console.log(result.stdout);
@@ -1106,7 +1106,7 @@ async function gitUndo(cwd: string, flags: GitFlags): Promise<void> {
     await runCommand("git checkout -- .", cwd);
     console.log(chalk.green("✓ Discarded all uncommitted changes"));
   } else {
-    console.log(chalk.dim("  Usage: setup git undo [commit|stage|changes]"));
+    console.log(chalk.dim("  Usage: setupr git undo [commit|stage|changes]"));
     console.log(chalk.dim("  commit  — undo last commit (keep changes staged)"));
     console.log(chalk.dim("  stage   — unstage all changes"));
     console.log(chalk.dim("  changes — discard all uncommitted changes (--force required)"));

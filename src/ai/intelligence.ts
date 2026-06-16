@@ -104,7 +104,7 @@ export async function intelligentResponse(
   // Level 2: Live AI call
   if (!hasAIKey()) {
     return {
-      response: "AI features require an API key. Run setup auth login or setup auth set-key <provider>. Shell environment keys still work for temporary use.",
+      response: "AI features require an API key. Run setupr auth login or setupr auth set-key <provider>. Shell environment keys still work for temporary use.",
       level: "pattern",
       cost: 0,
     };

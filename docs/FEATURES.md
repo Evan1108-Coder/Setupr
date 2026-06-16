@@ -41,22 +41,22 @@ Supports 7 AI providers (25+ models, plus custom GitHub Models catalog IDs):
 
 ```bash
 # Guided setup for provider API keys
-setup auth login
+setupr auth login
 
 # Save one provider API key globally
-setup auth set-key github
+setupr auth set-key github
 
 # View configured providers without printing raw keys
-setup auth list
+setupr auth list
 
 # Test configured providers with tiny requests
-setup auth test
+setupr auth test
 
 # View available models
-setup auth models
+setupr auth models
 
 # Set preferred model
-setup auth use openai/gpt-4.1-mini
+setupr auth use openai/gpt-4.1-mini
 ```
 
 Setupr stores provider API keys globally in `~/.setupr/secrets.json` with file permissions `0600`. Raw keys are never printed.
@@ -101,11 +101,11 @@ All command-like actions pass through one safety layer. Safe checks and normal d
 ## Environment Management
 
 ```bash
-setup env            # Open interactive .env editor TUI
-setup env init       # Create .env from .env.example
-setup env check      # Check for missing variables
-setup env sync       # Sync structure with .env.example
-setup env smart      # Smart reorganize + auto-fill
+setupr env            # Open interactive .env editor TUI
+setupr env init       # Create .env from .env.example
+setupr env check      # Check for missing variables
+setupr env sync       # Sync structure with .env.example
+setupr env smart      # Smart reorganize + auto-fill
 ```
 
 ## Checkpoint & Resume
