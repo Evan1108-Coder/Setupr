@@ -38,7 +38,15 @@ All notable changes to Setupr will be documented in this file. Setupr keeps a ch
 
 ## Unreleased
 
+### Fixed
+- TUI text input now deletes correctly: Backspace (and Fn+Delete) removes the character before the cursor instead of doing nothing. macOS Backspace sends `0x7f`, which Ink reports as `delete`; this was being routed to a forward delete, so it was a no-op at the end of a line. Forward delete remains available via Ctrl+D.
+- TUI text input no longer drops, scrambles, or appears to insert stray spaces between characters during fast typing or pastes. The component now tracks the live value/cursor synchronously instead of reading stale state between keystrokes, so a rapid burst types exactly what was entered, in order. This also fixes the input/border "squish" where overflowing garbled text broke the panel layout.
+- `setupr port <value>` now validates its argument and rejects non-numeric or out-of-range ports (must be an integer 1–65535) instead of reporting them as "available"; this also removes a raw-string interpolation into the underlying `lsof`/`netstat` command.
+- Error messages now show the directory the command actually targeted (e.g. via `--cwd`) instead of Setupr's own working directory; the top-level handler's fallback context no longer overwrites accurate, command-specific error fields.
+- `setupr registry` with no subcommand now prints a clear usage hint, and a valid registry with no package name reports "package name required" instead of a misleading "unknown subcommand".
+
 ### Added
+- Added regression coverage for the TUI input fixes (backspace/delete semantics, rapid-burst integrity, unicode/emoji, large paste, control-character/ANSI stripping, masked values) and for TUI border/rendering integrity at multiple terminal widths, using a faithful Ink keypress/render harness.
 - Added real repository visual snapshot assets generated from the current file tree.
 - Added public maintenance documentation updates: security policy, issue/PR templates, and repository snapshot notes.
 - Added Mermaid diagrams to the README (run lifecycle, detection priority, 3-tier intelligence, safety gate) and to `docs/FEATURES.md` (provider key/model resolution order) so the previously text-only sections are visual.

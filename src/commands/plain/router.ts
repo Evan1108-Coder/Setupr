@@ -671,13 +671,26 @@ async function cmdPort(port: string | undefined, cwd: string) {
     }
     return;
   }
-  const result = await checkPort(port);
+  // Reject non-numeric or out-of-range ports up front. Without this an input
+  // like "abc" or "99999" was passed straight to lsof/netstat, which matched
+  // nothing and was reported as "available" — a misleading false negative (and
+  // an unnecessary raw-string interpolation into a shell command).
+  const portNumber = Number(port);
+  if (!/^\d+$/.test(port.trim()) || !Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
+    throw createSetuprError({
+      code: "INVALID_ARGUMENT",
+      command: "port",
+      details: [`"${port}" is not a valid port. Ports must be an integer between 1 and 65535.`],
+      canContinue: false,
+    });
+  }
+  const result = await checkPort(portNumber);
   if (result.stdout.trim()) {
     const pid = result.stdout.trim().split("\n")[0];
-    console.log(chalk.yellow(`Port ${port} in use by PID: ${pid}`));
+    console.log(chalk.yellow(`Port ${portNumber} in use by PID: ${pid}`));
     console.log(chalk.dim(isWin ? `Kill with: taskkill /PID ${pid} /F` : `Kill with: kill ${pid}`));
   } else {
-    console.log(chalk.green(`Port ${port} is available`));
+    console.log(chalk.green(`Port ${portNumber} is available`));
   }
 }
 

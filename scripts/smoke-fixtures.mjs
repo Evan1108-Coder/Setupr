@@ -144,6 +144,8 @@ function plainSmoke() {
   expectRun("security headers guarded", "js-new", ["security", "headers", "--plain", "--url", "https://example.com"], ["External URL requires explicit authorization", "Rerun with --force"]);
   expectRun("invalid --cwd rejected", "js-new", ["status", "--plain", "--cwd", join(temp, "does-not-exist")], ["INVALID_CWD", "Directory not found"]);
   expectRun("missing package arg", "js-new", ["add", "--plain"], ["MISSING_PACKAGE", "Package name required"]);
+  expectRun("non-numeric port rejected", "js-new", ["port", "abc", "--plain"], ["INVALID_ARGUMENT", "not a valid port"]);
+  expectRun("out-of-range port rejected", "js-new", ["port", "99999", "--plain"], ["INVALID_ARGUMENT", "not a valid port"]);
 	  expectRun("no project setup", "no-project", ["setup", "--plain", "--force"], ["NO_PROJECT_DETECTED"]);
   expectRun("no project update", "no-project", ["update", "--plain"], ["NO_PROJECT_DETECTED"]);
   expectRun("forced non-tty tui", "js-new", ["status", "--tui"], ["TUI_RENDER_FAILED", "--tui was requested"]);

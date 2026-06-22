@@ -69,4 +69,40 @@ describe("product control commands", () => {
 
     expect(logs.join("\n")).toContain("https://pypi.org/project/fastapi/");
   });
+
+  it("guides usage when registry is called with no subcommand", async () => {
+    const cwd = await tempProject();
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((value?: unknown) => logs.push(String(value ?? "")));
+
+    await cmdRegistry(undefined, cwd, {});
+
+    const output = logs.join("\n");
+    expect(output).toContain("Unknown subcommand");
+    // Must not silently default to npm and mislabel the missing package as the subcommand.
+    expect(output).not.toContain("Command: registry npm");
+    expect(output).toContain("setupr registry <npm|pypi|crates> <package>");
+  });
+
+  it("reports a missing package (not an unknown subcommand) for a valid registry", async () => {
+    const cwd = await tempProject();
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((value?: unknown) => logs.push(String(value ?? "")));
+
+    await cmdRegistry("npm", cwd, { args: [] });
+
+    const output = logs.join("\n");
+    expect(output).toContain("Package name required");
+    expect(output).toContain("MISSING_PACKAGE");
+  });
+
+  it("rejects an unknown registry as an unknown subcommand", async () => {
+    const cwd = await tempProject();
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((value?: unknown) => logs.push(String(value ?? "")));
+
+    await cmdRegistry("bogus", cwd, { args: ["pkg"] });
+
+    expect(logs.join("\n")).toContain("Unknown subcommand");
+  });
 });

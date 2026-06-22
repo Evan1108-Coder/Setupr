@@ -95,4 +95,37 @@ describe("centralized error system", () => {
     expect(rendered.command).toBe("info");
     expect(rendered.details).toContain("File: package.json");
   });
+
+  it("does not let fallback context overwrite the error's real cwd/command", () => {
+    // A command-specific error already knows the resolved --cwd target. The
+    // top-level catch passes process.cwd() and the raw argv as fallbacks; these
+    // must only fill missing fields, never clobber the accurate values.
+    const original = createSetuprError({
+      code: "MALFORMED_PROJECT_FILE",
+      cwd: "/tmp/sclaw-fix/broken",
+      command: "info",
+      details: ["File: package.json"],
+    });
+
+    const rendered = fromUnknownError(original, {
+      cwd: "/some/other/process/cwd",
+      command: "--cwd /tmp/sclaw-fix/broken info --plain",
+    });
+
+    expect(rendered.cwd).toBe("/tmp/sclaw-fix/broken");
+    expect(rendered.command).toBe("info");
+    expect(renderPlainError(rendered)).toContain("Directory: /tmp/sclaw-fix/broken");
+  });
+
+  it("fills missing context fields on a structured error from fallbacks", () => {
+    const original = createSetuprError({
+      code: "MALFORMED_PROJECT_FILE",
+      details: ["File: package.json"],
+    });
+
+    const rendered = fromUnknownError(original, { cwd: "/fallback/cwd", command: "info" });
+
+    expect(rendered.cwd).toBe("/fallback/cwd");
+    expect(rendered.command).toBe("info");
+  });
 });

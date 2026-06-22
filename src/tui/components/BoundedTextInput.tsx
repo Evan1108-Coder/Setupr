@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { colors } from "../theme.js";
 import { createTerminalControlInputStripper, parseSgrMouse } from "../terminalInput.js";
@@ -32,6 +32,42 @@ export function BoundedTextInput({
   const controlStripper = useMemo(() => createTerminalControlInputStripper(), []);
   const wrapWidth = Math.max(1, width || 80);
 
+  // The controlled `value` prop only updates after a React render. A burst of
+  // keystrokes that arrives before the next render would otherwise all read the
+  // same stale `value`/`cursor` from this closure, dropping or scrambling
+  // characters. We keep ref copies that are mutated synchronously on every edit
+  // so consecutive keystrokes compose against the live text, not a stale snapshot.
+  const valueRef = useRef(value);
+  const cursorRef = useRef(cursor);
+  // Values we have emitted via onChange but not yet seen reflected back through
+  // the `value` prop. Used to tell our own (possibly batched/stale) prop echoes
+  // apart from a genuine parent-driven change such as a reset after submit.
+  const pendingEmitsRef = useRef<Set<string>>(new Set());
+
+  // Reconcile the controlled prop with our live ref state. A prop value we
+  // recently emitted is just an echo of our own edit (React may coalesce a burst
+  // into a single render, skipping intermediates), so we keep the live refs. Any
+  // other value is a genuine external change (e.g. the parent clearing the field
+  // after submit) and is adopted.
+  useEffect(() => {
+    // Already in sync with our live edit state — nothing to adopt.
+    if (value === valueRef.current) {
+      pendingEmitsRef.current.delete(value);
+      return;
+    }
+    // A lagging echo of a value we emitted (React may render intermediate burst
+    // states). Drop just that entry; never rewind the live refs backward.
+    if (pendingEmitsRef.current.has(value)) {
+      pendingEmitsRef.current.delete(value);
+      return;
+    }
+    // Genuine external change (e.g. parent reset after submit).
+    pendingEmitsRef.current.clear();
+    valueRef.current = value;
+    cursorRef.current = Math.min(cursorRef.current, value.length);
+    setCursor(cursorRef.current);
+  }, [value]);
+
   const displayValue = mask ? mask.repeat(value.length) : value;
   const renderedValue = focus
     ? `${displayValue.slice(0, cursor)}▌${displayValue.slice(cursor)}`
@@ -39,10 +75,6 @@ export function BoundedTextInput({
   const lines = useMemo(() => wrapLines(renderedValue || placeholder, wrapWidth), [renderedValue, placeholder, wrapWidth]);
   const visibleHeight = Math.min(maxLines, Math.max(1, lines.length));
   const maxScroll = Math.max(0, lines.length - visibleHeight);
-
-  useEffect(() => {
-    setCursor((current) => Math.min(current, value.length));
-  }, [value.length]);
 
   useEffect(() => {
     if (scrollLine > maxScroll) setScrollLine(maxScroll);
@@ -58,13 +90,28 @@ export function BoundedTextInput({
     }
   }, [cursor, displayValue, focus, maxScroll, scrollLine, visibleHeight, wrapWidth]);
 
+  // Apply a text edit synchronously against the live ref state, then notify the
+  // parent and schedule the visible caret update.
+  const commit = (nextValue: string, nextCursor: number) => {
+    valueRef.current = nextValue;
+    cursorRef.current = clamp(nextCursor, 0, nextValue.length);
+    pendingEmitsRef.current.add(nextValue);
+    setCursor(cursorRef.current);
+    onChange(nextValue);
+  };
+
+  const moveCursor = (nextCursor: number) => {
+    cursorRef.current = clamp(nextCursor, 0, valueRef.current.length);
+    setCursor(cursorRef.current);
+  };
+
   useInput((input, key) => {
     const mouse = parseSgrMouse(input);
     if (mouse?.action === "press") {
       if (scrollBounds && pointInBounds(mouse.x, mouse.y, scrollBounds)) {
         const line = clamp(mouse.y - scrollBounds.y + scrollLine, 0, Math.max(0, lines.length - 1));
         const column = clamp(mouse.x - scrollBounds.x, 0, wrapWidth);
-        setCursor(cursorForWrappedPosition(value, line, column, wrapWidth));
+        moveCursor(cursorForWrappedPosition(valueRef.current, line, column, wrapWidth));
       }
       return;
     }
@@ -77,9 +124,12 @@ export function BoundedTextInput({
       return;
     }
 
+    const liveValue = valueRef.current;
+    const liveCursor = clamp(cursorRef.current, 0, liveValue.length);
+
     const shortcut = shortcutFromInput(input, key);
     if (shortcut) {
-      applyShortcut(shortcut, value, cursor, onChange, setCursor);
+      applyShortcut(shortcut, liveValue, liveCursor, commit, moveCursor);
       return;
     }
 
@@ -90,31 +140,27 @@ export function BoundedTextInput({
     }
 
     if (returnOnly) {
-      onSubmit(value, { steer: Boolean(key.ctrl) });
+      onSubmit(liveValue, { steer: Boolean(key.ctrl) });
       return;
     }
 
-    if (key.backspace || input === "\x7f") {
-      if (cursor === 0) return;
-      const next = value.slice(0, cursor - 1) + value.slice(cursor);
-      onChange(next);
-      setCursor((current) => Math.max(0, current - 1));
-      return;
-    }
-
-    if (key.delete) {
-      if (cursor >= value.length) return;
-      onChange(value.slice(0, cursor) + value.slice(cursor + 1));
+    // macOS Backspace sends \x7f, which Ink reports as `key.delete` with an empty
+    // `input`; Fn+Delete (\x1b[3~) is reported identically. Both are treated as a
+    // backward delete because that is what the dominant Backspace key should do.
+    // Forward delete remains available via Ctrl+D (handled as a shortcut above).
+    if (key.backspace || key.delete || input === "\x7f") {
+      if (liveCursor === 0) return;
+      commit(liveValue.slice(0, liveCursor - 1) + liveValue.slice(liveCursor), liveCursor - 1);
       return;
     }
 
     if (key.leftArrow) {
-      setCursor((current) => Math.max(0, current - 1));
+      moveCursor(liveCursor - 1);
       return;
     }
 
     if (key.rightArrow) {
-      setCursor((current) => Math.min(value.length, current + 1));
+      moveCursor(liveCursor + 1);
       return;
     }
 
@@ -133,9 +179,7 @@ export function BoundedTextInput({
     }
 
     if (cleanInput) {
-      const next = value.slice(0, cursor) + cleanInput + value.slice(cursor);
-      onChange(next);
-      setCursor((current) => current + cleanInput.length);
+      commit(liveValue.slice(0, liveCursor) + cleanInput + liveValue.slice(liveCursor), liveCursor + cleanInput.length);
     }
   }, { isActive: focus });
 
@@ -215,7 +259,9 @@ function shortcutFromInput(input: string, key: { ctrl?: boolean; meta?: boolean;
   if (input === "\x1bf" || input === "\x1b[1;3C" || input === "\x1b[1;5C" || input === "\x1b[1;9C" || input === "\x1b[5C") return "word-right";
   if (input === "\x1b\x7f" || input === "\x1b\b" || input === "\x1b[3;3~" || input === "\x1b[3;5~") return "delete-word-before";
   if (input === "\x1bd" || input === "\x1b[3;2~" || input === "\x1b[3;6~") return "delete-word-after";
-  if (input === "\x1b[3~" || (input === "\x04" && key.ctrl) || key.delete) return "delete-forward";
+  // Note: a bare delete key (\x7f / \x1b[3~) is intentionally NOT a forward delete;
+  // it is handled as a backward Backspace in the main handler. Only Ctrl+D
+  // (matched above) performs a forward delete.
   return null;
 }
 
@@ -223,47 +269,45 @@ function applyShortcut(
   shortcut: InputShortcut,
   value: string,
   cursor: number,
-  onChange: (value: string) => void,
-  setCursor: React.Dispatch<React.SetStateAction<number>>
+  commit: (value: string, cursor: number) => void,
+  moveCursor: (cursor: number) => void
 ): void {
   if (shortcut === "start") {
-    setCursor(0);
+    moveCursor(0);
     return;
   }
   if (shortcut === "end") {
-    setCursor(value.length);
+    moveCursor(value.length);
     return;
   }
   if (shortcut === "clear-before") {
-    onChange(value.slice(cursor));
-    setCursor(0);
+    commit(value.slice(cursor), 0);
     return;
   }
   if (shortcut === "clear-after") {
-    onChange(value.slice(0, cursor));
+    commit(value.slice(0, cursor), cursor);
     return;
   }
   if (shortcut === "delete-forward") {
-    if (cursor < value.length) onChange(value.slice(0, cursor) + value.slice(cursor + 1));
+    if (cursor < value.length) commit(value.slice(0, cursor) + value.slice(cursor + 1), cursor);
     return;
   }
   if (shortcut === "word-left") {
-    setCursor(previousWordIndex(value, cursor));
+    moveCursor(previousWordIndex(value, cursor));
     return;
   }
   if (shortcut === "word-right") {
-    setCursor(nextWordIndex(value, cursor));
+    moveCursor(nextWordIndex(value, cursor));
     return;
   }
   if (shortcut === "delete-word-before") {
     const nextCursor = previousWordIndex(value, cursor);
-    onChange(value.slice(0, nextCursor) + value.slice(cursor));
-    setCursor(nextCursor);
+    commit(value.slice(0, nextCursor) + value.slice(cursor), nextCursor);
     return;
   }
   if (shortcut === "delete-word-after") {
     const nextCursor = nextWordIndex(value, cursor);
-    onChange(value.slice(0, cursor) + value.slice(nextCursor));
+    commit(value.slice(0, cursor) + value.slice(nextCursor), cursor);
   }
 }
 

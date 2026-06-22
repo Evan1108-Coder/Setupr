@@ -73,9 +73,17 @@ export function errorSummary(error: SetuprError): string {
 
 export function fromUnknownError(error: unknown, context: Partial<SetuprErrorInput> = {}): SetuprError {
   if (isSetuprError(error)) {
+    // The error already carries accurate, command-specific context (e.g. the
+    // resolved --cwd target and the command that raised it). Top-level callers
+    // pass fallback context such as process.cwd(); only let those fill fields
+    // the error did not already set, never overwrite the real values.
+    const existing = error as unknown as Record<string, unknown>;
+    const filledContext = Object.fromEntries(
+      Object.entries(context).filter(([key]) => existing[key] === undefined)
+    );
     return createSetuprError({
       ...error,
-      ...context,
+      ...filledContext,
       code: error.code,
       details: [...(error.details || []), ...(context.details || [])],
       cause: error.cause,

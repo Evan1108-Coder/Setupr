@@ -169,7 +169,32 @@ export async function cmdGithub(sub: string | undefined, cwd: string, flags: Pro
 }
 
 export async function cmdRegistry(sub: string | undefined, cwd: string, flags: ProductFlags = {}): Promise<void> {
-  const registry = sub || "npm";
+  const validRegistries = ["npm", "pypi", "crates"];
+  // With no subcommand at all, guide the user to the full usage rather than
+  // silently defaulting to npm and then complaining that the (missing) package
+  // is an unknown subcommand.
+  if (!sub) {
+    printPlainError(createSetuprError({
+      code: "UNKNOWN_SUBCOMMAND",
+      command: "registry",
+      cwd,
+      details: ["Usage: setupr registry <npm|pypi|crates> <package>"],
+    }));
+    return;
+  }
+  // A recognized registry but no package name is a missing-argument error, not
+  // an unknown subcommand.
+  if (validRegistries.includes(sub) && !flags.args?.[0]) {
+    printPlainError(createSetuprError({
+      code: "MISSING_PACKAGE",
+      command: "registry",
+      subcommand: sub,
+      cwd,
+      details: [`Usage: setupr registry ${sub} <package>`],
+    }));
+    return;
+  }
+  const registry = sub;
   const name = flags.args?.[0];
   if (!name) {
     printPlainError(createSetuprError({
