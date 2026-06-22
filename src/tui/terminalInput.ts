@@ -47,14 +47,23 @@ export function createTerminalControlInputStripper(): TerminalControlInputStripp
       const stripped = input
         .replace(new RegExp(`${escapeRegExp(ESC)}${SGR_MOUSE_PATTERN}`, "g"), "")
         .replace(new RegExp(SGR_MOUSE_PATTERN, "g"), "")
-        .replace(new RegExp(`${escapeRegExp(ESC)}\\[200~|${escapeRegExp(ESC)}\\[201~`, "g"), "")
+        // Bracketed-paste guards. Ink's keypress parser frequently consumes the
+        // leading ESC of a pasted chunk, so the markers can arrive as either
+        // `\x1b[200~`/`\x1b[201~` or the bare `[200~`/`[201~`. Strip both forms so
+        // a Cmd+V paste does not leak literal "[200~"/"[201~" into the field.
+        .replace(new RegExp(`${escapeRegExp(ESC)}?\\[20[01]~`, "g"), "")
         .replace(new RegExp(`${escapeRegExp(ESC)}\\[[0-?]*[ -/]*[@-~]`, "g"), "")
         .replace(new RegExp(`${escapeRegExp(ESC)}\\][^${escapeRegExp(BEL)}]*(?:${escapeRegExp(BEL)}|${escapeRegExp(ESC)}\\\\)`, "g"), "")
         .replace(new RegExp(`${escapeRegExp(ESC)}\\[M.{0,3}`, "g"), "")
         .replace(new RegExp(`${escapeRegExp(ESC)}.`, "g"), "")
         .replace(new RegExp(PARTIAL_SGR_MOUSE_PATTERN), "")
         .split(ESC).join("");
-      return stripC0Controls(stripped);
+      // Terminals deliver pasted line breaks as CR (\r). Normalize CR/CRLF to LF
+      // before stripping C0 controls (which would otherwise drop the bare \r and
+      // silently merge multi-line pastes into one line). This keeps line
+      // boundaries intact for multi-line/KEY=value pastes.
+      const newlineNormalized = stripped.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      return stripC0Controls(newlineNormalized);
     },
   };
 }
@@ -95,7 +104,17 @@ function escapeRegExp(value: string): string {
 
 function findPartialTerminalControl(input: string): { index: number; sequence: string } | null {
   const escIndex = input.lastIndexOf(ESC);
-  if (escIndex === -1) return null;
+  if (escIndex === -1) {
+    // No ESC, but an ESC-stripped bracketed-paste guard may have been split
+    // across chunks (e.g. "...text[20" then "1~"). Only hold a trailing partial
+    // that is already an unambiguous prefix of "[200~"/"[201~" (at least "[20")
+    // so ordinary typing of "[" or "[2" is never delayed or dropped.
+    const bare = input.match(/\[20[01]?~?$|\[20$/);
+    if (bare && bare.index !== undefined) {
+      return { index: bare.index, sequence: bare[0] };
+    }
+    return null;
+  }
   const tail = input.slice(escIndex);
   if (tail === ESC) return { index: escIndex, sequence: tail };
   if (tail.startsWith(`${ESC}[`)) {

@@ -106,7 +106,7 @@ export function DashboardLayout({ cwd, initialStatus, variant = "dashboard" }: D
 
       <TuiFooter
         width={terminal.width}
-        left="Ctrl+C abort · Tab next panel · ←/↑/↓/→ scroll/navigate · ? help"
+        left="Ctrl+C abort · Tab next panel · ←/↑/↓/→ scroll/navigate · q quit"
         right={status ? `v${process.env.npm_package_version || "0.0.0"} · ${status.projectName}` : undefined}
       />
     </Box>

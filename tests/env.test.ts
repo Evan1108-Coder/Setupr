@@ -4,6 +4,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { initEnvFile, loadEnvEditorState, mergeEnvEditorValues, parseEnvKeys, parseEnvPairs, saveEnvEditorEntries } from "../src/env/index.js";
 import { runNonTUICommand } from "../src/commands/plain/router.js";
+import { stripTerminalControlInput } from "../src/tui/terminalInput.js";
 
 describe("Environment helpers", () => {
   let tempDir: string;
@@ -59,6 +60,31 @@ describe("Environment helpers", () => {
 
     expect(parseEnvKeys(content)).toEqual(["API_KEY", "NORMAL"]);
     expect(parseEnvPairs(content)).toEqual({ API_KEY: "abc", NORMAL: "value" });
+  });
+
+  it("splits a multi-line paste (CR line breaks) into distinct vars through the input pipeline", () => {
+    // Reproduces the real-terminal env editor flow: a Cmd+V paste arrives wrapped in
+    // bracketed-paste guards with CR line breaks. The stripper must normalize it so
+    // parseEnvPairs yields three separate vars instead of one mashed-together value.
+    const pasted = "\x1b[200~API_KEY=sk-live-9999\rDATABASE_URL=postgres://localhost/db\rPORT=8080\x1b[201~";
+    const clean = stripTerminalControlInput(pasted).trim();
+
+    expect(parseEnvPairs(clean)).toEqual({
+      API_KEY: "sk-live-9999",
+      DATABASE_URL: "postgres://localhost/db",
+      PORT: "8080",
+    });
+
+    const merged = mergeEnvEditorValues(
+      [
+        { key: "API_KEY", value: "", status: "empty", sensitive: true, fromTemplate: true, fromEnv: false },
+        { key: "DATABASE_URL", value: "", status: "empty", sensitive: false, fromTemplate: true, fromEnv: false },
+        { key: "PORT", value: "3000", status: "filled", sensitive: false, fromTemplate: true, fromEnv: true },
+      ],
+      parseEnvPairs(clean)
+    );
+    expect(merged.find((entry) => entry.key === "DATABASE_URL")?.value).toBe("postgres://localhost/db");
+    expect(merged.find((entry) => entry.key === "PORT")?.value).toBe("8080");
   });
 
   it("sync preserves export-prefixed keys while using existing values", async () => {

@@ -34,6 +34,33 @@ describe("terminal control input handling", () => {
     expect(stripTerminalControlInput(`${esc}[201~`)).toBe("");
   });
 
+  it("strips bare bracketed paste markers when Ink has already consumed the leading ESC", () => {
+    // Ink's keypress parser frequently eats the leading ESC of a pasted chunk, so
+    // the guards arrive as bare "[200~"/"[201~". These must not leak into the field.
+    expect(stripTerminalControlInput("[200~hello world[201~")).toBe("hello world");
+    expect(stripTerminalControlInput(`[200~API_KEY=sk-abc123${esc}[201~`)).toBe("API_KEY=sk-abc123");
+  });
+
+  it("does not eat ordinary bracket text or a lone typed bracket", () => {
+    expect(stripTerminalControlInput("arr[200]=x")).toBe("arr[200]=x");
+    expect(stripTerminalControlInput("[")).toBe("[");
+  });
+
+  it("holds a bare ESC-stripped paste marker that is split across chunks", () => {
+    const consumer = createTerminalControlInputStripper();
+    expect(consumer.strip("first[20")).toBe("first");
+    expect(consumer.strip("0~second")).toBe("second");
+  });
+
+  it("preserves line breaks in multi-line pastes delivered as CR", () => {
+    // Terminals send pasted newlines as CR (\r). The stripper must normalize CR/CRLF
+    // to \n before dropping C0 controls, or multi-line KEY=value pastes collapse into
+    // one line and parseEnvPairs sees a single mashed entry.
+    expect(stripTerminalControlInput("A=1\rB=2\rC=3")).toBe("A=1\nB=2\nC=3");
+    expect(stripTerminalControlInput("A=1\r\nB=2")).toBe("A=1\nB=2");
+    expect(stripTerminalControlInput("[200~K1=v1\rK2=v2[201~")).toBe("K1=v1\nK2=v2");
+  });
+
   it("buffers split CSI and OSC terminal controls instead of leaking suffix text", () => {
     expect(stripTerminalControlInput(`${esc}[1;3`)).toBe("");
     expect(stripTerminalControlInput("Dword")).toBe("word");
