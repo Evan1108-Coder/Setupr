@@ -149,9 +149,9 @@ async function shareImport(cwd: string, flags: { args?: string[]; force?: boolea
     }
 
     // Create .setupr directory with imported config
-    const psetupDir = join(cwd, ".setupr");
-    await mkdir(psetupDir, { recursive: true });
-    await writeFile(join(psetupDir, "imported.json"), JSON.stringify(config, null, 2) + "\n");
+    const setuprDir = join(cwd, ".setupr");
+    await mkdir(setuprDir, { recursive: true });
+    await writeFile(join(setuprDir, "imported.json"), JSON.stringify(config, null, 2) + "\n");
     console.log(chalk.green("  ✓ Saved imported config to .setupr/imported.json"));
 
     // Show recommendations

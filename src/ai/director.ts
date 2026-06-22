@@ -244,7 +244,7 @@ function maybeHandlePromptIntent(input: DirectorInput, text: string): DirectorRe
 }
 
 async function switchModel(store: AppStore, model: AIModel, reason: string): Promise<void> {
-  process.env.P_SETUP_AI_MODEL = model.id;
+  process.env.SETUPR_AI_MODEL = model.id;
   await updateConfig({ ai: { model: model.id, enabled: true } });
   const message = `${reason}\nActive model: ${model.id} via ${model.provider} (${formatModelPrice(model)}).`;
   store.getState().addNotice({ type: "info", message: `AI model: ${model.id}` });

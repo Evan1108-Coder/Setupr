@@ -41,6 +41,15 @@ All notable changes to Setupr will be documented in this file. Setupr keeps a ch
 ### Added
 - Added real repository visual snapshot assets generated from the current file tree.
 - Added public maintenance documentation updates: security policy, issue/PR templates, and repository snapshot notes.
+- Added Mermaid diagrams to the README (run lifecycle, detection priority, 3-tier intelligence, safety gate) and to `docs/FEATURES.md` (provider key/model resolution order) so the previously text-only sections are visual.
+- Added an end-to-end "worked example" walkthrough to the README showing a real `setupr setup --plain` run on a fresh Next.js clone.
+
+### Changed
+- Renamed the AI model override environment variable to `SETUPR_AI_MODEL` (and documented `SETUPR_LOG_LEVEL`) to match the Setupr name. The legacy `P_SETUP_AI_MODEL` is still accepted as a backward-compatible alias; when both are set, `SETUPR_AI_MODEL` wins.
+- Replaced remaining internal `p-setup`/`P_SETUP` naming leftovers in source identifiers, ignore rules, and `.env.example` with `setupr`/`SETUPR` equivalents. No CLI command, flag, or public behavior changed.
+
+### Testing
+- Added regression coverage proving the legacy `P_SETUP_AI_MODEL` alias still resolves and that `SETUPR_AI_MODEL` takes precedence when both are set.
 
 ### Validation
 - Re-ran the documented test suite during the polish pass and recorded the real test status in `docs/project-snapshot.md`.

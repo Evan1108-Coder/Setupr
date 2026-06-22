@@ -216,7 +216,7 @@ async function authTest(provider?: string): Promise<void> {
         lines: [`  ${chalk.green("✓")} ${PROVIDER_LABELS[resolved].padEnd(15)} ${model.id} ${chalk.dim(`${Date.now() - started}ms, ${result.tokens} tokens`)}`],
       };
     } catch (err) {
-      const psetupError = classifyAIProviderError(err, {
+      const setuprError = classifyAIProviderError(err, {
         command: "auth",
         subcommand: "test",
         details: [`Provider: ${resolved}`, `Model: ${model.id}`],
@@ -224,9 +224,9 @@ async function authTest(provider?: string): Promise<void> {
       return {
         failure: true,
         lines: [
-          `  ${chalk.red("✗")} ${PROVIDER_LABELS[resolved].padEnd(15)} ${model.id} ${chalk.red(psetupError.title)}`,
-          chalk.dim(`    ${psetupError.explanation}`),
-          ...(psetupError.nextSteps || []).map((step) => chalk.dim(`    • ${step}`)),
+          `  ${chalk.red("✗")} ${PROVIDER_LABELS[resolved].padEnd(15)} ${model.id} ${chalk.red(setuprError.title)}`,
+          chalk.dim(`    ${setuprError.explanation}`),
+          ...(setuprError.nextSteps || []).map((step) => chalk.dim(`    • ${step}`)),
         ],
       };
     }

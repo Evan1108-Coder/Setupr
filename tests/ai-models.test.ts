@@ -57,7 +57,7 @@ describe("AI model configuration", () => {
     tempDir = await mkdtemp(join(tmpdir(), "setupr-ai-models-"));
     chdir(tempDir);
     for (const key of Object.keys(env)) {
-      if (key.endsWith("_API_KEY") || key === "GITHUB_TOKEN" || key === "P_SETUP_AI_MODEL" || key === "HOME") {
+      if (key.endsWith("_API_KEY") || key === "GITHUB_TOKEN" || key === "P_SETUP_AI_MODEL" || key === "SETUPR_AI_MODEL" || key === "HOME") {
         delete env[key];
       }
     }
@@ -80,10 +80,27 @@ describe("AI model configuration", () => {
   it("reads provider keys and model override from local .env files", async () => {
     await writeFile(
       join(tempDir, ".env"),
-      "export OPENAI_API_KEY=sk-test\nP_SETUP_AI_MODEL=gpt-4o-mini\n"
+      "export OPENAI_API_KEY=sk-test\nSETUPR_AI_MODEL=gpt-4o-mini\n"
     );
 
     expect(getAIEnvValue("OPENAI_API_KEY")).toBe("sk-test");
+    expect(getDefaultModel().id).toBe("gpt-4o-mini");
+  });
+
+  it("still honors the legacy P_SETUP_AI_MODEL alias for the model override", async () => {
+    await writeFile(
+      join(tempDir, ".env"),
+      "export OPENAI_API_KEY=sk-test\nP_SETUP_AI_MODEL=gpt-4o-mini\n"
+    );
+
+    expect(getDefaultModel().id).toBe("gpt-4o-mini");
+  });
+
+  it("prefers SETUPR_AI_MODEL over the legacy P_SETUP_AI_MODEL alias", async () => {
+    env.OPENAI_API_KEY = "sk-test";
+    env.P_SETUP_AI_MODEL = "gpt-4o";
+    env.SETUPR_AI_MODEL = "gpt-4o-mini";
+
     expect(getDefaultModel().id).toBe("gpt-4o-mini");
   });
 

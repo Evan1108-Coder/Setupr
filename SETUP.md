@@ -84,7 +84,7 @@ Project `.env` files are for the app being set up, not Setupr's own API keys. Fo
 
 ```bash
 setupr auth use kimi-k2-turbo-preview
-# Or temporarily: P_SETUP_AI_MODEL=openai/gpt-4.1 setup
+# Or temporarily: SETUPR_AI_MODEL=openai/gpt-4.1 setupr
 ```
 
 Supported model IDs are listed with:

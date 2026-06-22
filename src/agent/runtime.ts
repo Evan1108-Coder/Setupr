@@ -96,7 +96,7 @@ export async function diagnoseStepFailure(input: {
           buildDirectorContextPrompt(input.context),
           `Failed step: ${input.step.label}`,
           `Command: ${input.step.command || "(special step)"}`,
-          `Error: ${input.result.psetupError?.title || input.result.error || "unknown"}`,
+          `Error: ${input.result.setuprError?.title || input.result.error || "unknown"}`,
           `Output: ${(input.result.error || input.result.output || "").slice(0, 2000)}`,
         ].join("\n\n"),
       },

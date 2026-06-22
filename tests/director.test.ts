@@ -32,7 +32,7 @@ describe("AI director", () => {
     env.HOME = join(tempDir, "home");
     await mkdir(env.HOME, { recursive: true });
     for (const key of Object.keys(env)) {
-      if (key.endsWith("_API_KEY") || key === "GITHUB_TOKEN" || key === "P_SETUP_AI_MODEL") {
+      if (key.endsWith("_API_KEY") || key === "GITHUB_TOKEN" || key === "P_SETUP_AI_MODEL" || key === "SETUPR_AI_MODEL") {
         delete env[key];
       }
     }
@@ -57,7 +57,7 @@ describe("AI director", () => {
       store,
     });
 
-    expect(env.P_SETUP_AI_MODEL).toBe("minimax-m2.5");
+    expect(env.SETUPR_AI_MODEL).toBe("minimax-m2.5");
     expect(store.getState().messages.at(-1)?.content).toContain("Switched to minimax-m2.5");
   });
 
@@ -73,7 +73,7 @@ describe("AI director", () => {
       store,
     });
 
-    expect(env.P_SETUP_AI_MODEL).toBe("openai/gpt-4.1-mini");
+    expect(env.SETUPR_AI_MODEL).toBe("openai/gpt-4.1-mini");
     expect(store.getState().messages.at(-1)?.content).toContain("Switched to openai/gpt-4.1-mini");
   });
 
@@ -129,7 +129,7 @@ describe("AI director", () => {
       store,
     });
     expect(cheapest.action).toBe("model.cheapest");
-    expect(env.P_SETUP_AI_MODEL).toBe("gpt-4o-mini");
+    expect(env.SETUPR_AI_MODEL).toBe("gpt-4o-mini");
   });
 
   it("asks for clarification when a model change is ambiguous", async () => {

@@ -61,6 +61,20 @@ setupr auth use openai/gpt-4.1-mini
 
 Setupr stores provider API keys globally in `~/.setupr/secrets.json` with file permissions `0600`. Raw keys are never printed.
 
+**Key & model resolution order** — Setupr checks each source in turn and uses the first match, so a shell variable always overrides saved config:
+
+```mermaid
+flowchart TD
+    A[Shell environment<br/>OPENAI_API_KEY, ...] --> B[Global auth storage<br/>setupr auth set-key]
+    B --> C[Local .env.local]
+    C --> D[Local .env]
+    D --> E[Saved model preference<br/>setupr auth use<br/>*model selection only*]
+    classDef first fill:#2563eb,stroke:#1e40af,color:#fff;
+    class A first;
+```
+
+> Model override is read from `SETUPR_AI_MODEL` (legacy alias `P_SETUP_AI_MODEL` still honored), then the saved `setupr auth use` preference.
+
 ### AI Director Runtime
 
 Setupr's AI layer is a director runtime, not a one-shot planner:

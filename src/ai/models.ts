@@ -161,7 +161,7 @@ export function selectDefaultModel(): ModelSelection {
       return {
         model,
         source: "configured",
-        reason: "selected by P_SETUP_AI_MODEL or saved config",
+        reason: "selected by SETUPR_AI_MODEL or saved config",
         price: formatModelPrice(model),
       };
     }
@@ -262,7 +262,9 @@ export function getProviderKeySource(provider: AIProvider): "environment" | "glo
 }
 
 function getConfiguredModelId(): string | undefined {
-  return getAIEnvValue("P_SETUP_AI_MODEL") || readSavedModelId();
+  // SETUPR_AI_MODEL is the canonical override. P_SETUP_AI_MODEL is kept as a
+  // backward-compatible alias for setups configured before the Setupr rename.
+  return getAIEnvValue("SETUPR_AI_MODEL") || getAIEnvValue("P_SETUP_AI_MODEL") || readSavedModelId();
 }
 
 function readSavedModelId(): string | undefined {

@@ -17,7 +17,7 @@ describe("setupr chat", () => {
     env.HOME = join(tempDir, "home");
     await mkdir(env.HOME, { recursive: true });
     for (const key of Object.keys(env)) {
-      if (key.endsWith("_API_KEY") || key === "GITHUB_TOKEN" || key === "P_SETUP_AI_MODEL") {
+      if (key.endsWith("_API_KEY") || key === "GITHUB_TOKEN" || key === "P_SETUP_AI_MODEL" || key === "SETUPR_AI_MODEL") {
         delete env[key];
       }
     }
@@ -49,7 +49,7 @@ describe("setupr chat", () => {
     const answer = await askProjectChat(tempDir, "switch model to minimax-m2.5");
 
     expect(answer.action).toBe("model.switch");
-    expect(env.P_SETUP_AI_MODEL).toBe("minimax-m2.5");
+    expect(env.SETUPR_AI_MODEL).toBe("minimax-m2.5");
     expect(answer.text).toContain("Switched to minimax-m2.5");
   });
 

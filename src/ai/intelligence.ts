@@ -152,9 +152,9 @@ export async function intelligentResponse(
         cost: fallback.tokens * 0.000001,
       };
     }
-    const psetupError = classifyAIProviderError(err, { command: "ai-director" });
+    const setuprError = classifyAIProviderError(err, { command: "ai-director" });
     return {
-      response: `AI unavailable: ${errorSummary(psetupError)} ${psetupError.nextSteps?.join(" ") || ""}`,
+      response: `AI unavailable: ${errorSummary(setuprError)} ${setuprError.nextSteps?.join(" ") || ""}`,
       level: "pattern",
       cost: 0,
     };

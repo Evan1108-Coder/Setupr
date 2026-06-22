@@ -50,12 +50,15 @@ Project `.env`, `.env.local`, and `.env.example` should primarily describe the a
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `P_SETUP_AI_MODEL` | Project-local override for AI model selection | *(auto-detect cheapest available)* |
-| `P_SETUP_LOG_LEVEL` | Log verbosity (debug, info, warn, error) | `info` |
+| `SETUPR_AI_MODEL` | Project-local override for AI model selection | *(auto-detect cheapest available)* |
+| `SETUPR_LOG_LEVEL` | Log verbosity (debug, info, warn, error) | `info` |
+| `SETUPR_TUI_BORDER` | TUI border style: `bold`, `double`, `round`, `classic` | *(thin Unicode)* |
+
+> **Legacy alias:** `P_SETUP_AI_MODEL` is still accepted as a backward-compatible alias for `SETUPR_AI_MODEL` so older shells and CI jobs keep working. When both are set, `SETUPR_AI_MODEL` wins. Prefer the `SETUPR_*` names going forward.
 
 If several provider keys are set, the selected model is deterministic:
 
-1. `P_SETUP_AI_MODEL` or `setupr auth use ...` wins.
+1. `SETUPR_AI_MODEL` (or the legacy `P_SETUP_AI_MODEL`), or `setupr auth use ...` wins.
 2. Otherwise Setupr picks the cheapest configured model from its known local pricing table.
 3. GitHub Models catalog pricing is treated as unknown, so GitHub is picked automatically only if explicitly selected or if it is the only configured provider.
 4. The setup pre-warning and TUI timeline show which model the AI director is using.

@@ -78,7 +78,7 @@ export async function askProjectChat(cwd: string, text: string, flags: ChatFlags
   }
   store.getState().addMessage({ role: "user", content: redactText(text) });
 
-  if (flags.model) process.env.P_SETUP_AI_MODEL = flags.model;
+  if (flags.model) process.env.SETUPR_AI_MODEL = flags.model;
 
   const result = await handleDirectorInput({
     text,

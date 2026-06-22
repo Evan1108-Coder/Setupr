@@ -263,10 +263,10 @@ async function runSetupFlow(cwd: string, store: AppStore, options: { force: bool
     await deleteCheckpoint(cwd);
     await finishSuccessfulSetup(cwd, store, execution.results);
   } catch (err) {
-    const psetupError = fromUnknownError(err, { command: "setup", cwd });
-    store.getState().addLog({ content: errorSummary(psetupError), type: "error" });
-    store.getState().addNotice({ type: "error", message: psetupError.title });
-    store.getState().addMessage({ role: "system", content: errorSummary(psetupError) });
+    const setuprError = fromUnknownError(err, { command: "setup", cwd });
+    store.getState().addLog({ content: errorSummary(setuprError), type: "error" });
+    store.getState().addNotice({ type: "error", message: setuprError.title });
+    store.getState().addMessage({ role: "system", content: errorSummary(setuprError) });
     store.getState().setRunning(false);
   }
 }

@@ -13,7 +13,7 @@ export interface ExecutionResult {
   success: boolean;
   output: string;
   error?: string;
-  psetupError?: SetuprError;
+  setuprError?: SetuprError;
   duration: number;
 }
 
@@ -60,7 +60,7 @@ export async function executeStep(
 
   const safety = evaluateStepSafety(step);
   if (safety.decision === "block") {
-    const psetupError = createSetuprError({
+    const setuprError = createSetuprError({
       code: "COMMAND_ABORTED",
       command: step.command,
       cwd,
@@ -68,10 +68,10 @@ export async function executeStep(
       canContinue: false,
       forceBehavior: "Force mode cannot bypass blocked safety policy actions.",
     });
-    store.getState().updateStep(step.id, { status: "failed", error: psetupError.title });
+    store.getState().updateStep(step.id, { status: "failed", error: setuprError.title });
     store.getState().addLog({ content: `✗ ${step.label} — blocked by safety policy`, type: "error" });
-    store.getState().addMessage({ role: "system", content: errorSummary(psetupError) });
-    return { success: false, output: "", error: psetupError.explanation, psetupError, duration: Date.now() - start };
+    store.getState().addMessage({ role: "system", content: errorSummary(setuprError) });
+    return { success: false, output: "", error: setuprError.explanation, setuprError, duration: Date.now() - start };
   }
   if (safety.decision === "confirm") {
     store.getState().addMessage({
@@ -110,7 +110,7 @@ export async function executeStep(
       const stderr = result.timedOut
         ? `Command timed out after ${Math.round(timeoutMs / 1000)}s and was terminated.\n${result.stderr}`.trim()
         : result.stderr;
-      const psetupError = classifyCommandFailure({
+      const setuprError = classifyCommandFailure({
         command: step.command,
         cwd,
         exitCode: result.exitCode,
@@ -119,23 +119,23 @@ export async function executeStep(
         stepLabel: step.label,
         stepType: step.type,
       });
-      store.getState().updateStep(step.id, { status: "failed", error: psetupError.title });
-      store.getState().addLog({ content: `✗ ${step.label} — ${errorSummary(psetupError)}`, type: "error" });
-      store.getState().addMessage({ role: "system", content: errorSummary(psetupError) });
-      return { success: false, output: result.stdout, error: stderr, psetupError, duration };
+      store.getState().updateStep(step.id, { status: "failed", error: setuprError.title });
+      store.getState().addLog({ content: `✗ ${step.label} — ${errorSummary(setuprError)}`, type: "error" });
+      store.getState().addMessage({ role: "system", content: errorSummary(setuprError) });
+      return { success: false, output: result.stdout, error: stderr, setuprError, duration };
     }
   } catch (err) {
     const duration = Date.now() - start;
-    const psetupError = classifyCommandFailure({
+    const setuprError = classifyCommandFailure({
       command: step.command,
       cwd,
       stderr: err instanceof Error ? err.message : String(err),
       stepLabel: step.label,
       stepType: step.type,
     });
-    store.getState().updateStep(step.id, { status: "failed", error: psetupError.title });
-    store.getState().addLog({ content: `✗ ${step.label} — ${errorSummary(psetupError)}`, type: "error" });
-    return { success: false, output: "", error: psetupError.explanation, psetupError, duration };
+    store.getState().updateStep(step.id, { status: "failed", error: setuprError.title });
+    store.getState().addLog({ content: `✗ ${step.label} — ${errorSummary(setuprError)}`, type: "error" });
+    return { success: false, output: "", error: setuprError.explanation, setuprError, duration };
   }
 }
 
@@ -153,7 +153,7 @@ async function handleSpecialStep(
       try {
         const result = await initEnvFile(cwd);
         if (result.skipped) {
-          const psetupError = createSetuprError({
+          const setuprError = createSetuprError({
             code: result.reason === "missing-example" ? "ENV_TEMPLATE_MISSING" : "ENV_ALREADY_EXISTS",
             cwd,
             command: "setup",
@@ -163,13 +163,13 @@ async function handleSpecialStep(
               ? "Force mode creates an empty .env, then continues with a notice that no variables were inferred."
               : "Force mode may overwrite the existing .env when explicitly requested.",
           });
-          store.getState().addLog({ content: `${result.reason === "missing-example" ? "✗" : "⚠"} ${errorSummary(psetupError)}`, type: result.reason === "missing-example" ? "error" : "warning" });
+          store.getState().addLog({ content: `${result.reason === "missing-example" ? "✗" : "⚠"} ${errorSummary(setuprError)}`, type: result.reason === "missing-example" ? "error" : "warning" });
           if (result.reason === "missing-example") {
-            store.getState().updateStep(step.id, { status: "failed", error: psetupError.title });
-            return { success: false, output: "", error: psetupError.explanation, psetupError, duration: Date.now() - start };
+            store.getState().updateStep(step.id, { status: "failed", error: setuprError.title });
+            return { success: false, output: "", error: setuprError.explanation, setuprError, duration: Date.now() - start };
           }
-          store.getState().updateStep(step.id, { status: "done", error: psetupError.title });
-          return { success: true, output: psetupError.explanation, psetupError, duration: Date.now() - start };
+          store.getState().updateStep(step.id, { status: "done", error: setuprError.title });
+          return { success: true, output: setuprError.explanation, setuprError, duration: Date.now() - start };
         }
         const message = result.skipped
           ? ".env already exists; left unchanged"
@@ -178,16 +178,16 @@ async function handleSpecialStep(
             : "Created empty .env file";
         store.getState().addLog({ content: `✓ ${message}`, type: "success" });
       } catch (err) {
-        const psetupError = createSetuprError({
+        const setuprError = createSetuprError({
           code: "ENV_WRITE_FAILED",
           cwd,
           command: "setup",
           subcommand: "env",
           details: [err instanceof Error ? err.message : String(err)],
         });
-        store.getState().updateStep(step.id, { status: "failed", error: psetupError.title });
-        store.getState().addLog({ content: `✗ ${errorSummary(psetupError)}`, type: "error" });
-        return { success: false, output: "", error: psetupError.explanation, psetupError, duration: Date.now() - start };
+        store.getState().updateStep(step.id, { status: "failed", error: setuprError.title });
+        store.getState().addLog({ content: `✗ ${errorSummary(setuprError)}`, type: "error" });
+        return { success: false, output: "", error: setuprError.explanation, setuprError, duration: Date.now() - start };
       }
       store.getState().updateStep(step.id, { status: "done" });
       return { success: true, output: "Environment configured", duration: Date.now() - start };

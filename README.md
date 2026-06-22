@@ -83,6 +83,35 @@ setupr setup --plain
 
 **First run walkthrough:** `cd` into any project → run `setupr` → Setupr prints a pre-execution warning and waits for Enter → the TUI launches, scans the project, plans setup steps and shows the agent's reasoning → it asks for missing env values or risky choices only when needed → confirms the final plan → executes → shows a completion summary. You can steer the agent at any time from the persistent input at the bottom (e.g. paste `KEY=value` lines, type `skip build`, or choose `Other...` to override a decision).
 
+### Worked example: cloning a Next.js app on a fresh machine
+
+```console
+$ git clone https://github.com/acme/storefront.git && cd storefront
+$ setupr setup --plain
+⚙  Setupr — project control
+
+→ Scan        TypeScript · Next.js · pnpm · PostgreSQL (detected from pnpm-lock.yaml, next.config.js)
+→ Plan        4 steps · AI director: pattern-matched (no API key needed)
+   1. Install runtime    pnpm via corepack (Node ≥ 18 satisfied: v20.11.0)
+   2. Install deps       pnpm install
+   3. Configure env      .env created from .env.example — 2 values missing
+   4. Verify             pnpm run build
+
+? .env is missing required values. Paste KEY=value lines, or press Enter to skip:
+  DATABASE_URL=  ·  NEXTAUTH_SECRET=
+> DATABASE_URL=postgres://localhost:5432/storefront
+> NEXTAUTH_SECRET=dev-secret-please-rotate
+
+✓ Install runtime    pnpm 9.x ready                              (1.2s)
+✓ Install deps       312 packages installed                     (18.4s)
+✓ Configure env      .env complete (2 filled, 0 still missing)   (0.1s)
+✓ Verify             next build succeeded                        (22.7s)
+
+✔ Setup complete in 1m 2s. Next: `pnpm dev` — or run `setupr start` to launch + track it.
+```
+
+What just happened, mapped to the pipeline below: Setupr scanned the repo, planned 4 steps **without any AI key** (pattern matching was enough), stopped **once** to collect the two missing secrets, ran each step through the safety gate, and saved a checkpoint after every step so an interrupted run could resume with `setupr setup --resume`.
+
 ---
 
 ## Screenshots
@@ -159,6 +188,39 @@ These visuals are generated from the actual repository structure and project wor
 
 ![Project workflow](docs/assets/workflow.svg)
 
+### What happens on a run
+
+From the moment you type `setupr` to the completion summary, every run flows through the same scan → plan → confirm → execute → verify pipeline. The AI director only enters where heuristics are not enough, and every command-like action is gated by the safety layer before it touches your machine:
+
+```mermaid
+flowchart TD
+    A([setupr]) --> B[Scan project<br/>language · framework · PM · services]
+    B --> C{Enough signal<br/>from heuristics?}
+    C -->|Yes| D[Build setup plan]
+    C -->|No| AI[AI director<br/>proposes structured actions]
+    AI --> D
+    D --> E[Show plan + reasoning in TUI]
+    E --> F{Needs your input?<br/>env values · risky choice}
+    F -->|Yes| G[Pause for confirmation<br/>or steering]
+    G --> E
+    F -->|No| H{Safety gate}
+    H -->|Safe| I[Execute step]
+    H -->|Risky| G
+    H -->|Critical| X[Block + explain]
+    I --> J{More steps?}
+    J -->|Yes· checkpoint saved| H
+    J -->|No| K([Completion summary])
+    I -.->|on failure| L[Classify · recover · re-plan]
+    L --> H
+
+    classDef ai fill:#7c3aed,stroke:#5b21b6,color:#fff;
+    classDef safe fill:#059669,stroke:#047857,color:#fff;
+    classDef danger fill:#dc2626,stroke:#991b1b,color:#fff;
+    class AI,L ai;
+    class I,K safe;
+    class X danger;
+```
+
 ---
 
 ## Features
@@ -173,7 +235,19 @@ Setupr automatically detects:
 - **Services**: PostgreSQL, MySQL, MongoDB, Redis, RabbitMQ, Elasticsearch, Docker
 - **Monorepos**: npm workspaces, pnpm workspaces, Turborepo, Lerna, Nx
 
-**Detection priority:** (1) `.setupr.json` config → (2) `package.json` `"setupr"` field → (3) file-based scanning (lock/config files) → (4) content analysis (dependency inspection) → (5) AI fallback (novel situations only).
+**Detection priority** — Setupr stops at the first layer that gives a confident answer, so explicit config always wins and the AI is only a last resort:
+
+```mermaid
+flowchart LR
+    A[".setupr.json<br/>(explicit)"] --> B["package.json<br/>\"setupr\" field"]
+    B --> C["File scan<br/>(lock/config files)"]
+    C --> D["Content analysis<br/>(dependency inspection)"]
+    D --> E["AI fallback<br/>(novel situations only)"]
+    classDef hi fill:#2563eb,stroke:#1e40af,color:#fff;
+    classDef ai fill:#7c3aed,stroke:#5b21b6,color:#fff;
+    class A hi;
+    class E ai;
+```
 
 ### 🤖 AI Director Runtime
 
@@ -189,7 +263,21 @@ Setupr's AI layer is a **director runtime, not a one-shot planner**. It:
 
 AI output is **never** treated as raw shell text. The director proposes *structured actions*; Setupr's executor and [safety policy](#safety-policy) decide whether each action is allowed, needs confirmation, or must be blocked.
 
-**3-tier progressive intelligence** keeps it cheap and fast:
+**3-tier progressive intelligence** keeps it cheap and fast — a query only escalates to a paid model when the two free tiers come up empty:
+
+```mermaid
+flowchart TD
+    Q[Query / decision] --> L0{Level 0<br/>Pattern matching}
+    L0 -->|hit ~80%| R[Answer]
+    L0 -->|miss| L1{Level 1<br/>Cached response}
+    L1 -->|hit free| R
+    L1 -->|miss| L2[Level 2<br/>Live AI · compressed DSL]
+    L2 --> R
+    classDef free fill:#059669,stroke:#047857,color:#fff;
+    classDef paid fill:#f59e0b,stroke:#b45309,color:#fff;
+    class L0,L1 free;
+    class L2 paid;
+```
 
 1. **Pattern Matching** (Level 0) — free, instant; handles ~80% of queries
 2. **Cached Responses** (Level 1) — free after first hit; smart deduplication
@@ -429,7 +517,24 @@ Setupr TUIs share one terminal-native visual grammar:
 
 ## Safety Policy
 
-All command-like actions pass through **one safety layer**:
+Whether a step comes from heuristics, a plugin, or the AI director, it passes through **one safety layer** before it can run. Risk classification decides the outcome:
+
+```mermaid
+flowchart LR
+    A[Proposed action] --> B{Risk level?}
+    B -->|Safe<br/>checks, installs| C["✅ Run"]
+    B -->|Medium / high| D["⚠️ Confirm first"]
+    B -->|Critical<br/>rm -rf ~, curl &#124; sh| E["⛔ Block"]
+    D -->|approved| C
+    F["--force"] -.->|skips ordinary prompts only| D
+    F -.->|never overrides| E
+    classDef safe fill:#059669,stroke:#047857,color:#fff;
+    classDef warn fill:#f59e0b,stroke:#b45309,color:#fff;
+    classDef danger fill:#dc2626,stroke:#991b1b,color:#fff;
+    class C safe;
+    class D warn;
+    class E danger;
+```
 
 - ✅ Safe checks and normal dependency installs run freely
 - ⚠️ Medium/high-risk actions require confirmation
